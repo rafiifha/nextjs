@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
@@ -26,16 +26,21 @@ interface Order {
   totalHarga: number;
   deliveryMethod: string | null;
   shippingFee: number | null;
+  trackingId: string | null;
+  waybillId: string | null;
+  biteshipOrderId: string | null;
   createdAt: string;
   items: OrderItem[];
 }
 
 export default function PesananPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [highlightOrderId, setHighlightOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     // Check authentication
@@ -51,14 +56,41 @@ export default function PesananPage() {
       const userData = JSON.parse(userStr);
       setUser(userData);
       setIsAuthenticated(true);
-      fetchOrders();
+      
+      // Check if there's orderId in URL (from payment success redirect)
+      const orderIdParam = searchParams?.get('orderId');
+      if (orderIdParam) {
+        const orderId = parseInt(orderIdParam);
+        if (!isNaN(orderId)) {
+          setHighlightOrderId(orderId);
+          // Scroll to highlighted order after a short delay
+          setTimeout(() => {
+            const element = document.getElementById(`order-${orderId}`);
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 500);
+        }
+      }
+      
+      // Fetch orders after user is set
+      setTimeout(() => {
+        // Fetch orders after user is set
+      setTimeout(() => {
+        fetchOrders();
+      }, 100);
+      }, 100);
     } catch (e) {
       router.push('/login?redirect=/pesanan');
     }
-  }, [router]);
+  }, [router, searchParams]);
 
   const fetchOrders = async () => {
     try {
+      // Get user from localStorage to ensure we have the latest data
+      const userStr = localStorage.getItem('user');
+      const currentUser = userStr ? JSON.parse(userStr) : user;
+      
       const token = localStorage.getItem('token');
       const res = await fetch('/api/pesanan', {
         headers: {
@@ -68,18 +100,44 @@ export default function PesananPage() {
       
       if (res.ok) {
         const data = await res.json();
+        console.log('📦 Fetched orders:', data);
+        console.log('👤 Current user:', currentUser);
+        
         // Filter orders by current user (if not admin)
-        if (user?.role !== 'admin') {
-          const filtered = Array.isArray(data) ? data.filter((order: Order) => 
-            order.customerPhone === user?.phone || order.customerPhone === user?.email
-          ) : [];
+        if (currentUser?.role !== 'admin') {
+          // Normalize phone/email for comparison (remove spaces, convert to lowercase)
+          const normalize = (str: string | null | undefined) => {
+            if (!str) return '';
+            return str.toString().trim().toLowerCase().replace(/\s+/g, '');
+          };
+          
+          const userPhone = normalize(currentUser?.phone);
+          const userEmail = normalize(currentUser?.email);
+          
+          const filtered = Array.isArray(data) ? data.filter((order: Order) => {
+            const orderPhone = normalize(order.customerPhone);
+            // Match if order phone matches user phone OR user email
+            const matches = orderPhone === userPhone || orderPhone === userEmail || 
+                          (userPhone && orderPhone.includes(userPhone)) ||
+                          (userEmail && orderPhone.includes(userEmail));
+            
+            console.log(`🔍 Order ${order.id}: customerPhone="${order.customerPhone}" (normalized: "${orderPhone}") vs user phone="${userPhone}" email="${userEmail}" -> ${matches ? 'MATCH' : 'NO MATCH'}`);
+            
+            return matches;
+          }) : [];
+          
+          console.log(`✅ Filtered orders for user:`, filtered);
           setOrders(filtered);
         } else {
           setOrders(Array.isArray(data) ? data : []);
         }
+      } else {
+        console.error('❌ Failed to fetch orders:', res.status, res.statusText);
+        const errorData = await res.json().catch(() => ({}));
+        console.error('Error details:', errorData);
       }
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('❌ Error fetching orders:', error);
     } finally {
       setLoading(false);
     }
@@ -92,6 +150,7 @@ export default function PesananPage() {
       processing: { label: 'Sedang Diproses', icon: Package, className: 'bg-blue-100 text-blue-800' },
       delivered: { label: 'Sudah Dikirim', icon: Truck, className: 'bg-purple-100 text-purple-800' },
       cancelled: { label: 'Dibatalkan', icon: XCircle, className: 'bg-red-100 text-red-800' },
+      expired: { label: 'Kedaluwarsa', icon: XCircle, className: 'bg-gray-100 text-gray-800' },
     };
 
     const config = statusConfig[status] || statusConfig.pending;
@@ -146,7 +205,12 @@ export default function PesananPage() {
         {orders.length > 0 ? (
           <div className="space-y-4">
             {orders.map((order) => (
-              <Card key={order.id} className="border-gray-200 shadow-md hover:shadow-lg transition-shadow">
+              <Card 
+                key={order.id} 
+                className={`border-gray-200 shadow-md hover:shadow-lg transition-shadow ${
+                  highlightOrderId === order.id ? 'ring-2 ring-[#ffd700] bg-[#ffd700]/5' : ''
+                }`}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
@@ -155,6 +219,11 @@ export default function PesananPage() {
                         <Calendar className="h-4 w-4 inline mr-1" />
                         {formatDate(order.createdAt)}
                       </CardDescription>
+                      {order.expiredAt && order.status === 'pending' && (
+                        <CardDescription className="mt-1 text-xs text-red-600">
+                          ⏰ Kedaluwarsa: {formatDate(order.expiredAt)}
+                        </CardDescription>
+                      )}
                     </div>
                     {getStatusBadge(order.status)}
                   </div>
@@ -204,10 +273,40 @@ export default function PesananPage() {
                           Total Pembayaran
                         </h4>
                         <p className="text-2xl font-bold text-[#ffd700]">
-                          {formatRupiah(order.totalHarga + (order.shippingFee || 0))}
+                          {formatRupiah(order.totalHarga)}
                         </p>
                       </div>
                     </div>
+
+                    {/* Order IDs & Tracking Info */}
+                    {(order.trackingId || order.waybillId || order.biteshipOrderId) && (
+                      <div className="pt-4 border-t border-gray-200">
+                        <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                          <Package className="h-4 w-4 text-[#ffd700]" />
+                          Informasi Pengiriman
+                        </h4>
+                        <div className="space-y-1 text-sm">
+                          {order.trackingId && (
+                            <p className="text-gray-600">
+                              <span className="font-medium">Tracking ID:</span>{' '}
+                              <span className="font-mono text-gray-900">{order.trackingId}</span>
+                            </p>
+                          )}
+                          {order.waybillId && (
+                            <p className="text-gray-600">
+                              <span className="font-medium">Waybill ID:</span>{' '}
+                              <span className="font-mono text-gray-900">{order.waybillId}</span>
+                            </p>
+                          )}
+                          {order.biteshipOrderId && (
+                            <p className="text-gray-600">
+                              <span className="font-medium">Biteship Order ID:</span>{' '}
+                              <span className="font-mono text-gray-900">{order.biteshipOrderId}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Customer Info */}
                     <div className="pt-4 border-t border-gray-200">

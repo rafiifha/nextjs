@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Package, 
   CheckCircle, 
@@ -44,6 +45,7 @@ interface Order {
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -75,11 +77,31 @@ export default function AdminDashboard() {
 
     const handleOrderCreated = (data: any) => {
       console.log('New order created:', data);
+      // Show notification for new order
+      toast({
+        variant: "success",
+        title: "🆕 Pesanan Baru!",
+        description: `Pesanan #${data.order.id} dari ${data.order.customerName} - Total: ${formatRupiah(data.order.totalHarga)}`,
+      });
       fetchOrders();
     };
 
     const handleOrderUpdated = (data: any) => {
       console.log('Order updated:', data);
+      // Show notification for order update
+      const statusLabels: { [key: string]: string } = {
+        pending: 'Menunggu Pembayaran',
+        paid: 'Sudah Dibayar',
+        processing: 'Sedang Diproses',
+        delivered: 'Sudah Dikirim',
+        cancelled: 'Dibatalkan',
+        expired: 'Kedaluwarsa',
+      };
+      toast({
+        variant: "info",
+        title: "🔄 Pesanan Diperbarui",
+        description: `Status pesanan #${data.order.id} berubah menjadi ${statusLabels[data.order.status] || data.order.status}`,
+      });
       fetchOrders();
       if (selectedOrder && selectedOrder.id === data.order.id) {
         setSelectedOrder(data.order);

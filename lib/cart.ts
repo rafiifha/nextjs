@@ -15,23 +15,53 @@ export interface CartItem {
   price: number;
 }
 
-const CART_STORAGE_KEY = 'tokonaning_cart';
+const CART_STORAGE_PREFIX = 'tokonaning_cart_';
+
+// Helper function to get current user ID
+function getCurrentUserId(): number | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return user?.id || null;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
+// Helper function to get cart storage key
+function getCartStorageKey(userId: number | null): string {
+  if (userId) {
+    return `${CART_STORAGE_PREFIX}${userId}`;
+  }
+  // Fallback to guest cart if no user
+  return `${CART_STORAGE_PREFIX}guest`;
+}
 
 export const cartService = {
-  getCart(): CartItem[] {
+  getCart(userId?: number | null): CartItem[] {
     if (typeof window === 'undefined') return [];
+    const currentUserId = userId !== undefined ? userId : getCurrentUserId();
+    const storageKey = getCartStorageKey(currentUserId);
+    
     try {
-      const cartStr = localStorage.getItem(CART_STORAGE_KEY);
+      const cartStr = localStorage.getItem(storageKey);
       return cartStr ? JSON.parse(cartStr) : [];
     } catch (e) {
       return [];
     }
   },
 
-  setCart(cart: CartItem[]): void {
+  setCart(cart: CartItem[], userId?: number | null): void {
     if (typeof window === 'undefined') return;
+    const currentUserId = userId !== undefined ? userId : getCurrentUserId();
+    const storageKey = getCartStorageKey(currentUserId);
+    
     try {
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+      localStorage.setItem(storageKey, JSON.stringify(cart));
       // Dispatch custom event untuk update UI
       window.dispatchEvent(new CustomEvent('cartUpdated'));
     } catch (e) {
@@ -39,8 +69,8 @@ export const cartService = {
     }
   },
 
-  addToCart(product: CartItem['product'], priceType: 'dus' | 'pak' | 'renceng', quantity: number = 1): CartItem[] {
-    const cart = this.getCart();
+  addToCart(product: CartItem['product'], priceType: 'dus' | 'pak' | 'renceng', quantity: number = 1, userId?: number | null): CartItem[] {
+    const cart = this.getCart(userId);
     const price = priceType === 'dus' ? product.hargaDus : priceType === 'pak' ? product.hargaPak : product.hargaRenceng;
     
     const existingIndex = cart.findIndex(
@@ -59,15 +89,15 @@ export const cartService = {
       });
     }
     
-    this.setCart(cart);
+    this.setCart(cart, userId);
     return cart;
   },
 
-  updateQuantity(productId: number, priceType: 'dus' | 'pak' | 'renceng', quantity: number): CartItem[] {
-    const cart = this.getCart();
+  updateQuantity(productId: number, priceType: 'dus' | 'pak' | 'renceng', quantity: number, userId?: number | null): CartItem[] {
+    const cart = this.getCart(userId);
     
     if (quantity <= 0) {
-      return this.removeFromCart(productId, priceType);
+      return this.removeFromCart(productId, priceType, userId);
     }
     
     const item = cart.find(
@@ -76,33 +106,57 @@ export const cartService = {
     
     if (item) {
       item.quantity = quantity;
-      this.setCart(cart);
+      this.setCart(cart, userId);
     }
     
     return cart;
   },
 
-  removeFromCart(productId: number, priceType: 'dus' | 'pak' | 'renceng'): CartItem[] {
-    const cart = this.getCart();
+  removeFromCart(productId: number, priceType: 'dus' | 'pak' | 'renceng', userId?: number | null): CartItem[] {
+    const cart = this.getCart(userId);
     const newCart = cart.filter(
       (item) => !(item.productId === productId && item.priceType === priceType)
     );
-    this.setCart(newCart);
+    this.setCart(newCart, userId);
     return newCart;
   },
 
-  clearCart(): void {
-    this.setCart([]);
+  clearCart(userId?: number | null): void {
+    this.setCart([], userId);
   },
 
-  getCartCount(): number {
-    const cart = this.getCart();
+  getCartCount(userId?: number | null): number {
+    const cart = this.getCart(userId);
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   },
 
-  getCartTotal(): number {
-    const cart = this.getCart();
+  getCartTotal(userId?: number | null): number {
+    const cart = this.getCart(userId);
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  },
+
+  // Migrate cart from old key to user-specific key (for existing users)
+  migrateCartToUser(userId: number): void {
+    if (typeof window === 'undefined') return;
+    
+    const oldKey = 'tokonaning_cart';
+    const newKey = getCartStorageKey(userId);
+    
+    try {
+      const oldCartStr = localStorage.getItem(oldKey);
+      if (oldCartStr) {
+        const oldCart = JSON.parse(oldCartStr);
+        // Only migrate if new cart is empty
+        const newCart = this.getCart(userId);
+        if (newCart.length === 0 && oldCart.length > 0) {
+          this.setCart(oldCart, userId);
+          // Optionally remove old cart
+          localStorage.removeItem(oldKey);
+        }
+      }
+    } catch (e) {
+      console.error('Error migrating cart:', e);
+    }
   },
 };
 

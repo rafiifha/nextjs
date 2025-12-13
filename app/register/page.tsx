@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+import { cartService } from '@/lib/cart';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -51,15 +52,28 @@ export default function RegisterPage() {
 
       if (!response.ok) {
         setError(data.error || 'Registrasi gagal');
+        setLoading(false);
         return;
       }
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      // Migrate cart from old key to user-specific key if needed
+      if (data.user?.id) {
+        cartService.migrateCartToUser(data.user.id);
+      }
+
+      // Dispatch custom event to notify Navbar
+      window.dispatchEvent(new Event('userLogin'));
+      
+      // Also dispatch cartUpdated to refresh cart count
+      window.dispatchEvent(new Event('cartUpdated'));
+
       router.push('/');
-    } catch (err) {
-      setError('Terjadi kesalahan saat registrasi');
+    } catch (err: any) {
+      console.error('Register error:', err);
+      setError(err.message || 'Terjadi kesalahan saat registrasi. Pastikan server berjalan.');
     } finally {
       setLoading(false);
     }

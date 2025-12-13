@@ -13,7 +13,13 @@ export const prisma =
         url: env.DATABASE_URL,
       },
     },
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
+
+// Handle connection errors gracefully
+prisma.$connect().catch((error) => {
+  console.error('Database connection error:', error);
+});
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 

@@ -28,7 +28,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { customerName, customerPhone, items, deliveryMethod, shippingFee } = body;
+    const { customerName, customerPhone, items, deliveryMethod, shippingFee, trackingId, waybillId, biteshipOrderId } = body;
 
     if (!customerName || !customerPhone || !items || items.length === 0) {
       return NextResponse.json(
@@ -37,8 +37,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate products exist and check stock
+    const productIds = items.map((item: any) => item.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+    });
+
+    if (products.length !== productIds.length) {
+      const foundIds = products.map(p => p.id);
+      const missingIds = productIds.filter((id: number) => !foundIds.includes(id));
+      return NextResponse.json(
+        { error: `Produk dengan ID ${missingIds.join(', ')} tidak ditemukan` },
+        { status: 404 }
+      );
+    }
+
+    // Validate stock_online availability (stok tidak dikurangi, hanya divalidasi)
+    const stockErrors: string[] = [];
+    for (const item of items) {
+      const product = products.find(p => p.id === item.productId);
+      if (product && product.stock_online < item.quantity) {
+        stockErrors.push(`${product.name}: stok online tersedia ${product.stock_online}, diminta ${item.quantity}`);
+      }
+    }
+
+    if (stockErrors.length > 0) {
+      return NextResponse.json(
+        { error: 'Stok tidak mencukupi', details: stockErrors },
+        { status: 400 }
+      );
+    }
+
     // Calculate total
     const totalHarga = items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) + (shippingFee || 0);
+
+    // Set expiredAt to 24 hours from now
+    const expiredAt = new Date();
+    expiredAt.setHours(expiredAt.getHours() + 24);
 
     const order = await prisma.order.create({
       data: {
@@ -47,6 +82,10 @@ export async function POST(request: NextRequest) {
         totalHarga,
         deliveryMethod: deliveryMethod || null,
         shippingFee: shippingFee || null,
+        trackingId: trackingId || null,
+        waybillId: waybillId || null,
+        biteshipOrderId: biteshipOrderId || null,
+        expiredAt: expiredAt, // 24 jam dari sekarang
         items: {
           create: items.map((item: any) => ({
             productId: item.productId,
@@ -88,10 +127,30 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(order, { status: 201 });
-  } catch (error) {
-    console.error('Create order error:', error);
+  } catch (error: any) {
+    console.error('❌ Create order error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack
+    });
+    
+    // Provide more specific error messages
+    let errorMessage = 'Gagal membuat pesanan';
+    if (error.code === 'P2002') {
+      errorMessage = 'Data sudah ada di database';
+    } else if (error.code === 'P2003') {
+      errorMessage = 'Produk tidak ditemukan';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
     return NextResponse.json(
-      { error: 'Gagal membuat pesanan' },
+      { 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     );
   }

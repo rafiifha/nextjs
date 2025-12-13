@@ -14,7 +14,8 @@ interface Product {
   hargaDus: number;
   hargaPak: number;
   hargaRenceng: number;
-  stok: number;
+  stock_online: number;
+  stock_offline: number;
 }
 
 interface CartItem {
@@ -115,7 +116,7 @@ export default function KasirPage() {
     setSubmitting(true);
 
     try {
-      const response = await fetch('/api/pesanan', {
+      const response = await fetch('/api/kasir', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -126,8 +127,6 @@ export default function KasirPage() {
             quantity: item.quantity,
             price: item.price,
           })),
-          deliveryMethod: 'pickup',
-          shippingFee: 0,
         }),
       });
 
@@ -192,7 +191,14 @@ export default function KasirPage() {
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <h3 className="font-bold text-gray-900">{product.name}</h3>
-                          <p className="text-sm text-gray-600">Stok: {product.stok}</p>
+                          <div className="text-sm">
+                            <p className="text-gray-600">
+                              Stok Offline: <span className={product.stock_offline > 0 ? 'text-green-600 font-semibold' : 'text-red-600'}>{product.stock_offline}</span>
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              Stok Online: {product.stock_online}
+                            </p>
+                          </div>
                         </div>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
@@ -200,7 +206,7 @@ export default function KasirPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => addToCart(product, 'dus', 1)}
-                          disabled={product.stok === 0}
+                          disabled={product.stock_offline === 0}
                           className="text-xs"
                         >
                           Dus
@@ -209,7 +215,7 @@ export default function KasirPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => addToCart(product, 'pak', 1)}
-                          disabled={product.stok === 0}
+                          disabled={product.stock_offline === 0}
                           className="text-xs"
                         >
                           Pak
@@ -218,7 +224,7 @@ export default function KasirPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => addToCart(product, 'renceng', 1)}
-                          disabled={product.stok === 0}
+                          disabled={product.stock_offline === 0}
                           className="text-xs"
                         >
                           Renceng

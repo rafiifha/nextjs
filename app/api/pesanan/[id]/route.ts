@@ -41,7 +41,7 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const { status, customerName, customerPhone, deliveryMethod, shippingFee } = body;
+    const { status, customerName, customerPhone, deliveryMethod, shippingFee, trackingId, waybillId, biteshipOrderId } = body;
 
     const order = await prisma.order.update({
       where: { id: parseInt(params.id) },
@@ -51,6 +51,9 @@ export async function PUT(
         ...(customerPhone && { customerPhone }),
         ...(deliveryMethod !== undefined && { deliveryMethod }),
         ...(shippingFee !== undefined && { shippingFee }),
+        ...(trackingId !== undefined && { trackingId }),
+        ...(waybillId !== undefined && { waybillId }),
+        ...(biteshipOrderId !== undefined && { biteshipOrderId }),
       },
       include: {
         items: {

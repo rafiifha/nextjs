@@ -35,7 +35,11 @@ export async function createSnapTransaction(orderDetails: {
       finish_redirect_url: orderDetails.finishRedirectUrl || `${baseUrl}/payment/success`,
       unfinish_redirect_url: orderDetails.unfinishRedirectUrl || `${baseUrl}/payment/pending`,
       error_redirect_url: orderDetails.errorRedirectUrl || `${baseUrl}/payment/failed`,
+      // Notification URL for server-to-server callback
+      notification_url: `${baseUrl}/api/payment/midtrans/notify`,
     };
+
+    console.log('📤 Creating Midtrans transaction with notification URL:', parameter.notification_url);
 
     const transaction = await snap.createTransaction(parameter);
     return transaction;

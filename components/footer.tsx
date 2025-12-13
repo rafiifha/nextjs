@@ -7,8 +7,8 @@ import { ShoppingBag, Phone, Mail, MapPin, Facebook, Instagram, Twitter } from '
 export default function Footer() {
   const pathname = usePathname();
 
-  // Hide footer on login, register, admin, payment, checkout, and keranjang pages
-  if (pathname?.startsWith('/login') || pathname?.startsWith('/register') || pathname?.startsWith('/admin') || pathname?.startsWith('/payment') || pathname?.startsWith('/checkout') || pathname?.startsWith('/keranjang')) {
+  // Hide footer on login, register, admin, and payment pages
+  if (pathname?.startsWith('/login') || pathname?.startsWith('/register') || pathname?.startsWith('/admin') || pathname?.startsWith('/payment')) {
     return null;
   }
 

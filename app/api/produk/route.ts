@@ -19,14 +19,18 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, hargaDus, hargaPak, hargaRenceng, stok } = body;
+    const { name, hargaDus, hargaPak, hargaRenceng, stock_online, stock_offline } = body;
 
-    if (!name || hargaDus === undefined || hargaPak === undefined || hargaRenceng === undefined || stok === undefined) {
+    if (!name || hargaDus === undefined || hargaPak === undefined || hargaRenceng === undefined) {
       return NextResponse.json(
-        { error: 'Semua field harus diisi' },
+        { error: 'Nama dan harga harus diisi' },
         { status: 400 }
       );
     }
+
+    // Default stock jika tidak diisi
+    const onlineStock = stock_online !== undefined ? stock_online : 0;
+    const offlineStock = stock_offline !== undefined ? stock_offline : 0;
 
     const product = await prisma.product.create({
       data: {
@@ -34,7 +38,8 @@ export async function POST(request: NextRequest) {
         hargaDus,
         hargaPak,
         hargaRenceng,
-        stok,
+        stock_online: onlineStock,
+        stock_offline: offlineStock,
       },
     });
 

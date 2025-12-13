@@ -75,10 +75,13 @@ export interface ShippingRateResponse {
 
 export async function getShippingRates(data: ShippingRateRequest): Promise<ShippingRateResponse> {
   try {
+    console.log('🚀 Request to Biteship API:', JSON.stringify(data, null, 2));
     const response = await biteshipApi.post('/rates/couriers', data);
+    console.log('✅ Biteship API Response:', JSON.stringify(response.data, null, 2));
+    console.log('📦 Pricing array:', response.data.pricing);
     return response.data;
   } catch (error: any) {
-    console.error('Biteship error:', error.response?.data || error.message);
+    console.error('❌ Biteship error:', error.response?.data || error.message);
     throw error;
   }
 }

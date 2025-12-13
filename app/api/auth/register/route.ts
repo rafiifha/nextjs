@@ -16,14 +16,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          email ? { email } : {},
-          phone ? { phone } : {},
-        ],
-      },
-    });
+    const whereClause: any = {
+      OR: [],
+    };
+    
+    if (email) {
+      whereClause.OR.push({ email });
+    }
+    if (phone) {
+      whereClause.OR.push({ phone });
+    }
+    
+    const existingUser = whereClause.OR.length > 0 
+      ? await prisma.user.findFirst({
+          where: whereClause,
+        })
+      : null;
 
     if (existingUser) {
       return NextResponse.json(
@@ -58,10 +66,13 @@ export async function POST(request: NextRequest) {
       token,
       user: userWithoutPassword,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Register error:', error);
     return NextResponse.json(
-      { error: 'Terjadi kesalahan saat registrasi' },
+      { 
+        error: error.message || 'Terjadi kesalahan saat registrasi',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     );
   }

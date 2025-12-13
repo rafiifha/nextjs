@@ -1,16 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+import { cartService } from '@/lib/cart';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -36,20 +38,49 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Login gagal');
+        // Show user-friendly error message
+        let errorMessage = data.error || 'Login gagal';
+        
+        // Handle specific error cases
+        if (errorMessage.includes('database') || errorMessage.includes('database server')) {
+          errorMessage = 'Tidak dapat terhubung ke database. Silakan coba lagi nanti.';
+        } else if (errorMessage.includes('Email/Phone atau password salah')) {
+          errorMessage = 'Email/Phone atau password salah. Silakan coba lagi.';
+        }
+        
+        setError(errorMessage);
+        setLoading(false);
         return;
       }
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      // Migrate cart from old key to user-specific key if needed
+      if (data.user?.id) {
+        cartService.migrateCartToUser(data.user.id);
+      }
+
+      // Dispatch custom event to notify Navbar
+      window.dispatchEvent(new Event('userLogin'));
+      
+      // Also dispatch cartUpdated to refresh cart count
+      window.dispatchEvent(new Event('cartUpdated'));
+
       if (data.user.role === 'admin') {
         router.push('/admin/dashboard');
       } else {
-        router.push('/');
+        const redirectUrl = searchParams?.get('redirect') || '/';
+        router.push(redirectUrl);
       }
-    } catch (err) {
-      setError('Terjadi kesalahan saat login');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      // Handle network errors
+      if (err.message?.includes('fetch') || err.message?.includes('network')) {
+        setError('Tidak dapat terhubung ke server. Pastikan server berjalan dan coba lagi.');
+      } else {
+        setError(err.message || 'Terjadi kesalahan saat login. Pastikan server berjalan.');
+      }
     } finally {
       setLoading(false);
     }

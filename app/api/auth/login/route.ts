@@ -15,13 +15,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Build where clause properly
+    const whereClause: any = {
+      OR: [],
+    };
+    
+    if (email) {
+      whereClause.OR.push({ email });
+    }
+    if (phone) {
+      whereClause.OR.push({ phone });
+    }
+    
+    // If no email or phone, return error
+    if (whereClause.OR.length === 0) {
+      return NextResponse.json(
+        { error: 'Email atau nomor telepon harus diisi' },
+        { status: 400 }
+      );
+    }
+
     const user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          email ? { email } : {},
-          phone ? { phone } : {},
-        ],
-      },
+      where: whereClause,
     });
 
     if (!user) {
@@ -54,10 +69,36 @@ export async function POST(request: NextRequest) {
       token,
       user: userWithoutPassword,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error:', error);
+    
+    // Handle database connection errors
+    if (error.message?.includes("Can't reach database server") || 
+        error.message?.includes("P1001") ||
+        error.code === 'P1001') {
+      return NextResponse.json(
+        { 
+          error: 'Tidak dapat terhubung ke database. Silakan coba lagi nanti atau hubungi administrator.',
+        },
+        { status: 503 }
+      );
+    }
+    
+    // Handle other Prisma errors
+    if (error.code?.startsWith('P')) {
+      return NextResponse.json(
+        { 
+          error: 'Terjadi kesalahan pada database. Silakan coba lagi.',
+        },
+        { status: 500 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: 'Terjadi kesalahan saat login' },
+      { 
+        error: error.message || 'Terjadi kesalahan saat login',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     );
   }

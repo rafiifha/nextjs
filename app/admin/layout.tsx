@@ -16,6 +16,7 @@ import {
   LogOut,
   ShoppingBag
 } from 'lucide-react';
+import { cartService } from '@/lib/cart';
 
 export default function AdminLayout({
   children,
@@ -49,8 +50,17 @@ export default function AdminLayout({
   }, [router]);
 
   const handleLogout = () => {
+    // Get user ID before removing
+    let userId: number | null = null;
+    if (user?.id) {
+      userId = user.id;
+    }
+    
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Don't clear cart - it's saved per user, so it will be available when they login again
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new Event('userLogout'));
     router.push('/');
   };
 

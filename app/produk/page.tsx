@@ -9,6 +9,7 @@ import { formatRupiah } from '@/lib/utils';
 import { Package, ShoppingCart, Search, Loader2, Check } from 'lucide-react';
 import Link from 'next/link';
 import { cartService } from '@/lib/cart';
+import { useToast } from '@/hooks/use-toast';
 
 interface Product {
   id: number;
@@ -16,12 +17,14 @@ interface Product {
   hargaDus: number;
   hargaPak: number;
   hargaRenceng: number;
-  stok: number;
+  stock_online: number;
+  stock_offline: number;
 }
 
 export default function ProdukPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,8 +63,27 @@ export default function ProdukPage() {
     setAddingToCart({ ...addingToCart, [key]: true });
     
     try {
-      cartService.addToCart(product, priceType, 1);
+      const userStr = localStorage.getItem('user');
+      let userId: number | null = null;
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          userId = user?.id || null;
+        } catch (e) {
+          // ignore
+        }
+      }
+      
+      cartService.addToCart(product.id, product, priceType, 1, userId);
       loadCart();
+      
+      // Show success notification
+      const priceTypeLabel = priceType === 'dus' ? 'Dus' : priceType === 'pak' ? 'Pak' : 'Renceng';
+      toast({
+        variant: "success",
+        title: "✅ Produk Ditambahkan",
+        description: `${product.name} (${priceTypeLabel}) berhasil ditambahkan ke keranjang`,
+      });
       
       // Show success feedback
       setTimeout(() => {
@@ -69,6 +91,11 @@ export default function ProdukPage() {
       }, 1000);
     } catch (error) {
       console.error('Error adding to cart:', error);
+      toast({
+        variant: "error",
+        title: "❌ Gagal Menambahkan",
+        description: "Gagal menambahkan produk ke keranjang. Silakan coba lagi",
+      });
       setAddingToCart({ ...addingToCart, [key]: false });
     }
   };
@@ -194,7 +221,7 @@ export default function ProdukPage() {
                         size="sm"
                         variant={isInCart(product.id, 'pak') ? 'default' : 'outline'}
                         onClick={() => handleAddToCart(product, 'pak')}
-                        disabled={product.stok === 0 || addingToCart[`${product.id}-pak`]}
+                        disabled={product.stock_online === 0 || addingToCart[`${product.id}-pak`]}
                         className="h-7 px-3 text-xs"
                       >
                         {addingToCart[`${product.id}-pak`] ? (
@@ -220,7 +247,7 @@ export default function ProdukPage() {
                         size="sm"
                         variant={isInCart(product.id, 'renceng') ? 'default' : 'outline'}
                         onClick={() => handleAddToCart(product, 'renceng')}
-                        disabled={product.stok === 0 || addingToCart[`${product.id}-renceng`]}
+                        disabled={product.stock_online === 0 || addingToCart[`${product.id}-renceng`]}
                         className="h-7 px-3 text-xs"
                       >
                         {addingToCart[`${product.id}-renceng`] ? (

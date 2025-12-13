@@ -14,7 +14,8 @@ interface Product {
   hargaDus: number;
   hargaPak: number;
   hargaRenceng: number;
-  stok: number;
+  stock_online: number;
+  stock_offline: number;
 }
 
 export default function ManajemenProdukPage() {
@@ -27,7 +28,8 @@ export default function ManajemenProdukPage() {
     hargaDus: '',
     hargaPak: '',
     hargaRenceng: '',
-    stok: '',
+    stock_online: '',
+    stock_offline: '',
   });
 
   useEffect(() => {
@@ -56,7 +58,8 @@ export default function ManajemenProdukPage() {
       hargaDus: parseInt(formData.hargaDus),
       hargaPak: parseInt(formData.hargaPak),
       hargaRenceng: parseInt(formData.hargaRenceng),
-      stok: parseInt(formData.stok),
+      stock_online: parseInt(formData.stock_online) || 0,
+      stock_offline: parseInt(formData.stock_offline) || 0,
     };
 
     try {
@@ -104,7 +107,8 @@ export default function ManajemenProdukPage() {
       hargaDus: product.hargaDus.toString(),
       hargaPak: product.hargaPak.toString(),
       hargaRenceng: product.hargaRenceng.toString(),
-      stok: product.stok.toString(),
+      stock_online: product.stock_online.toString(),
+      stock_offline: product.stock_offline.toString(),
     });
     setShowForm(true);
   };
@@ -135,7 +139,8 @@ export default function ManajemenProdukPage() {
       hargaDus: '',
       hargaPak: '',
       hargaRenceng: '',
-      stok: '',
+      stock_online: '',
+      stock_offline: '',
     });
     setEditingProduct(null);
     setShowForm(false);
@@ -203,15 +208,41 @@ export default function ManajemenProdukPage() {
                     required
                   />
                 </div>
-                <div>
-                  <Label htmlFor="stok">Stok</Label>
-                  <Input
-                    id="stok"
-                    type="number"
-                    value={formData.stok}
-                    onChange={(e) => setFormData({ ...formData, stok: e.target.value })}
-                    required
-                  />
+                <div className="col-span-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="stock_online">Stok Online</Label>
+                      <Input
+                        id="stock_online"
+                        type="number"
+                        min="0"
+                        value={formData.stock_online}
+                        onChange={(e) => setFormData({ ...formData, stock_online: e.target.value })}
+                        required
+                        placeholder="0"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Untuk transaksi online</p>
+                    </div>
+                    <div>
+                      <Label htmlFor="stock_offline">Stok Offline</Label>
+                      <Input
+                        id="stock_offline"
+                        type="number"
+                        min="0"
+                        value={formData.stock_offline}
+                        onChange={(e) => setFormData({ ...formData, stock_offline: e.target.value })}
+                        required
+                        placeholder="0"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Untuk transaksi kasir</p>
+                    </div>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                    <p className="text-sm text-blue-900">
+                      <strong>Total Stok:</strong>{' '}
+                      {(parseInt(formData.stock_online) || 0) + (parseInt(formData.stock_offline) || 0)}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -238,9 +269,19 @@ export default function ManajemenProdukPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="text-lg font-bold">{product.name}</CardTitle>
-                    <CardDescription className="mt-1">
-                      Stok: <span className={product.stok > 0 ? 'text-green-600' : 'text-red-600'}>{product.stok}</span>
-                    </CardDescription>
+                    <div className="mt-1 text-sm text-gray-600">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <span>
+                          Stok Online: <span className={product.stock_online > 0 ? 'text-blue-600 font-semibold' : 'text-red-600'}>{product.stock_online}</span>
+                        </span>
+                        <span>
+                          Stok Offline: <span className={product.stock_offline > 0 ? 'text-gray-600 font-semibold' : 'text-red-600'}>{product.stock_offline}</span>
+                        </span>
+                        <span className="text-gray-500">
+                          Total: <span className="font-semibold">{product.stock_online + product.stock_offline}</span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   <Package className="h-6 w-6 text-[#ffd700]" />
                 </div>

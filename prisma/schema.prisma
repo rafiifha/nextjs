@@ -13,7 +13,8 @@ model Product {
   hargaDus    Int
   hargaPak    Int
   hargaRenceng Int
-  stok        Int
+  stock_online Int     @default(0)  // Stok untuk transaksi online
+  stock_offline Int    @default(0)   // Stok untuk transaksi kasir
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   items       OrderItem[]
@@ -23,10 +24,14 @@ model Order {
   id            Int         @id @default(autoincrement())
   customerName  String
   customerPhone String
-  status        String      @default("pending") // pending, paid, processing, delivered, cancelled
+  status        String      @default("pending") // pending, paid, processing, delivered, cancelled, expired
   totalHarga    Int
   deliveryMethod String?
   shippingFee   Int?
+  trackingId    String?     // Biteship tracking ID
+  waybillId     String?     // Biteship waybill ID
+  biteshipOrderId String?   // Biteship order ID
+  expiredAt     DateTime?   // Waktu kedaluwarsa pembayaran
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   items         OrderItem[]

@@ -33,7 +33,7 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const { name, hargaDus, hargaPak, hargaRenceng, stok } = body;
+    const { name, hargaDus, hargaPak, hargaRenceng, stock_online, stock_offline } = body;
 
     const product = await prisma.product.update({
       where: { id: parseInt(params.id) },
@@ -42,7 +42,8 @@ export async function PUT(
         ...(hargaDus !== undefined && { hargaDus }),
         ...(hargaPak !== undefined && { hargaPak }),
         ...(hargaRenceng !== undefined && { hargaRenceng }),
-        ...(stok !== undefined && { stok }),
+        ...(stock_online !== undefined && { stock_online }),
+        ...(stock_offline !== undefined && { stock_offline }),
       },
     });
 

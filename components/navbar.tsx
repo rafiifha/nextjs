@@ -6,46 +6,107 @@ import { Button } from '@/components/ui/button';
 import { ShoppingBag, LogIn, LogOut, User, ShoppingCart } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cartService } from '@/lib/cart';
+import CartDrawer from '@/components/cart-drawer';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
   const [cartCount, setCartCount] = useState(0);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
 
   useEffect(() => {
+    // Load cart count function - use current user state
+    const updateCartCount = () => {
+      // Get user from localStorage directly to ensure we have latest data
+      const userStr = localStorage.getItem('user');
+      let userId: number | null = null;
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          userId = user?.id || null;
+        } catch (e) {
+          // ignore
+        }
+      }
+      const count = cartService.getCartCount(userId);
+      setCartCount(count);
+    };
+
+    const loadUser = () => {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const userData = JSON.parse(userStr);
+          setUser(userData);
+        } catch (e) {
+          // ignore
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      // Always update cart count after loading user
+      updateCartCount();
+    };
+
+    // Load user on mount
+    loadUser();
+
+    // Listen for storage changes (when user logs in/out in another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'user' || e.key === 'token') {
+        loadUser();
+      }
+    };
+
+    // Listen for custom login event (when user logs in on same tab)
+    const handleLogin = () => {
+      loadUser();
+    };
+
+    // Listen for logout event
+    const handleLogout = () => {
+      setUser(null);
+      setCartCount(0);
+    };
+    
+    // Add event listeners
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('userLogin', handleLogin);
+    window.addEventListener('userLogout', handleLogout);
+    window.addEventListener('cartUpdated', updateCartCount);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userLogin', handleLogin);
+      window.removeEventListener('userLogout', handleLogout);
+      window.removeEventListener('cartUpdated', updateCartCount);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    // Get user ID before removing
     const userStr = localStorage.getItem('user');
+    let userId: number | null = null;
     if (userStr) {
       try {
-        setUser(JSON.parse(userStr));
+        const user = JSON.parse(userStr);
+        userId = user?.id || null;
       } catch (e) {
         // ignore
       }
     }
-
-    // Load cart count
-    const updateCartCount = () => {
-      setCartCount(cartService.getCartCount());
-    };
     
-    updateCartCount();
-    window.addEventListener('cartUpdated', updateCartCount);
-    
-    return () => window.removeEventListener('cartUpdated', updateCartCount);
-  }, []);
-
-  const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Don't clear cart - it's saved per user, so it will be available when they login again
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new Event('userLogout'));
     window.location.href = '/';
   };
 
-  // Hide navbar on login, register, admin, payment, and checkout pages
-  if (pathname?.startsWith('/login') || pathname?.startsWith('/register') || pathname?.startsWith('/admin') || pathname?.startsWith('/payment') || pathname?.startsWith('/checkout')) {
-    return null;
-  }
-  
-  // Hide navbar on keranjang page too
-  if (pathname?.startsWith('/keranjang')) {
+  // Hide navbar on login, register, admin, and payment pages
+  if (pathname?.startsWith('/login') || pathname?.startsWith('/register') || pathname?.startsWith('/admin') || pathname?.startsWith('/payment')) {
     return null;
   }
 
@@ -97,18 +158,26 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link href="/keranjang" className="relative">
-              <Button variant="ghost" size="sm" className="relative">
-                <ShoppingCart className="h-5 w-5" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                    {cartCount > 99 ? '99+' : cartCount}
-                  </span>
-                )}
-              </Button>
-            </Link>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="relative"
+              onClick={() => setCartDrawerOpen(true)}
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              )}
+            </Button>
             {user ? (
               <>
+                {/* Display user name */}
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-md">
+                  <User className="h-4 w-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-900">{user.name}</span>
+                </div>
                 {user.role === 'admin' && (
                   <Link href="/admin/dashboard">
                     <Button variant="outline" size="sm">
@@ -133,6 +202,9 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+      
+      {/* Cart Drawer */}
+      <CartDrawer isOpen={cartDrawerOpen} onClose={() => setCartDrawerOpen(false)} />
     </nav>
   );
 }

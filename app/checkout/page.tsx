@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
-import { ShoppingCart, Plus, Minus, Trash2, Loader2, Package, User, Phone, MapPin, Truck } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Loader2, Package, User, Phone, MapPin, Truck, ArrowLeft, CheckCircle, XCircle, AlertCircle, Info } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { cartService, CartItem as CartItemType } from '@/lib/cart';
+import { useToast } from '@/hooks/use-toast';
 
 // Dynamic import untuk MapPicker (client component)
 const MapPicker = dynamic(() => import('@/components/map-picker'), {
@@ -42,6 +43,7 @@ interface CartItem {
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -83,7 +85,10 @@ export default function CheckoutPage() {
       const userData = JSON.parse(userStr);
       setUser(userData);
       setCustomerName(userData.name || '');
-      setCustomerPhone(userData.phone || userData.email || '');
+      // Use phone first, fallback to email, ensure it's a string
+      const userContact = (userData.phone || userData.email || '').toString().trim();
+      setCustomerPhone(userContact);
+      console.log('👤 User loaded for checkout:', { name: userData.name, phone: userData.phone, email: userData.email, customerPhone: userContact });
       setIsAuthenticated(true);
       loadCartFromStorage();
       // Only fetch products if productId in URL (for adding product directly)
@@ -97,6 +102,42 @@ export default function CheckoutPage() {
       router.push('/login?redirect=/checkout');
     }
   }, [router, searchParams]);
+
+  // Request GPS location when delivery method changes to 'delivery'
+  useEffect(() => {
+    if (deliveryMethod === 'delivery' && !destinationLat && !destinationLng) {
+      // Request GPS location
+      if (navigator.geolocation) {
+        console.log('📍 Requesting GPS location for delivery...');
+        setLoadingAddress(true); // Show loading state
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log('✅ GPS location received:', latitude, longitude);
+            // Set coordinates immediately
+            setDestinationLat(latitude);
+            setDestinationLng(longitude);
+            // Reverse geocode to fill address fields
+            await reverseGeocode(latitude, longitude);
+          },
+          (error) => {
+            console.error('❌ GPS error:', error);
+            setLoadingAddress(false); // Hide loading state
+            // Don't show alert, just log - user can still select location manually
+            console.warn('GPS location not available, user can select location manually on map');
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          }
+        );
+      } else {
+        console.warn('Geolocation not supported by browser');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deliveryMethod]);
 
   // Listen for cart updates
   useEffect(() => {
@@ -162,6 +203,7 @@ export default function CheckoutPage() {
   };
 
   const reverseGeocode = async (lat: number, lng: number) => {
+    console.log('🔄 Starting reverse geocode for:', lat, lng);
     setLoadingAddress(true);
     try {
       const response = await fetch(
@@ -173,6 +215,10 @@ export default function CheckoutPage() {
         }
       );
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
 
       if (data && data.address) {
@@ -183,7 +229,16 @@ export default function CheckoutPage() {
         const houseNumber = addr.house_number || '';
         const village = addr.village || addr.neighbourhood || '';
         const subdistrict = addr.suburb || addr.subdistrict || '';
-        const city = addr.city || addr.town || addr.municipality || '';
+        
+        // Extract city/kabupaten - try multiple fields (Indonesia specific)
+        const city = addr.city || 
+                    addr.town || 
+                    addr.municipality || 
+                    addr.county || // Kabupaten
+                    addr.city_district || 
+                    addr.district || 
+                    '';
+        
         const province = addr.state || addr.province || '';
         const postalCode = addr.postcode || '';
 
@@ -194,46 +249,138 @@ export default function CheckoutPage() {
         if (village) fullAddress += (fullAddress ? ', ' : '') + village;
         if (subdistrict) fullAddress += (fullAddress ? ', ' : '') + subdistrict;
 
-        setDestinationAddress(fullAddress || data.display_name.split(',')[0]);
-        setDestinationCity(city || '');
+        // If city is still empty, try to extract from display_name
+        let extractedCity = city;
+        if (!extractedCity && data.display_name) {
+          const parts = data.display_name.split(',');
+          // Try to find city in display_name (usually 2-3 parts from the end)
+          for (let i = parts.length - 2; i >= 0 && i >= parts.length - 4; i--) {
+            const part = parts[i]?.trim() || '';
+            // Skip if it looks like province or postal code
+            if (part && !part.match(/^\d{5}$/) && !part.toLowerCase().includes('indonesia')) {
+              extractedCity = part;
+              break;
+            }
+          }
+        }
+
+        // Update all fields
+        setDestinationAddress(fullAddress || data.display_name?.split(',')[0] || '');
+        setDestinationCity(extractedCity || '');
         setDestinationProvince(province || '');
         setDestinationPostalCode(postalCode || '');
-        setDestinationLat(lat);
-        setDestinationLng(lng);
+        
+        console.log('✅ Address fields updated:', {
+          address: fullAddress || data.display_name?.split(',')[0],
+          city: extractedCity,
+          province,
+          postalCode,
+          rawAddress: addr
+        });
+      } else if (data && data.display_name) {
+        // Fallback: parse from display_name
+        const parts = data.display_name.split(',');
+        setDestinationAddress(parts[0]?.trim() || '');
+        
+        // Try to extract city and province from display_name
+        // Usually format: "Address, City, Province, Postal Code, Indonesia"
+        let extractedCity = '';
+        let extractedProvince = '';
+        
+        if (parts.length >= 3) {
+          // City is usually 2nd or 3rd from the end (before province)
+          for (let i = parts.length - 2; i >= 0 && i >= parts.length - 4; i--) {
+            const part = parts[i]?.trim() || '';
+            if (part && !part.match(/^\d{5}$/) && !part.toLowerCase().includes('indonesia')) {
+              if (!extractedProvince) {
+                extractedProvince = part;
+              } else if (!extractedCity) {
+                extractedCity = part;
+                break;
+              }
+            }
+          }
+        }
+        
+        setDestinationCity(extractedCity || '');
+        setDestinationProvince(extractedProvince || '');
+        
+        console.log('✅ Address fields updated from display_name:', {
+          address: parts[0]?.trim(),
+          city: extractedCity,
+          province: extractedProvince,
+          display_name: data.display_name
+        });
       } else {
-        // Fallback: use display_name
-        setDestinationAddress(data.display_name || '');
-        setDestinationLat(lat);
-        setDestinationLng(lng);
+        // If no data, at least set coordinates
+        setDestinationAddress(`Koordinat: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
       }
     } catch (error) {
       console.error('Error reverse geocoding:', error);
-      alert('Gagal mendapatkan alamat dari lokasi yang dipilih');
+      // Even on error, set coordinates and a basic address
+      setDestinationAddress(`Koordinat: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      // Don't show alert, just log the error
+      console.warn('Gagal mendapatkan detail alamat, menggunakan koordinat saja');
     } finally {
       setLoadingAddress(false);
     }
   };
 
-  const handleMapLocationSelect = (lat: number, lng: number) => {
-    reverseGeocode(lat, lng);
+  const handleMapLocationSelect = async (lat: number, lng: number) => {
+    console.log('📍 Location selected:', lat, lng);
+    // Immediately update coordinates
+    setDestinationLat(lat);
+    setDestinationLng(lng);
+    // Then reverse geocode to fill address fields
+    await reverseGeocode(lat, lng);
   };
 
   const checkShippingRates = async () => {
     if (!destinationAddress) {
-      alert('Pilih lokasi di peta terlebih dahulu');
+      toast({
+        variant: "warning",
+        title: "⚠️ Lokasi Belum Dipilih",
+        description: "Pilih lokasi di peta terlebih dahulu untuk melanjutkan",
+      });
       return;
     }
 
-    if (!destinationPostalCode) {
-      alert('Kode pos tidak ditemukan. Mohon isi manual atau pilih lokasi lain di peta');
+    // Validate: need either coordinates or postal code for destination
+    if (!destinationLat || !destinationLng) {
+      if (!destinationPostalCode) {
+        toast({
+          variant: "warning",
+          title: "⚠️ Kode Pos Tidak Ditemukan",
+          description: "Mohon isi manual atau pilih lokasi lain di peta",
+        });
+        return;
+      }
+    }
+
+    if (cart.length === 0) {
+      toast({
+        variant: "warning",
+        title: "⚠️ Keranjang Kosong",
+        description: "Keranjang masih kosong, tidak bisa cek ongkir",
+      });
       return;
     }
 
     setCheckingShipping(true);
+    setShippingRates([]);
+    setSelectedShipping(null);
+    setShippingFee(0);
 
     try {
+      // Determine courier list based on whether coordinates are available
+      // Instant couriers (gojek, grab, paxel, lalamove, borzo) require coordinates
+      const hasCoordinates = destinationLat && destinationLng;
+      const instantCouriers = hasCoordinates ? 'gojek,grab,paxel,lalamove,borzo,' : '';
+      const standardCouriers = 'jne,jnt,sicepat,anteraja,tiki';
+      const courierList = `${instantCouriers}${standardCouriers}`;
+
       const requestBody: any = {
-        couriers: 'jne,jnt,sicepat,anteraja,tiki',
+        couriers: courierList,
         items: cart.map((item) => ({
           name: item.product.name,
           description: `${item.product.name} - ${item.priceType === 'dus' ? 'Dus' : item.priceType === 'pak' ? 'Pak' : 'Renceng'}`,
@@ -241,21 +388,32 @@ export default function CheckoutPage() {
           length: 30,
           width: 20,
           height: 15,
-          weight: Math.max(1000, item.quantity * 500),
+          weight: Math.max(1000, item.quantity * 500), // Minimum 1kg, atau 500g per item
           quantity: item.quantity,
         })),
       };
 
-      // Use coordinates if available (more accurate), otherwise use postal code
+      // Use origin coordinates (Toko Naning location) - sesuai dokumentasi
+      requestBody.origin_latitude = -6.986796039948391;
+      requestBody.origin_longitude = 107.82757218203778;
+      
+      // Use destination coordinates if available (lebih akurat), otherwise use postal code
+      // Sesuai dokumentasi: bisa mix antara coordinate dan postal code
       if (destinationLat && destinationLng) {
-        requestBody.origin_postal_code = 10110;
         requestBody.destination_latitude = destinationLat;
         requestBody.destination_longitude = destinationLng;
+        // Optional: juga kirim postal code jika ada (untuk akurasi lebih baik)
+        if (destinationPostalCode) {
+          requestBody.destination_postal_code = parseInt(destinationPostalCode);
+        }
       } else if (destinationPostalCode) {
-        requestBody.origin_postal_code = 10110;
         requestBody.destination_postal_code = parseInt(destinationPostalCode);
       } else {
-        alert('Lokasi tidak valid. Silakan pilih lokasi di peta');
+        toast({
+          variant: "error",
+          title: "❌ Lokasi Tidak Valid",
+          description: "Silakan pilih lokasi di peta atau isi kode pos",
+        });
         setCheckingShipping(false);
         return;
       }
@@ -268,10 +426,48 @@ export default function CheckoutPage() {
 
       const data = await response.json();
 
-      if (response.ok && data.success && data.pricing) {
-        setShippingRates(data.pricing);
+      // Log response untuk verifikasi
+      console.log('📦 Biteship API Response (from route):', JSON.stringify(data, null, 2));
+      console.log('📦 Pricing data:', data.pricing);
+
+      if (response.ok && data.success && data.pricing && Array.isArray(data.pricing)) {
+        // Filter pricing yang valid (ada price dan price > 0)
+        const validRates = data.pricing.filter((rate: any) => rate.price && rate.price > 0);
+        
+        // Sort rates: prioritize instant delivery first
+        const sortedRates = validRates.sort((a: any, b: any) => {
+          // Check if service is instant (service_type === "instant" or courier_code is instant courier)
+          const aIsInstant = a.service_type === 'instant' || 
+                            ['grab', 'gojek', 'paxel', 'lalamove', 'borzo'].includes(a.courier_code?.toLowerCase());
+          const bIsInstant = b.service_type === 'instant' || 
+                            ['grab', 'gojek', 'paxel', 'lalamove', 'borzo'].includes(b.courier_code?.toLowerCase());
+          
+          // Instant services first
+          if (aIsInstant && !bIsInstant) return -1;
+          if (!aIsInstant && bIsInstant) return 1;
+          
+          // Then sort by price (cheapest first)
+          return a.price - b.price;
+        });
+        
+        if (sortedRates.length > 0) {
+          setShippingRates(sortedRates);
+          toast({
+            variant: "success",
+            title: "✅ Layanan Kurir Tersedia",
+            description: `Ditemukan ${sortedRates.length} layanan kurir untuk lokasi Anda`,
+          });
+        } else {
+          toast({
+            variant: "warning",
+            title: "⚠️ Layanan Kurir Tidak Tersedia",
+            description: "Tidak ada layanan kurir yang tersedia untuk lokasi ini",
+          });
+        }
       } else {
-        alert(data.error || data.message || 'Gagal mengambil data ongkir');
+        const errorMsg = data.error || data.message || 'Gagal mengambil data ongkir';
+        console.error('Biteship rates error:', data);
+        alert(errorMsg);
       }
     } catch (error) {
       console.error('Error checking shipping:', error);
@@ -283,23 +479,39 @@ export default function CheckoutPage() {
 
   const handleCheckout = async () => {
     if (!customerName || !customerPhone) {
-      alert('Nama dan nomor telepon harus diisi');
+      toast({
+        variant: "warning",
+        title: "⚠️ Data Belum Lengkap",
+        description: "Nama dan nomor telepon harus diisi",
+      });
       return;
     }
 
     if (cart.length === 0) {
-      alert('Keranjang masih kosong');
+      toast({
+        variant: "warning",
+        title: "⚠️ Keranjang Kosong",
+        description: "Keranjang masih kosong, silakan tambahkan produk terlebih dahulu",
+      });
       return;
     }
 
     // Validasi untuk delivery
     if (deliveryMethod === 'delivery') {
       if (!destinationAddress || !destinationPostalCode || !destinationCity || !destinationProvince) {
-        alert('Lengkapi semua informasi pengiriman terlebih dahulu (alamat, kota, provinsi, kode pos)');
+        toast({
+          variant: "warning",
+          title: "⚠️ Informasi Pengiriman Belum Lengkap",
+          description: "Lengkapi semua informasi pengiriman terlebih dahulu (alamat, kota, provinsi, kode pos)",
+        });
         return;
       }
       if (!selectedShipping) {
-        alert('Pilih kurir dan layanan pengiriman terlebih dahulu');
+        toast({
+          variant: "warning",
+          title: "⚠️ Kurir Belum Dipilih",
+          description: "Pilih kurir dan layanan pengiriman terlebih dahulu",
+        });
         return;
       }
     }
@@ -307,76 +519,96 @@ export default function CheckoutPage() {
     setSubmitting(true);
 
     try {
+      // Prepare order payload
+      const orderPayload = {
+        customerName,
+        customerPhone,
+        items: cart.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        deliveryMethod,
+        shippingFee: deliveryMethod === 'delivery' && selectedShipping ? selectedShipping.price : 0,
+      };
+
+      console.log('📦 Creating order with payload:', JSON.stringify(orderPayload, null, 2));
+
       // Create order in database
       const orderResponse = await fetch('/api/pesanan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerName,
-          customerPhone,
-          items: cart.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-          deliveryMethod,
-          shippingFee: deliveryMethod === 'delivery' && selectedShipping ? selectedShipping.price : 0,
-        }),
+        body: JSON.stringify(orderPayload),
       });
 
       const orderData = await orderResponse.json();
 
+      console.log('📦 Order response:', {
+        ok: orderResponse.ok,
+        status: orderResponse.status,
+        data: orderData
+      });
+
       if (!orderResponse.ok) {
-        alert(orderData.error || 'Gagal membuat pesanan');
+        console.error('❌ Create order error:', orderData);
+        const errorMessage = orderData.error || orderData.message || 'Gagal membuat pesanan';
+        toast({
+          variant: "error",
+          title: "❌ Gagal Membuat Pesanan",
+          description: errorMessage,
+        });
+        setSubmitting(false);
         return;
       }
 
       // If delivery, create Biteship order
       if (deliveryMethod === 'delivery' && selectedShipping) {
         try {
-          // Prepare Biteship order data
-          const biteshipOrderData: any = {
-            origin_contact_name: 'Toko Naning',
-            origin_contact_phone: '081234567890',
-            origin_address: 'Jl. Raya Sembako No. 123, Jakarta',
-            destination_contact_name: customerName,
-            destination_contact_phone: customerPhone,
-            destination_address: destinationAddress,
-            courier_company: selectedShipping.courier_code,
-            courier_type: selectedShipping.courier_service_code,
-            delivery_type: 'now',
-            items: cart.map((item) => ({
-              name: item.product.name,
-              description: `${item.product.name} - ${item.priceType === 'dus' ? 'Dus' : item.priceType === 'pak' ? 'Pak' : 'Renceng'}`,
-              value: item.price * item.quantity,
-              length: 30,
-              width: 20,
-              height: 15,
-              weight: Math.max(1000, item.quantity * 500),
-              quantity: item.quantity,
-            })),
-            reference_id: `ORDER-${orderData.id}`,
-          };
+              // Prepare Biteship order data
+              const biteshipOrderData: any = {
+                origin_contact_name: 'Toko Naning',
+                origin_contact_phone: '081234567890',
+                origin_address: 'Jl. Raya Sembako No. 123, Bandung',
+                // Use origin coordinates (Toko Naning location)
+                origin_coordinate: {
+                  latitude: -6.986796039948391,
+                  longitude: 107.82757218203778,
+                },
+                destination_contact_name: customerName,
+                destination_contact_phone: customerPhone,
+                destination_address: destinationAddress,
+                courier_company: selectedShipping.courier_code,
+                courier_type: selectedShipping.courier_service_code,
+                delivery_type: 'now',
+                items: cart.map((item) => ({
+                  name: item.product.name,
+                  description: `${item.product.name} - ${item.priceType === 'dus' ? 'Dus' : item.priceType === 'pak' ? 'Pak' : 'Renceng'}`,
+                  value: item.price * item.quantity,
+                  length: 30,
+                  width: 20,
+                  height: 15,
+                  weight: Math.max(1000, item.quantity * 500),
+                  quantity: item.quantity,
+                })),
+                reference_id: `ORDER-${orderData.id}`,
+              };
 
-          // Add origin postal code (always required)
-          biteshipOrderData.origin_postal_code = 10110;
+              // Add destination postal code or coordinate
+              if (destinationPostalCode) {
+                biteshipOrderData.destination_postal_code = parseInt(destinationPostalCode);
+              }
+              
+              if (destinationLat && destinationLng) {
+                biteshipOrderData.destination_coordinate = {
+                  latitude: destinationLat,
+                  longitude: destinationLng,
+                };
+              }
 
-          // Add destination postal code or coordinate
-          if (destinationPostalCode) {
-            biteshipOrderData.destination_postal_code = parseInt(destinationPostalCode);
-          }
-          
-          if (destinationLat && destinationLng) {
-            biteshipOrderData.destination_coordinate = {
-              latitude: destinationLat,
-              longitude: destinationLng,
-            };
-          }
-
-          // Add destination note if available
-          if (destinationCity && destinationProvince) {
-            biteshipOrderData.destination_note = `${destinationCity}, ${destinationProvince}`;
-          }
+              // Add destination note if available
+              if (destinationCity && destinationProvince) {
+                biteshipOrderData.destination_note = `${destinationCity}, ${destinationProvince}`;
+              }
 
           console.log('Creating Biteship order with data:', JSON.stringify(biteshipOrderData, null, 2));
 
@@ -392,20 +624,43 @@ export default function CheckoutPage() {
             console.log('✅ Biteship order created successfully:', biteshipOrder);
             console.log('Tracking ID:', biteshipOrder.courier?.tracking_id);
             console.log('Waybill ID:', biteshipOrder.courier?.waybill_id);
-            // Optionally save tracking_id to order in database
+            console.log('Biteship Order ID:', biteshipOrder.id);
+            
+            // Update order with Biteship tracking info
+            try {
+              await fetch(`/api/pesanan/${orderData.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  trackingId: biteshipOrder.courier?.tracking_id || null,
+                  waybillId: biteshipOrder.courier?.waybill_id || null,
+                  biteshipOrderId: biteshipOrder.id || null,
+                }),
+              });
+            } catch (error) {
+              console.error('Error updating order with Biteship info:', error);
+            }
           } else {
             console.error('❌ Biteship order failed:', biteshipOrder);
             const errorMsg = biteshipOrder.error || biteshipOrder.message || 'Gagal membuat order pengiriman';
             console.error('Error details:', errorMsg);
             // Show warning but don't block the checkout flow
-            alert(`Peringatan: ${errorMsg}. Pesanan tetap dibuat, silakan hubungi admin untuk pengiriman.`);
+            toast({
+              variant: "warning",
+              title: "⚠️ Peringatan Pengiriman",
+              description: `${errorMsg}. Pesanan tetap dibuat, silakan hubungi admin untuk pengiriman.`,
+            });
           }
         } catch (error: any) {
           console.error('❌ Error creating Biteship order:', error);
           console.error('Error message:', error.message);
           console.error('Error stack:', error.stack);
           // Show warning but don't block the checkout flow
-          alert('Peringatan: Gagal membuat order pengiriman. Pesanan tetap dibuat, silakan hubungi admin untuk pengiriman.');
+          toast({
+            variant: "warning",
+            title: "⚠️ Peringatan Pengiriman",
+            description: "Gagal membuat order pengiriman. Pesanan tetap dibuat, silakan hubungi admin untuk pengiriman.",
+          });
         }
       }
 
@@ -434,7 +689,11 @@ export default function CheckoutPage() {
       const tokenData = await tokenResponse.json();
 
       if (!tokenResponse.ok) {
-        alert('Gagal membuat payment token');
+        toast({
+          variant: "error",
+          title: "❌ Gagal Membuat Payment Token",
+          description: "Silakan coba lagi atau hubungi admin",
+        });
         return;
       }
 
@@ -460,17 +719,24 @@ export default function CheckoutPage() {
             if (typeof window !== 'undefined' && (window as any).snap) {
               openSnapPopup();
             } else {
-              alert('Gagal memuat halaman pembayaran. Silakan refresh halaman.');
+              toast({
+                variant: "error",
+                title: "❌ Gagal Memuat Halaman Pembayaran",
+                description: "Silakan refresh halaman atau coba lagi",
+              });
             }
           }, 1000);
         }
       };
 
       openSnapPopup();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Checkout error:', error);
-      alert('Terjadi kesalahan saat checkout');
-    } finally {
+      toast({
+        variant: "error",
+        title: "❌ Terjadi Kesalahan",
+        description: error.message || "Terjadi kesalahan saat checkout. Silakan coba lagi",
+      });
       setSubmitting(false);
     }
   };
@@ -523,14 +789,14 @@ export default function CheckoutPage() {
                   <Package className="h-4 w-4 mr-2" />
                   Lihat Produk
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => router.push('/keranjang')}
-                  className="w-full"
-                >
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Lihat Keranjang
-                </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push('/produk')}
+                    className="w-full"
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Lanjut Belanja
+                  </Button>
               </div>
             </div>
           </CardContent>
@@ -542,17 +808,11 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Checkout</h1>
             <p className="text-gray-600">Review pesanan Anda dan lengkapi informasi pengiriman</p>
           </div>
-          <Link href="/produk">
-            <Button variant="outline" size="sm">
-              <Package className="h-4 w-4 mr-2" />
-              Tambah Produk
-            </Button>
-          </Link>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -640,7 +900,14 @@ export default function CheckoutPage() {
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     required
+                    readOnly={!!user?.phone || !!user?.email}
+                    className={user?.phone || user?.email ? 'bg-gray-100 cursor-not-allowed' : ''}
                   />
+                  {(user?.phone || user?.email) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Menggunakan nomor/email dari akun Anda
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -726,6 +993,7 @@ export default function CheckoutPage() {
                         Klik pada peta untuk memilih lokasi pengiriman. Alamat akan terisi otomatis.
                       </p>
                       <MapPicker
+                        key={`map-${destinationLat}-${destinationLng}`} // Force re-render when coordinates change
                         onLocationSelect={handleMapLocationSelect}
                         initialPosition={destinationLat && destinationLng ? [destinationLat, destinationLng] : undefined}
                       />
@@ -776,20 +1044,22 @@ export default function CheckoutPage() {
                     </div>
                     
                     <div>
-                      <Label htmlFor="destinationPostalCode">Kode Pos *</Label>
+                      <Label htmlFor="destinationPostalCode">
+                        Kode Pos {destinationLat && destinationLng ? '(Opsional)' : '*'}
+                      </Label>
                       <div className="flex gap-2">
                         <Input
                           id="destinationPostalCode"
                           value={destinationPostalCode}
                           onChange={(e) => setDestinationPostalCode(e.target.value)}
-                          placeholder="10110"
-                          required
+                          placeholder={destinationLat ? "Akan terisi otomatis dari peta" : "10110"}
+                          required={!destinationLat}
                         />
                         <Button
                           type="button"
                           variant="outline"
                           onClick={checkShippingRates}
-                          disabled={checkingShipping || !destinationAddress || !destinationPostalCode || !destinationCity || !destinationProvince}
+                          disabled={checkingShipping || !destinationAddress || (!destinationLat && !destinationPostalCode) || !destinationCity || !destinationProvince}
                           className="whitespace-nowrap"
                         >
                           {checkingShipping ? (
@@ -803,7 +1073,9 @@ export default function CheckoutPage() {
                         </Button>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        Klik "Cek Ongkir" untuk melihat pilihan kurir dan layanan
+                        {destinationLat && destinationLng 
+                          ? 'Koordinat sudah terdeteksi dari peta. Kode pos opsional untuk akurasi lebih baik.'
+                          : 'Klik "Cek Ongkir" untuk melihat pilihan kurir dan layanan. Pilih lokasi di peta atau isi kode pos.'}
                       </p>
                     </div>
                     
@@ -811,48 +1083,59 @@ export default function CheckoutPage() {
                       <div>
                         <Label>Pilih Kurir & Layanan Pengiriman *</Label>
                         <div className="space-y-2 mt-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                          {shippingRates.map((rate: any, index) => (
-                            <div
-                              key={index}
-                              className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                                selectedShipping?.courier_code === rate.courier_code &&
-                                selectedShipping?.courier_service_code === rate.courier_service_code
-                                  ? 'border-[#ffd700] bg-[#ffd700]/10 shadow-md'
-                                  : 'border-gray-200 hover:border-[#ffd700]/50 hover:bg-gray-50'
-                              }`}
-                              onClick={() => {
-                                setSelectedShipping(rate);
-                                setShippingFee(rate.price);
-                              }}
-                            >
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <p className="font-semibold text-sm text-gray-900">{rate.courier_name}</p>
-                                    {selectedShipping?.courier_code === rate.courier_code &&
-                                    selectedShipping?.courier_service_code === rate.courier_service_code && (
-                                      <span className="text-xs bg-[#ffd700] text-gray-900 px-2 py-0.5 rounded font-medium">
-                                        Dipilih
-                                      </span>
+                          {shippingRates.map((rate: any, index) => {
+                            // Check if service is instant
+                            const isInstant = rate.service_type === 'instant' || 
+                                            ['grab', 'gojek', 'paxel', 'lalamove', 'borzo'].includes(rate.courier_code?.toLowerCase());
+                            
+                            return (
+                              <div
+                                key={index}
+                                className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                                  selectedShipping?.courier_code === rate.courier_code &&
+                                  selectedShipping?.courier_service_code === rate.courier_service_code
+                                    ? 'border-[#ffd700] bg-[#ffd700]/10 shadow-md'
+                                    : 'border-gray-200 hover:border-[#ffd700]/50 hover:bg-gray-50'
+                                } ${isInstant ? 'ring-2 ring-blue-200' : ''}`}
+                                onClick={() => {
+                                  setSelectedShipping(rate);
+                                  setShippingFee(rate.price);
+                                }}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                      <p className="font-semibold text-sm text-gray-900">{rate.courier_name}</p>
+                                      {isInstant && (
+                                        <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded font-medium">
+                                          ⚡ Instant
+                                        </span>
+                                      )}
+                                      {selectedShipping?.courier_code === rate.courier_code &&
+                                      selectedShipping?.courier_service_code === rate.courier_service_code && (
+                                        <span className="text-xs bg-[#ffd700] text-gray-900 px-2 py-0.5 rounded font-medium">
+                                          Dipilih
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-gray-600 mb-1">{rate.courier_service_name}</p>
+                                    <p className="text-xs text-gray-500 mb-1">Estimasi: {rate.duration}</p>
+                                    {rate.description && (
+                                      <p className="text-xs text-gray-400 italic">{rate.description}</p>
                                     )}
                                   </div>
-                                  <p className="text-xs text-gray-600 mb-1">{rate.courier_service_name}</p>
-                                  <p className="text-xs text-gray-500 mb-1">Estimasi: {rate.duration}</p>
-                                  {rate.description && (
-                                    <p className="text-xs text-gray-400 italic">{rate.description}</p>
-                                  )}
-                                </div>
-                                <div className="text-right ml-4">
-                                  <p className="font-bold text-[#ffd700] text-lg">{formatRupiah(rate.price)}</p>
-                                  {rate.shipping_fee_discount && rate.shipping_fee_discount > 0 && (
-                                    <p className="text-xs text-green-600 line-through">
-                                      {formatRupiah(rate.shipping_fee)}
-                                    </p>
-                                  )}
+                                  <div className="text-right ml-4">
+                                    <p className="font-bold text-[#ffd700] text-lg">{formatRupiah(rate.price)}</p>
+                                    {rate.shipping_fee_discount && rate.shipping_fee_discount > 0 && (
+                                      <p className="text-xs text-green-600 line-through">
+                                        {formatRupiah(rate.shipping_fee)}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                         {!selectedShipping && (
                           <p className="text-xs text-red-600 mt-2">

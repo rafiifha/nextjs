@@ -1,58 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatRupiah } from '@/lib/utils';
-import { cartService, CartItem } from '@/lib/cart';
-import { ShoppingCart, Plus, Minus, Trash2, Loader2, Package, ArrowRight } from 'lucide-react';
-import Link from 'next/link';
 
 export default function KeranjangPage() {
   const router = useRouter();
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadCart();
-    
-    // Listen for cart updates
-    const handleCartUpdate = () => {
-      loadCart();
-    };
-    
-    window.addEventListener('cartUpdated', handleCartUpdate);
-    return () => window.removeEventListener('cartUpdated', handleCartUpdate);
-  }, []);
+    // Redirect to home since cart is now in drawer
+    router.push('/');
+  }, [router]);
 
-  const loadCart = () => {
-    const cartData = cartService.getCart();
-    setCart(cartData);
-    setLoading(false);
-  };
-
-  const updateQuantity = (productId: number, priceType: 'dus' | 'pak' | 'renceng', quantity: number) => {
-    const newCart = cartService.updateQuantity(productId, priceType, quantity);
-    setCart(newCart);
-  };
-
-  const removeFromCart = (productId: number, priceType: 'dus' | 'pak' | 'renceng') => {
-    const newCart = cartService.removeFromCart(productId, priceType);
-    setCart(newCart);
-  };
-
-  const getTotalPrice = () => {
-    return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  };
-
-  const handleCheckout = () => {
-    if (cart.length === 0) {
-      alert('Keranjang masih kosong');
-      return;
-    }
-    router.push('/checkout');
-  };
+  return null;
 
   if (loading) {
     return (
