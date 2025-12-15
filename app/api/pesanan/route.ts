@@ -41,6 +41,9 @@ export async function POST(request: NextRequest) {
     const productIds = items.map((item: any) => item.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
+      include: {
+        variants: true,
+      },
     });
 
     if (products.length !== productIds.length) {
@@ -52,12 +55,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate stock_online availability (stok tidak dikurangi, hanya divalidasi)
+    // Validate stock_online availability per variant (stok tidak dikurangi, hanya divalidasi)
     const stockErrors: string[] = [];
     for (const item of items) {
       const product = products.find(p => p.id === item.productId);
-      if (product && product.stock_online < item.quantity) {
-        stockErrors.push(`${product.name}: stok online tersedia ${product.stock_online}, diminta ${item.quantity}`);
+      if (!product) {
+        stockErrors.push(`Produk dengan ID ${item.productId} tidak ditemukan`);
+        continue;
+      }
+
+      // Find variant by variantId or priceType
+      const variant = item.variantId 
+        ? product.variants.find(v => v.id === item.variantId)
+        : product.variants.find(v => v.priceType === item.priceType);
+
+      if (!variant) {
+        stockErrors.push(`${product.name}: varian harga "${item.priceType}" tidak ditemukan`);
+        continue;
+      }
+
+      const availableStock = variant.stock_online ?? 0;
+      if (availableStock < item.quantity) {
+        stockErrors.push(`${product.name} (${variant.priceType}): stok online tersedia ${availableStock}, diminta ${item.quantity}`);
       }
     }
 
@@ -87,11 +106,20 @@ export async function POST(request: NextRequest) {
         biteshipOrderId: biteshipOrderId || null,
         expiredAt: expiredAt, // 24 jam dari sekarang
         items: {
-          create: items.map((item: any) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
-          })),
+          create: items.map((item: any) => {
+            const product = products.find(p => p.id === item.productId);
+            const variant = item.variantId 
+              ? product?.variants.find(v => v.id === item.variantId)
+              : product?.variants.find(v => v.priceType === item.priceType);
+
+            return {
+              productId: item.productId,
+              variantId: variant?.id || null,
+              priceType: item.priceType || variant?.priceType || '',
+              quantity: item.quantity,
+              price: item.price,
+            };
+          }),
         },
       },
       include: {

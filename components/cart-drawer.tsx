@@ -49,7 +49,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     setLoading(false);
   };
 
-  const updateQuantity = (productId: number, priceType: 'dus' | 'pak' | 'renceng', quantity: number) => {
+  const updateQuantity = (productId: number, priceType: string, quantity: number) => {
     const userStr = localStorage.getItem('user');
     let userId: number | null = null;
     if (userStr) {
@@ -79,7 +79,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     }
   };
 
-  const removeFromCart = (productId: number, priceType: 'dus' | 'pak' | 'renceng') => {
+  const removeFromCart = (productId: number, priceType: string) => {
     const userStr = localStorage.getItem('user');
     let userId: number | null = null;
     if (userStr) {
@@ -102,7 +102,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   };
 
   const getTotalPrice = () => {
-    return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    return cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
   };
 
   const handleCheckout = () => {
@@ -191,9 +191,13 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900 mb-1">{item.product.name}</h4>
                       <p className="text-sm text-gray-600 mb-2">
-                        {item.priceType === 'dus' ? 'Dus' : item.priceType === 'pak' ? 'Pak' : 'Renceng'} - {formatRupiah(item.price)}
+                        <span className="capitalize">{item.priceType}</span> - {item.price ? formatRupiah(item.price) : 'Belum ada harga'}
                       </p>
-                      <p className="text-xs text-gray-500">Stok: {item.product.stok}</p>
+                      {item.product.variants && item.variantId && (
+                        <p className="text-xs text-gray-500">
+                          Stok: {item.product.variants.find(v => v.id === item.variantId)?.stock_online || 0}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <div className="flex items-center gap-2">
@@ -210,7 +214,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           variant="outline"
                           size="sm"
                           onClick={() => updateQuantity(item.productId, item.priceType, item.quantity + 1)}
-                          disabled={item.quantity >= item.product.stok}
+                          disabled={
+                            item.product.variants && item.variantId
+                              ? item.quantity >= (item.product.variants.find(v => v.id === item.variantId)?.stock_online || 0)
+                              : false
+                          }
                           className="h-8 w-8 p-0"
                         >
                           <Plus className="h-4 w-4" />
@@ -225,7 +233,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                       <p className="text-sm font-semibold text-gray-900">
-                        {formatRupiah(item.price * item.quantity)}
+                        {item.price ? formatRupiah(item.price * item.quantity) : 'Belum ada harga'}
                       </p>
                     </div>
                   </div>

@@ -7,17 +7,41 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  priceTypes  String[] // Array of price type names, e.g., ["dus", "pak", "item"] or ["bal", "kg"]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  products    Product[]
+}
+
 model Product {
   id          Int      @id @default(autoincrement())
   name        String
-  hargaDus    Int
-  hargaPak    Int
-  hargaRenceng Int
-  stock_online Int     @default(0)  // Stok untuk transaksi online
-  stock_offline Int    @default(0)   // Stok untuk transaksi kasir
+  categoryId  Int      @default(1) // Default ke kategori pertama (akan dibuat via seed)
+  category    Category @relation(fields: [categoryId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  variants    ProductVariant[]
   items       OrderItem[]
+}
+
+model ProductVariant {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priceType   String   // "dus", "pak", "item", "bal", "kg", etc.
+  price       Int?     // Harga untuk jenis ini (bisa kosong)
+  stock_online Int?    // Stok online untuk varian ini (bisa kosong)
+  stock_offline Int?   // Stok offline untuk varian ini (bisa kosong)
+  length      Int?     // Panjang dalam cm (untuk pengiriman)
+  width       Int?     // Lebar dalam cm (untuk pengiriman)
+  height      Int?     // Tinggi dalam cm (untuk pengiriman)
+  weight      Int?     // Berat dalam gram (untuk pengiriman)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  items       OrderItem[] @relation("VariantOrderItems")
 }
 
 model Order {
@@ -41,10 +65,13 @@ model OrderItem {
   id        Int     @id @default(autoincrement())
   orderId   Int
   productId Int
+  variantId Int?   // ID varian harga yang dipilih
+  priceType String  @default("dus") // Jenis harga: "dus", "pak", "item", "bal", "kg", etc.
   quantity  Int
   price     Int
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id])
+  variant   ProductVariant? @relation("VariantOrderItems", fields: [variantId], references: [id])
 }
 
 model User {

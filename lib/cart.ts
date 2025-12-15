@@ -2,17 +2,30 @@
 
 export interface CartItem {
   productId: number;
+  variantId?: number; // ID varian harga
   product: {
     id: number;
     name: string;
-    hargaDus: number;
-    hargaPak: number;
-    hargaRenceng: number;
-    stok: number;
+    category?: {
+      id: number;
+      name: string;
+      priceTypes: string[];
+    };
+    variants?: Array<{
+      id: number;
+      priceType: string;
+      price: number | null;
+      stock_online: number | null;
+      stock_offline: number | null;
+      length?: number | null;
+      width?: number | null;
+      height?: number | null;
+      weight?: number | null;
+    }>;
   };
-  priceType: 'dus' | 'pak' | 'renceng';
+  priceType: string; // 'dus', 'pak', 'item', 'bal', 'kg', etc.
   quantity: number;
-  price: number;
+  price: number | null;
 }
 
 const CART_STORAGE_PREFIX = 'tokonaning_cart_';
@@ -69,19 +82,27 @@ export const cartService = {
     }
   },
 
-  addToCart(product: CartItem['product'], priceType: 'dus' | 'pak' | 'renceng', quantity: number = 1, userId?: number | null): CartItem[] {
+  addToCart(
+    productId: number,
+    product: CartItem['product'],
+    variantId: number | undefined,
+    priceType: string,
+    price: number | null,
+    quantity: number = 1,
+    userId?: number | null
+  ): CartItem[] {
     const cart = this.getCart(userId);
-    const price = priceType === 'dus' ? product.hargaDus : priceType === 'pak' ? product.hargaPak : product.hargaRenceng;
     
     const existingIndex = cart.findIndex(
-      (item) => item.productId === product.id && item.priceType === priceType
+      (item) => item.productId === productId && item.priceType === priceType
     );
     
     if (existingIndex >= 0) {
       cart[existingIndex].quantity += quantity;
     } else {
       cart.push({
-        productId: product.id,
+        productId,
+        variantId,
         product,
         priceType,
         quantity,
@@ -93,7 +114,7 @@ export const cartService = {
     return cart;
   },
 
-  updateQuantity(productId: number, priceType: 'dus' | 'pak' | 'renceng', quantity: number, userId?: number | null): CartItem[] {
+  updateQuantity(productId: number, priceType: string, quantity: number, userId?: number | null): CartItem[] {
     const cart = this.getCart(userId);
     
     if (quantity <= 0) {
@@ -112,7 +133,7 @@ export const cartService = {
     return cart;
   },
 
-  removeFromCart(productId: number, priceType: 'dus' | 'pak' | 'renceng', userId?: number | null): CartItem[] {
+  removeFromCart(productId: number, priceType: string, userId?: number | null): CartItem[] {
     const cart = this.getCart(userId);
     const newCart = cart.filter(
       (item) => !(item.productId === productId && item.priceType === priceType)
@@ -132,7 +153,7 @@ export const cartService = {
 
   getCartTotal(userId?: number | null): number {
     const cart = this.getCart(userId);
-    return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    return cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
   },
 
   // Migrate cart from old key to user-specific key (for existing users)
@@ -159,4 +180,3 @@ export const cartService = {
     }
   },
 };
-

@@ -11,7 +11,12 @@ async function updateOrderToPaid(orderId: number) {
     include: {
       items: {
         include: {
-          product: true,
+          product: {
+            include: {
+              variants: true,
+            },
+          },
+          variant: true,
         },
       },
     },
@@ -33,30 +38,65 @@ async function updateOrderToPaid(orderId: number) {
     throw new Error('Order is expired');
   }
 
-  // Validate stock_online availability before reducing
+  // Determine if this is a kasir order (pickup with no shipping fee) or online order
+  const isKasirOrder = order.deliveryMethod === 'pickup' && (!order.shippingFee || order.shippingFee === 0);
+  const stockField = isKasirOrder ? 'stock_offline' : 'stock_online';
+  const stockType = isKasirOrder ? 'offline' : 'online';
+
+  // Validate stock availability per variant before reducing
   const stockErrors: string[] = [];
   for (const item of order.items) {
-    if (item.product.stock_online < item.quantity) {
-      stockErrors.push(`${item.product.name}: stok online tersedia ${item.product.stock_online}, diminta ${item.quantity}`);
+    if (!item.variant) {
+      // Try to find variant by priceType if variantId is null
+      const variant = item.product.variants.find(v => v.priceType === item.priceType);
+      if (!variant) {
+        stockErrors.push(`${item.product.name}: varian "${item.priceType}" tidak ditemukan`);
+        continue;
+      }
+      
+      const availableStock = isKasirOrder ? (variant.stock_offline ?? 0) : (variant.stock_online ?? 0);
+      if (availableStock < item.quantity) {
+        stockErrors.push(`${item.product.name} (${variant.priceType}): stok ${stockType} tersedia ${availableStock}, diminta ${item.quantity}`);
+      }
+    } else {
+      const availableStock = isKasirOrder ? (item.variant.stock_offline ?? 0) : (item.variant.stock_online ?? 0);
+      if (availableStock < item.quantity) {
+        stockErrors.push(`${item.product.name} (${item.variant.priceType}): stok ${stockType} tersedia ${availableStock}, diminta ${item.quantity}`);
+      }
     }
   }
 
   if (stockErrors.length > 0) {
-    console.error(`❌ Insufficient stock_online for order ${orderId}:`, stockErrors);
-    throw new Error(`Stok online tidak mencukupi: ${stockErrors.join(', ')}`);
+    console.error(`❌ Insufficient stock_${stockType} for order ${orderId}:`, stockErrors);
+    throw new Error(`Stok ${stockType} tidak mencukupi: ${stockErrors.join(', ')}`);
   }
 
-  // Reduce stock_online for each item (transaksi online)
+  // Reduce stock for each variant
   for (const item of order.items) {
-    await prisma.product.update({
-      where: { id: item.productId },
-      data: {
-        stock_online: {
-          decrement: item.quantity,
-        },
-      },
+    let variantId = item.variantId;
+    
+    // If variantId is null, find variant by priceType
+    if (!variantId) {
+      const variant = item.product.variants.find(v => v.priceType === item.priceType);
+      if (!variant) {
+        console.error(`❌ Variant not found for product ${item.productId} with priceType ${item.priceType}`);
+        continue;
+      }
+      variantId = variant.id;
+    }
+
+    const updateData: any = {};
+    if (isKasirOrder) {
+      updateData.stock_offline = { decrement: item.quantity };
+    } else {
+      updateData.stock_online = { decrement: item.quantity };
+    }
+
+    await prisma.productVariant.update({
+      where: { id: variantId },
+      data: updateData,
     });
-    console.log(`✅ Reduced stock_online for product ${item.productId} by ${item.quantity}`);
+    console.log(`✅ Reduced stock_${stockType} for variant ${variantId} (${item.priceType}) by ${item.quantity}`);
   }
 
   // Update order status to paid
@@ -136,7 +176,13 @@ export async function POST(request: NextRequest) {
         include: {
           items: {
             include: {
-              product: true,
+              product: {
+                include: {
+                  category: true,
+                  variants: true,
+                },
+              },
+              variant: true,
             },
           },
         },

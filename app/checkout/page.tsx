@@ -26,18 +26,31 @@ const MapPicker = dynamic(() => import('@/components/map-picker'), {
 interface Product {
   id: number;
   name: string;
-  hargaDus: number;
-  hargaPak: number;
-  hargaRenceng: number;
-  stok: number;
+  category?: {
+    id: number;
+    name: string;
+    priceTypes: string[];
+  };
+  variants?: Array<{
+    id: number;
+    priceType: string;
+    price: number | null;
+    stock_online: number | null;
+    stock_offline: number | null;
+    length?: number | null;
+    width?: number | null;
+    height?: number | null;
+    weight?: number | null;
+  }>;
 }
 
 interface CartItem {
   productId: number;
+  variantId?: number;
   product: Product;
-  priceType: 'dus' | 'pak' | 'renceng';
+  priceType: string;
   quantity: number;
-  price: number;
+  price: number | null;
 }
 
 export default function CheckoutPage() {
@@ -179,23 +192,23 @@ export default function CheckoutPage() {
     }
   };
 
-  const addToCart = (product: Product, priceType: 'dus' | 'pak' | 'renceng', quantity: number = 1) => {
+  const addToCart = (product: Product, variantId: number | undefined, priceType: string, price: number, quantity: number = 1) => {
     const cartData = cartService.addToCart(product, priceType, quantity);
     setCart(cartData);
   };
 
-  const updateCartQuantity = (productId: number, priceType: 'dus' | 'pak' | 'renceng', quantity: number) => {
+  const updateCartQuantity = (productId: number, priceType: string, quantity: number) => {
     const cartData = cartService.updateQuantity(productId, priceType, quantity);
     setCart(cartData);
   };
 
-  const removeFromCart = (productId: number, priceType: 'dus' | 'pak' | 'renceng') => {
+  const removeFromCart = (productId: number, priceType: string) => {
     const cartData = cartService.removeFromCart(productId, priceType);
     setCart(cartData);
   };
 
   const getTotalPrice = () => {
-    const itemsTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const itemsTotal = cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
     const finalShippingFee = deliveryMethod === 'delivery' && selectedShipping 
       ? selectedShipping.price 
       : 0;
@@ -381,16 +394,31 @@ export default function CheckoutPage() {
 
       const requestBody: any = {
         couriers: courierList,
-        items: cart.map((item) => ({
-          name: item.product.name,
-          description: `${item.product.name} - ${item.priceType === 'dus' ? 'Dus' : item.priceType === 'pak' ? 'Pak' : 'Renceng'}`,
-          value: item.price * item.quantity,
-          length: 30,
-          width: 20,
-          height: 15,
-          weight: Math.max(1000, item.quantity * 500), // Minimum 1kg, atau 500g per item
-          quantity: item.quantity,
-        })),
+        items: cart.map((item) => {
+          // Get variant dimensions from the selected variant
+          const variant = item.variantId 
+            ? item.product.variants?.find(v => v.id === item.variantId)
+            : item.product.variants?.find(v => v.priceType === item.priceType);
+          
+          // Use variant dimensions if available, otherwise use defaults
+          const length = variant?.length || 30;
+          const width = variant?.width || 20;
+          const height = variant?.height || 15;
+          const weight = variant?.weight 
+            ? Math.max(1000, variant.weight * item.quantity) // Use variant weight * quantity
+            : Math.max(1000, item.quantity * 500); // Default: minimum 1kg, atau 500g per item
+          
+          return {
+            name: item.product.name,
+            description: `${item.product.name} - ${item.priceType.charAt(0).toUpperCase() + item.priceType.slice(1)}`,
+            value: (item.price || 0) * item.quantity,
+            length,
+            width,
+            height,
+            weight,
+            quantity: item.quantity,
+          };
+        }),
       };
 
       // Use origin coordinates (Toko Naning location) - sesuai dokumentasi
@@ -580,16 +608,31 @@ export default function CheckoutPage() {
                 courier_company: selectedShipping.courier_code,
                 courier_type: selectedShipping.courier_service_code,
                 delivery_type: 'now',
-                items: cart.map((item) => ({
-                  name: item.product.name,
-                  description: `${item.product.name} - ${item.priceType === 'dus' ? 'Dus' : item.priceType === 'pak' ? 'Pak' : 'Renceng'}`,
-                  value: item.price * item.quantity,
-                  length: 30,
-                  width: 20,
-                  height: 15,
-                  weight: Math.max(1000, item.quantity * 500),
-                  quantity: item.quantity,
-                })),
+                items: cart.map((item) => {
+                  // Get variant dimensions from the selected variant
+                  const variant = item.variantId 
+                    ? item.product.variants?.find(v => v.id === item.variantId)
+                    : item.product.variants?.find(v => v.priceType === item.priceType);
+                  
+                  // Use variant dimensions if available, otherwise use defaults
+                  const length = variant?.length || 30;
+                  const width = variant?.width || 20;
+                  const height = variant?.height || 15;
+                  const weight = variant?.weight 
+                    ? Math.max(1000, variant.weight * item.quantity) // Use variant weight * quantity
+                    : Math.max(1000, item.quantity * 500); // Default: minimum 1kg, atau 500g per item
+                  
+                  return {
+                    name: item.product.name,
+                    description: `${item.product.name} - ${item.priceType.charAt(0).toUpperCase() + item.priceType.slice(1)}`,
+                    value: (item.price || 0) * item.quantity,
+                    length,
+                    width,
+                    height,
+                    weight,
+                    quantity: item.quantity,
+                  };
+                }),
                 reference_id: `ORDER-${orderData.id}`,
               };
 
@@ -836,7 +879,7 @@ export default function CheckoutPage() {
                         <div className="flex-1">
                           <p className="font-medium text-gray-900">{item.product.name}</p>
                           <p className="text-sm text-gray-600">
-                            {item.priceType === 'dus' ? 'Dus' : item.priceType === 'pak' ? 'Pak' : 'Renceng'} - {formatRupiah(item.price)}
+                            <span className="capitalize">{item.priceType}</span> - {item.price ? formatRupiah(item.price) : 'Belum ada harga'}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1200,7 +1243,7 @@ export default function CheckoutPage() {
                 <div className="border-t border-gray-200 pt-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">{formatRupiah(cart.reduce((sum, item) => sum + item.price * item.quantity, 0))}</span>
+                    <span className="font-medium">{formatRupiah(cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0))}</span>
                   </div>
                   {deliveryMethod === 'delivery' && selectedShipping && (
                     <div className="flex justify-between text-sm">

@@ -61,11 +61,22 @@ export async function POST(
       );
     }
 
-    // Validate stock_online availability before reducing
+    // Validate stock_online availability per variant before reducing
     const stockErrors: string[] = [];
     for (const item of order.items) {
-      if (item.product.stock_online < item.quantity) {
-        stockErrors.push(`${item.product.name}: stok online tersedia ${item.product.stock_online}, diminta ${item.quantity}`);
+      let variant = item.variant;
+      
+      // If variant is null, find by priceType
+      if (!variant) {
+        variant = item.product.variants.find(v => v.priceType === item.priceType);
+        if (!variant) {
+          stockErrors.push(`${item.product.name}: varian "${item.priceType}" tidak ditemukan`);
+          continue;
+        }
+      }
+
+      if (variant.stock_online < item.quantity) {
+        stockErrors.push(`${item.product.name} (${variant.priceType}): stok online tersedia ${variant.stock_online}, diminta ${item.quantity}`);
       }
     }
 
@@ -76,17 +87,28 @@ export async function POST(
       );
     }
 
-    // Reduce stock_online for each item (transaksi online)
+    // Reduce stock_online for each variant (transaksi online)
     for (const item of order.items) {
-      await prisma.product.update({
-        where: { id: item.productId },
+      let variantId = item.variantId;
+      
+      if (!variantId) {
+        const variant = item.product.variants.find(v => v.priceType === item.priceType);
+        if (!variant) {
+          console.error(`❌ Variant not found for product ${item.productId} with priceType ${item.priceType}`);
+          continue;
+        }
+        variantId = variant.id;
+      }
+
+      await prisma.productVariant.update({
+        where: { id: variantId },
         data: {
           stock_online: {
             decrement: item.quantity,
           },
         },
       });
-      console.log(`✅ Reduced stock_online for product ${item.productId} by ${item.quantity}`);
+      console.log(`✅ Reduced stock_online for variant ${variantId} by ${item.quantity}`);
     }
 
     // Update order status to paid

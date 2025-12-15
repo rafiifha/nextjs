@@ -11,14 +11,30 @@ import Link from 'next/link';
 import { cartService } from '@/lib/cart';
 import { useToast } from '@/hooks/use-toast';
 
+interface ProductVariant {
+  id: number;
+  priceType: string;
+  price: number | null;
+  stock_online: number | null;
+  stock_offline: number | null;
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
+  weight?: number | null;
+}
+
+interface Category {
+  id: number;
+  name: string;
+  priceTypes: string[];
+}
+
 interface Product {
   id: number;
   name: string;
-  hargaDus: number;
-  hargaPak: number;
-  hargaRenceng: number;
-  stock_online: number;
-  stock_offline: number;
+  categoryId: number;
+  category: Category;
+  variants: ProductVariant[];
 }
 
 export default function ProdukPage() {
@@ -58,8 +74,17 @@ export default function ProdukPage() {
     setCart(cartData);
   };
 
-  const handleAddToCart = async (product: Product, priceType: 'dus' | 'pak' | 'renceng') => {
-    const key = `${product.id}-${priceType}`;
+  const handleAddToCart = async (product: Product, variant: ProductVariant) => {
+    if (!variant.price) {
+      toast({
+        title: "⚠️ Harga Belum Tersedia",
+        description: "Produk ini belum memiliki harga. Silakan hubungi admin.",
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const key = `${product.id}-${variant.priceType}`;
     setAddingToCart({ ...addingToCart, [key]: true });
     
     try {
@@ -74,13 +99,20 @@ export default function ProdukPage() {
         }
       }
       
-      cartService.addToCart(product.id, product, priceType, 1, userId);
+      cartService.addToCart(
+        product.id,
+        product,
+        variant.id,
+        variant.priceType,
+        variant.price,
+        1,
+        userId
+      );
       loadCart();
       
       // Show success notification
-      const priceTypeLabel = priceType === 'dus' ? 'Dus' : priceType === 'pak' ? 'Pak' : 'Renceng';
+      const priceTypeLabel = variant.priceType.charAt(0).toUpperCase() + variant.priceType.slice(1);
       toast({
-        variant: "success",
         title: "✅ Produk Ditambahkan",
         description: `${product.name} (${priceTypeLabel}) berhasil ditambahkan ke keranjang`,
       });
@@ -92,15 +124,15 @@ export default function ProdukPage() {
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast({
-        variant: "error",
         title: "❌ Gagal Menambahkan",
         description: "Gagal menambahkan produk ke keranjang. Silakan coba lagi",
+        variant: 'destructive',
       });
       setAddingToCart({ ...addingToCart, [key]: false });
     }
   };
 
-  const isInCart = (productId: number, priceType: 'dus' | 'pak' | 'renceng') => {
+  const isInCart = (productId: number, priceType: string) => {
     return cart.some(item => item.productId === productId && item.priceType === priceType);
   };
 
@@ -168,100 +200,63 @@ export default function ProdukPage() {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-gray-900 mb-2">{product.name}</h3>
-                      <div className="flex items-center gap-2 mb-3">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            product.stok > 0
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {product.stok > 0 ? `Stok: ${product.stok}` : 'Stok Habis'}
+                      <div className="flex items-center gap-2 mb-3 flex-wrap">
+                        <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                          {product.category.name}
                         </span>
+                        {product.variants.some(v => (v.stock_online ?? 0) > 0) ? (
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
+                            Tersedia
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700">
+                            Stok Habis
+                          </span>
+                        )}
                       </div>
                     </div>
                     <Package className="h-8 w-8 text-[#ffd700]" />
                   </div>
 
                   <div className="space-y-3 mb-4">
-                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <div>
-                        <span className="text-sm text-gray-600">Dus:</span>
-                        <span className="font-semibold text-gray-900 ml-2">
-                          {formatRupiah(product.hargaDus)}
-                        </span>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant={isInCart(product.id, 'dus') ? 'default' : 'outline'}
-                        onClick={() => handleAddToCart(product, 'dus')}
-                        disabled={product.stok === 0 || addingToCart[`${product.id}-dus`]}
-                        className="h-7 px-3 text-xs"
-                      >
-                        {addingToCart[`${product.id}-dus`] ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : isInCart(product.id, 'dus') ? (
-                          <>
-                            <Check className="h-3 w-3 mr-1" />
-                            Di Keranjang
-                          </>
-                        ) : (
-                          '+ Dus'
-                        )}
-                      </Button>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <div>
-                        <span className="text-sm text-gray-600">Pak:</span>
-                        <span className="font-semibold text-gray-900 ml-2">
-                          {formatRupiah(product.hargaPak)}
-                        </span>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant={isInCart(product.id, 'pak') ? 'default' : 'outline'}
-                        onClick={() => handleAddToCart(product, 'pak')}
-                        disabled={product.stock_online === 0 || addingToCart[`${product.id}-pak`]}
-                        className="h-7 px-3 text-xs"
-                      >
-                        {addingToCart[`${product.id}-pak`] ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : isInCart(product.id, 'pak') ? (
-                          <>
-                            <Check className="h-3 w-3 mr-1" />
-                            Di Keranjang
-                          </>
-                        ) : (
-                          '+ Pak'
-                        )}
-                      </Button>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <div>
-                        <span className="text-sm text-gray-600">Renceng:</span>
-                        <span className="font-semibold text-gray-900 ml-2">
-                          {formatRupiah(product.hargaRenceng)}
-                        </span>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant={isInCart(product.id, 'renceng') ? 'default' : 'outline'}
-                        onClick={() => handleAddToCart(product, 'renceng')}
-                        disabled={product.stock_online === 0 || addingToCart[`${product.id}-renceng`]}
-                        className="h-7 px-3 text-xs"
-                      >
-                        {addingToCart[`${product.id}-renceng`] ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : isInCart(product.id, 'renceng') ? (
-                          <>
-                            <Check className="h-3 w-3 mr-1" />
-                            Di Keranjang
-                          </>
-                        ) : (
-                          '+ Renceng'
-                        )}
-                      </Button>
-                    </div>
+                    {product.variants.map((variant) => {
+                      const key = `${product.id}-${variant.priceType}`;
+                      const inCart = isInCart(product.id, variant.priceType);
+                      const isAdding = addingToCart[key];
+                      const isDisabled = (variant.stock_online ?? 0) === 0 || isAdding;
+                      
+                      return (
+                        <div key={variant.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <div>
+                            <span className="text-sm text-gray-600 capitalize">{variant.priceType}:</span>
+                            <span className="font-semibold text-gray-900 ml-2">
+                              {variant.price ? formatRupiah(variant.price) : 'Belum ada harga'}
+                            </span>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Stok: {variant.stock_online !== null && variant.stock_online !== undefined ? variant.stock_online : 'Belum ada'}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={inCart ? 'default' : 'outline'}
+                            onClick={() => handleAddToCart(product, variant)}
+                            disabled={isDisabled || !variant.price}
+                            className="h-7 px-3 text-xs"
+                          >
+                            {isAdding ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : inCart ? (
+                              <>
+                                <Check className="h-3 w-3 mr-1" />
+                                Di Keranjang
+                              </>
+                            ) : (
+                              `+ ${variant.priceType.charAt(0).toUpperCase() + variant.priceType.slice(1)}`
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <div className="flex gap-2">
@@ -309,4 +304,3 @@ export default function ProdukPage() {
     </div>
   );
 }
-

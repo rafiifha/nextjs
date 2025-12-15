@@ -17,10 +17,18 @@ export async function createSnapTransaction(orderDetails: {
   finishRedirectUrl?: string;
   unfinishRedirectUrl?: string;
   errorRedirectUrl?: string;
+  notificationUrl?: string;
 }) {
   try {
-    // Get base URL from environment or use localhost for development
+    // Use provided URLs or construct from baseUrl
+    // baseUrl should be passed from the calling function (API route)
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    
+    // Use provided redirect URLs if available, otherwise construct from baseUrl
+    const finishUrl = orderDetails.finishRedirectUrl || `${baseUrl}/payment/success`;
+    const unfinishUrl = orderDetails.unfinishRedirectUrl || `${baseUrl}/payment/pending`;
+    const errorUrl = orderDetails.errorRedirectUrl || `${baseUrl}/payment/failed`;
+    const notifyUrl = orderDetails.notificationUrl || `${baseUrl}/api/payment/midtrans/notify`;
     
     const parameter: any = {
       transaction_details: {
@@ -32,16 +40,27 @@ export async function createSnapTransaction(orderDetails: {
         phone: orderDetails.customerDetails.phone,
       },
       // Redirect URLs
-      finish_redirect_url: orderDetails.finishRedirectUrl || `${baseUrl}/payment/success`,
-      unfinish_redirect_url: orderDetails.unfinishRedirectUrl || `${baseUrl}/payment/pending`,
-      error_redirect_url: orderDetails.errorRedirectUrl || `${baseUrl}/payment/failed`,
+      finish_redirect_url: finishUrl,
+      unfinish_redirect_url: unfinishUrl,
+      error_redirect_url: errorUrl,
       // Notification URL for server-to-server callback
-      notification_url: `${baseUrl}/api/payment/midtrans/notify`,
+      notification_url: notifyUrl,
     };
 
-    console.log('📤 Creating Midtrans transaction with notification URL:', parameter.notification_url);
+    console.log('📤 Creating Midtrans transaction:');
+    console.log('  - Order ID:', parameter.transaction_details.order_id);
+    console.log('  - Finish Redirect:', parameter.finish_redirect_url);
+    console.log('  - Unfinish Redirect:', parameter.unfinish_redirect_url);
+    console.log('  - Error Redirect:', parameter.error_redirect_url);
+    console.log('  - Notification URL:', parameter.notification_url);
+    console.log('  - Full parameter:', JSON.stringify(parameter, null, 2));
 
     const transaction = await snap.createTransaction(parameter);
+    
+    console.log('✅ Midtrans transaction created:');
+    console.log('  - Token:', transaction.token);
+    console.log('  - Redirect URL from response:', transaction.redirect_url);
+    
     return transaction;
   } catch (error) {
     console.error('Midtrans error:', error);
