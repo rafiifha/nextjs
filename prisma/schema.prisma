@@ -50,6 +50,9 @@ model Order {
   customerPhone String
   status        String      @default("pending") // pending, paid, processing, delivered, cancelled, expired
   totalHarga    Int
+  discount      Int?        @default(0) // Diskon dalam rupiah
+  cashReceived  Int?        // Uang yang diterima (untuk pembayaran tunai)
+  change        Int?         // Kembalian (untuk pembayaran tunai)
   deliveryMethod String?
   shippingFee   Int?
   trackingId    String?     // Biteship tracking ID

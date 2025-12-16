@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
-import { ShoppingCart, Plus, Minus, Trash2, Search, X, Loader2, Filter, Package, Box, TrendingDown, CheckCircle, CreditCard, Wallet } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Search, X, Loader2, Filter, Package, Box, TrendingDown, CheckCircle, CreditCard, Wallet, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProductVariant {
@@ -52,8 +52,12 @@ export default function KasirPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'tunai' | 'non-tunai'>('tunai');
+  const [cashReceived, setCashReceived] = useState<string>('');
+  const [discount, setDiscount] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState<any>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -86,6 +90,30 @@ export default function KasirPage() {
     
     if (paymentStatus && orderId) {
       if (paymentStatus === 'success') {
+        // Fetch order details for receipt
+        fetch(`/api/pesanan/${orderId}`)
+          .then(res => res.json())
+          .then(order => {
+            if (order) {
+              const subtotal = order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+              setReceiptData({
+                orderId: order.id,
+                customerName: order.customerName,
+                customerPhone: order.customerPhone,
+                items: order.items,
+                subtotal: subtotal,
+                discount: order.discount || 0,
+                total: order.totalHarga,
+                cashReceived: order.cashReceived,
+                change: order.change,
+                paymentMethod: 'Non-Tunai',
+                date: new Date(order.createdAt).toLocaleString('id-ID'),
+              });
+              setShowReceipt(true);
+            }
+          })
+          .catch(err => console.error('Error fetching order:', err));
+        
         toast({
           title: '✅ Pembayaran Berhasil',
           description: `Pesanan #${orderId} berhasil dibayar!`,
@@ -94,6 +122,8 @@ export default function KasirPage() {
         setCart([]);
         setCustomerName('');
         setCustomerPhone('');
+        setCashReceived('');
+        setDiscount('');
         setSearchQuery('');
         fetchProducts();
         // Remove query params from URL
@@ -295,6 +325,25 @@ export default function KasirPage() {
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   };
 
+  const getDiscountAmount = () => {
+    const discountValue = discount && discount !== '' ? parseFloat(discount) : 0;
+    return isNaN(discountValue) ? 0 : discountValue;
+  };
+
+  const getSubtotal = () => {
+    return getTotalPrice();
+  };
+
+  const getTotalAfterDiscount = () => {
+    return Math.max(0, getSubtotal() - getDiscountAmount());
+  };
+
+  const getChange = () => {
+    const cashValue = cashReceived && cashReceived !== '' ? parseFloat(cashReceived) : 0;
+    if (isNaN(cashValue) || cashValue <= 0) return 0;
+    return Math.max(0, cashValue - getTotalAfterDiscount());
+  };
+
   const handleCheckout = async () => {
     if (!customerName || !customerPhone) {
       toast({
@@ -314,6 +363,28 @@ export default function KasirPage() {
       return;
     }
 
+    // Validate cash payment
+    if (paymentMethod === 'tunai') {
+      const cashValue = cashReceived && cashReceived !== '' ? parseFloat(cashReceived) : 0;
+      if (isNaN(cashValue) || cashValue <= 0) {
+        toast({
+          title: '❌ Error',
+          description: 'Uang yang diterima harus diisi',
+          variant: 'error',
+        });
+        return;
+      }
+
+      if (getChange() < 0) {
+        toast({
+          title: '❌ Error',
+          description: `Uang tidak mencukupi! Kurang: ${formatRupiah(Math.abs(getChange()))}`,
+          variant: 'error',
+        });
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
@@ -325,6 +396,8 @@ export default function KasirPage() {
           customerName,
           customerPhone,
           paymentMethod: paymentMethod,
+          discount: paymentMethod === 'tunai' ? getDiscountAmount() : 0,
+          cashReceived: paymentMethod === 'tunai' ? (cashReceived && cashReceived !== '' ? parseFloat(cashReceived) : 0) : null,
           items: cart.map((item) => {
             // Ensure all required fields are present and valid
             if (!item.productId || !item.priceType || !item.quantity || !item.price) {
@@ -359,15 +432,40 @@ export default function KasirPage() {
 
       // If payment method is tunai, order is already paid
       if (paymentMethod === 'tunai') {
+        const changeAmount = getChange();
+        
+        // Set receipt data
+        // Note: API returns order directly, not wrapped in { order: ... }
+        setReceiptData({
+          orderId: data.id,
+          customerName: data.customerName,
+          customerPhone: data.customerPhone,
+          items: data.items,
+          subtotal: getSubtotal(),
+          discount: getDiscountAmount(),
+          total: getTotalAfterDiscount(),
+          cashReceived: cashReceived && cashReceived !== '' ? parseFloat(cashReceived) : 0,
+          change: changeAmount,
+          paymentMethod: 'Tunai',
+          date: new Date().toLocaleString('id-ID'),
+        });
+        
         toast({
           title: '✅ Berhasil',
-          description: 'Pesanan berhasil dibuat!',
+          description: changeAmount > 0 
+            ? `Pesanan berhasil dibuat! Kembalian: ${formatRupiah(changeAmount)}`
+            : 'Pesanan berhasil dibuat!',
         });
+        
+        // Show receipt
+        setShowReceipt(true);
         
         // Reset form
         setCart([]);
         setCustomerName('');
         setCustomerPhone('');
+        setCashReceived('');
+        setDiscount('');
         setSearchQuery('');
         
         // Refresh products
@@ -607,10 +705,15 @@ export default function KasirPage() {
                               return (
                                 <div
                                   key={variant.id}
-                                  className={`border rounded-lg p-3 transition-colors ${
+                                  onClick={() => {
+                                    if (isAvailable) {
+                                      addToCart(product, variant, 1);
+                                    }
+                                  }}
+                                  className={`border rounded-lg p-3 transition-all cursor-pointer ${
                                     isAvailable
-                                      ? 'border-gray-200 bg-white hover:border-[#ffd700]/50'
-                                      : 'border-gray-100 bg-gray-50 opacity-60'
+                                      ? 'border-gray-200 bg-white hover:border-[#ffd700] hover:bg-[#ffd700]/5 hover:shadow-md active:scale-[0.98]'
+                                      : 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
                                   }`}
                                 >
                                   <div className="flex justify-between items-center mb-2">
@@ -645,33 +748,6 @@ export default function KasirPage() {
                                     </span>
                                   </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-
-                          {/* Add to Cart Buttons */}
-                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200">
-                            {product.variants.map((variant) => {
-                              const hasStock = (variant.stock_offline ?? 0) > 0;
-                              const hasPrice = variant.price !== null && variant.price !== undefined;
-                              const isAvailable = hasStock && hasPrice;
-                              
-                              return (
-                                <Button
-                                  key={variant.id}
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => addToCart(product, variant, 1)}
-                                  disabled={!isAvailable}
-                                  className={`text-xs transition-all ${
-                                    isAvailable
-                                      ? 'hover:bg-[#ffd700]/10 hover:border-[#ffd700] hover:text-[#ffd700]'
-                                      : 'opacity-50 cursor-not-allowed'
-                                  }`}
-                                >
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  {variant.priceType.charAt(0).toUpperCase() + variant.priceType.slice(1)}
-                                </Button>
                               );
                             })}
                           </div>
@@ -793,7 +869,11 @@ export default function KasirPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setPaymentMethod('tunai')}
+                      onClick={() => {
+                        setPaymentMethod('tunai');
+                        setCashReceived('');
+                        setDiscount('');
+                      }}
                       className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all ${
                         paymentMethod === 'tunai'
                           ? 'border-[#ffd700] bg-[#ffd700]/10'
@@ -805,7 +885,11 @@ export default function KasirPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPaymentMethod('non-tunai')}
+                      onClick={() => {
+                        setPaymentMethod('non-tunai');
+                        setCashReceived('');
+                        setDiscount('');
+                      }}
                       className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all ${
                         paymentMethod === 'non-tunai'
                           ? 'border-[#ffd700] bg-[#ffd700]/10'
@@ -819,16 +903,102 @@ export default function KasirPage() {
                 </div>
               )}
 
-              {/* Total */}
-              <div className="border-t border-gray-200 pt-4">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-lg font-bold text-gray-900">Total:</span>
-                  <span className="text-xl font-bold text-[#ffd700]">{formatRupiah(getTotalPrice())}</span>
+              {/* Summary & Payment */}
+              <div className="border-t border-gray-200 pt-4 space-y-4">
+                {/* Ringkasan Pembayaran */}
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Ringkasan Pembayaran</h4>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Subtotal:</span>
+                    <span className="text-sm font-semibold text-gray-900">{formatRupiah(getSubtotal())}</span>
+                  </div>
+
+                  {paymentMethod === 'tunai' && getDiscountAmount() > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Diskon:</span>
+                      <span className="text-sm font-semibold text-red-600">-{formatRupiah(getDiscountAmount())}</span>
+                    </div>
+                  )}
+
+                  <div className="border-t border-gray-200 pt-2 mt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-base font-bold text-gray-900">Total:</span>
+                      <span className="text-lg font-bold text-[#ffd700]">{formatRupiah(getTotalAfterDiscount())}</span>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Input Pembayaran Tunai */}
+                {paymentMethod === 'tunai' && (
+                  <div className="bg-blue-50 rounded-lg p-4 space-y-3">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Pembayaran Tunai</h4>
+                    
+                    {/* Uang Diterima - Prominent */}
+                    <div className="space-y-2">
+                      <Label htmlFor="cashReceived" className="text-base font-bold text-gray-900 flex items-center gap-2">
+                        <Wallet className="h-4 w-4 text-[#ffd700]" />
+                        Uang Diterima (Rp) <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="cashReceived"
+                        type="number"
+                        min="0"
+                        value={cashReceived}
+                        onChange={(e) => setCashReceived(e.target.value)}
+                        placeholder="Masukkan jumlah uang"
+                        className="w-full text-lg font-semibold py-3 border-2 border-[#ffd700] focus:border-[#ffd700] focus:ring-2 focus:ring-[#ffd700]/20"
+                        autoFocus
+                      />
+                    </div>
+
+                    {/* Diskon - Optional, smaller */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="discount" className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                        Diskon (Rp) <span className="text-gray-400 text-[10px]">(Opsional)</span>
+                      </Label>
+                      <Input
+                        id="discount"
+                        type="number"
+                        min="0"
+                        value={discount}
+                        onChange={(e) => setDiscount(e.target.value)}
+                        placeholder="0"
+                        className="w-full text-sm"
+                      />
+                    </div>
+
+                    {/* Kembalian Display */}
+                    {cashReceived && parseFloat(cashReceived) > 0 && (
+                      <>
+                        {getChange() > 0 ? (
+                          <div className="bg-green-100 border border-green-300 rounded-lg p-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-semibold text-green-900">Kembalian:</span>
+                              <span className="text-base font-bold text-green-700">{formatRupiah(getChange())}</span>
+                            </div>
+                          </div>
+                        ) : getChange() < 0 && (
+                          <div className="bg-red-100 border border-red-300 rounded-lg p-3">
+                            <p className="text-sm text-red-700 font-medium">
+                              Uang tidak mencukupi! Kurang: {formatRupiah(Math.abs(getChange()))}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Checkout Button */}
                 <Button
                   onClick={handleCheckout}
                   className="w-full"
-                  disabled={submitting || cart.length === 0}
+                  disabled={
+                    submitting || 
+                    cart.length === 0 || 
+                    (paymentMethod === 'tunai' && (getChange() < 0 || !cashReceived || parseFloat(cashReceived) <= 0))
+                  }
                 >
                   {submitting ? (
                     <>
@@ -844,6 +1014,148 @@ export default function KasirPage() {
           </Card>
         </div>
       </div>
+
+      {/* Receipt Modal */}
+      {showReceipt && receiptData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto" id="receipt">
+            <div className="p-6">
+              {/* Receipt Header */}
+              <div className="text-center mb-6 border-b pb-4">
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">STRUK PEMBELIAN</h2>
+                <p className="text-sm text-gray-600">Terima Kasih Atas Kunjungan Anda</p>
+                <p className="text-xs text-gray-500 mt-2">{receiptData.date}</p>
+              </div>
+
+              {/* Order Info */}
+              <div className="mb-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">No. Pesanan:</span>
+                  <span className="font-semibold">#{receiptData.orderId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Pelanggan:</span>
+                  <span className="font-semibold">{receiptData.customerName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Telepon:</span>
+                  <span className="font-semibold">{receiptData.customerPhone}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Pembayaran:</span>
+                  <span className="font-semibold">{receiptData.paymentMethod}</span>
+                </div>
+              </div>
+
+              {/* Items */}
+              <div className="border-t border-b py-4 my-4">
+                <div className="space-y-3">
+                  {receiptData.items.map((item: any, index: number) => (
+                    <div key={index} className="flex justify-between text-sm">
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900">{item.product.name}</p>
+                        <p className="text-gray-600 text-xs">
+                          {item.priceType.charAt(0).toUpperCase() + item.priceType.slice(1)} x {item.quantity}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-900">
+                          {formatRupiah(item.price * item.quantity)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="space-y-2 text-sm mb-4">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Subtotal:</span>
+                  <span className="font-semibold">{formatRupiah(receiptData.subtotal)}</span>
+                </div>
+                {receiptData.discount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Diskon:</span>
+                    <span className="font-semibold text-red-600">-{formatRupiah(receiptData.discount)}</span>
+                  </div>
+                )}
+                {receiptData.cashReceived && receiptData.cashReceived > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Uang Diterima:</span>
+                      <span className="font-semibold">{formatRupiah(receiptData.cashReceived)}</span>
+                    </div>
+                    {receiptData.change && receiptData.change > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Kembalian:</span>
+                        <span className="font-semibold text-green-600">{formatRupiah(receiptData.change)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="flex justify-between pt-2 border-t font-bold text-lg">
+                  <span>Total:</span>
+                  <span className="text-[#ffd700]">{formatRupiah(receiptData.total)}</span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="text-center text-xs text-gray-500 border-t pt-4 mt-4">
+                <p>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
+                <p className="mt-2">Terima Kasih</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 mt-6 print:hidden">
+                <Button
+                  onClick={() => {
+                    window.print();
+                  }}
+                  className="flex-1"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowReceipt(false);
+                    setReceiptData(null);
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Tutup
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Print Styles */}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #receipt, #receipt * {
+            visibility: visible;
+          }
+          #receipt {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            max-width: 100%;
+            box-shadow: none;
+            border: none;
+          }
+          .print\\:hidden {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -553,6 +553,8 @@ export default function CheckoutPage() {
         customerPhone,
         items: cart.map((item) => ({
           productId: item.productId,
+          variantId: item.variantId || null,
+          priceType: item.priceType,
           quantity: item.quantity,
           price: item.price,
         })),
@@ -561,6 +563,14 @@ export default function CheckoutPage() {
       };
 
       console.log('📦 Creating order with payload:', JSON.stringify(orderPayload, null, 2));
+      console.log('📦 Cart items:', cart.map(item => ({
+        productId: item.productId,
+        variantId: item.variantId,
+        priceType: item.priceType,
+        productName: item.product.name,
+        hasVariants: !!item.product.variants,
+        variants: item.product.variants
+      })));
 
       // Create order in database
       const orderResponse = await fetch('/api/pesanan', {
@@ -569,7 +579,14 @@ export default function CheckoutPage() {
         body: JSON.stringify(orderPayload),
       });
 
-      const orderData = await orderResponse.json();
+      let orderData;
+      try {
+        const text = await orderResponse.text();
+        orderData = text ? JSON.parse(text) : {};
+      } catch (parseError) {
+        console.error('❌ Error parsing response:', parseError);
+        orderData = { error: 'Gagal memproses response dari server' };
+      }
 
       console.log('📦 Order response:', {
         ok: orderResponse.ok,
@@ -578,8 +595,37 @@ export default function CheckoutPage() {
       });
 
       if (!orderResponse.ok) {
-        console.error('❌ Create order error:', orderData);
-        const errorMessage = orderData.error || orderData.message || 'Gagal membuat pesanan';
+        console.error('❌ Create order error:', {
+          status: orderResponse.status,
+          statusText: orderResponse.statusText,
+          data: orderData
+        });
+        
+        let errorMessage = 'Gagal membuat pesanan';
+        if (orderData && orderData.error) {
+          errorMessage = orderData.error;
+          if (orderData.details && Array.isArray(orderData.details)) {
+            errorMessage += ': ' + orderData.details.join(', ');
+          } else if (orderData.details) {
+            errorMessage += ': ' + orderData.details;
+          }
+        } else if (orderData && orderData.message) {
+          errorMessage = orderData.message;
+        } else if (orderResponse.status === 400) {
+          errorMessage = 'Data tidak valid. Silakan cek kembali pesanan Anda.';
+        } else if (orderResponse.status === 404) {
+          if (orderData && orderData.error) {
+            errorMessage = orderData.error;
+            if (orderData.details) {
+              errorMessage += ' - ' + orderData.details;
+            }
+          } else {
+            errorMessage = 'Produk tidak ditemukan. Silakan refresh halaman dan coba lagi.';
+          }
+        } else if (orderResponse.status === 500) {
+          errorMessage = 'Terjadi kesalahan pada server. Silakan coba lagi nanti.';
+        }
+        
         toast({
           variant: "error",
           title: "❌ Gagal Membuat Pesanan",

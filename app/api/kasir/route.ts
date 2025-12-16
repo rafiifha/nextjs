@@ -7,7 +7,7 @@ import { triggerOrderEvent } from '@/services/pusherService';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { customerName, customerPhone, paymentMethod, items } = body;
+    const { customerName, customerPhone, paymentMethod, discount, cashReceived, items } = body;
 
     if (!customerName || !customerPhone || !items || items.length === 0) {
       return NextResponse.json(
@@ -108,8 +108,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate total
-    const totalHarga = normalizedItems.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+    // Calculate subtotal
+    const subtotal = normalizedItems.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+    
+    // Calculate discount
+    const discountAmount = discount && !isNaN(parseFloat(discount)) ? Math.max(0, parseFloat(discount)) : 0;
+    
+    // Calculate total after discount
+    const totalHarga = Math.max(0, subtotal - discountAmount);
+
+    // Calculate change for cash payment
+    const cashReceivedAmount = paymentMethod === 'tunai' && cashReceived && !isNaN(parseFloat(cashReceived))
+      ? Math.max(0, parseFloat(cashReceived))
+      : null;
+    const changeAmount = cashReceivedAmount !== null
+      ? Math.max(0, cashReceivedAmount - totalHarga)
+      : null;
 
     // Determine order status based on payment method
     const orderStatus = paymentMethod === 'non-tunai' ? 'pending' : 'paid';
@@ -121,6 +135,9 @@ export async function POST(request: NextRequest) {
         customerPhone,
         status: orderStatus, // 'paid' for tunai, 'pending' for non-tunai
         totalHarga,
+        discount: discountAmount > 0 ? discountAmount : 0,
+        cashReceived: cashReceivedAmount,
+        change: changeAmount,
         deliveryMethod: 'pickup',
         shippingFee: 0,
         items: {

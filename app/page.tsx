@@ -13,7 +13,7 @@ export default function Home() {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
               Toko{' '}
               <span className="text-[#ffd700]">Naning</span>
-            </h1>
+          </h1>
             <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
               Supplier sembako terpercaya dengan harga grosir terbaik. 
               Stok lengkap, harga kompetitif, dan pelayanan cepat untuk kebutuhan usaha Anda.
