@@ -14,6 +14,7 @@ model Category {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   products    Product[]
+  productRequests ProductRequest[]
 }
 
 model Product {
@@ -87,15 +88,17 @@ model User {
   createdAt DateTime @default(now())
 }
 
-model Debt {
+model ProductRequest {
   id            Int      @id @default(autoincrement())
-  customerName  String
-  customerPhone String
-  amount        Int
-  paidAmount    Int      @default(0)
-  status        String   @default("unpaid") // unpaid, partial, paid
-  dueDate       DateTime?
+  productName   String   // Nama produk yang diminta
+  categoryId    Int?     // ID kategori (opsional)
+  category      Category? @relation(fields: [categoryId], references: [id])
+  customerName  String   // Nama pelanggan yang meminta
+  customerPhone String   // Nomor telepon pelanggan
+  notes         String?  // Catatan tambahan (opsional)
+  status        String   @default("pending") // pending, approved, rejected, completed
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
 

@@ -9,12 +9,12 @@ import {
   ShoppingCart,
   Package,
   FileText,
-  CreditCard,
   BarChart3,
   Menu,
   X,
   LogOut,
-  ShoppingBag
+  ShoppingBag,
+  MessageSquare
 } from 'lucide-react';
 import { cartService } from '@/lib/cart';
 
@@ -69,7 +69,7 @@ export default function AdminLayout({
     { href: '/admin/kasir', label: 'Kasir', icon: ShoppingCart },
     { href: '/admin/produk', label: 'Manajemen Produk', icon: Package },
     { href: '/admin/pesanan', label: 'Manajemen Pesanan', icon: FileText },
-    { href: '/admin/hutang', label: 'Manajemen Hutang', icon: CreditCard },
+    { href: '/admin/permintaan-barang', label: 'Permintaan Barang', icon: MessageSquare },
     { href: '/admin/laporan', label: 'Laporan Penjualan', icon: BarChart3 },
   ];
 

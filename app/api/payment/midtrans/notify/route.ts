@@ -122,18 +122,41 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log('📥 Midtrans notification received:', JSON.stringify(body, null, 2));
+    console.log('📥 Request headers:', {
+      'user-agent': request.headers.get('user-agent'),
+      'content-type': request.headers.get('content-type'),
+    });
     
     const notification = await verifyNotification(body);
     console.log('✅ Notification verified:', JSON.stringify(notification, null, 2));
 
     // Parse order ID from format: ORDER-{id}-{timestamp}
-    const orderIdParts = notification.order_id.split('-');
-    const orderId = parseInt(orderIdParts[1]);
+    // Example: ORDER-15-1765793248340
+    const orderIdMatch = notification.order_id.match(/^ORDER-(\d+)-/);
+    let orderId: number;
     
-    if (isNaN(orderId)) {
-      console.error('❌ Invalid order ID:', notification.order_id);
+    if (orderIdMatch && orderIdMatch[1]) {
+      orderId = parseInt(orderIdMatch[1]);
+      console.log(`📋 Parsed order ID: ${orderId} from ${notification.order_id}`);
+    } else {
+      // Fallback: try splitting by dash
+      const orderIdParts = notification.order_id.split('-');
+      if (orderIdParts.length >= 2) {
+        orderId = parseInt(orderIdParts[1]);
+        console.log(`📋 Parsed order ID (fallback): ${orderId} from ${notification.order_id}`);
+      } else {
+        console.error('❌ Invalid order ID format:', notification.order_id);
+        return NextResponse.json(
+          { error: `Invalid order ID format: ${notification.order_id}` },
+          { status: 400 }
+        );
+      }
+    }
+    
+    if (isNaN(orderId) || orderId <= 0) {
+      console.error('❌ Invalid order ID:', notification.order_id, '-> parsed as:', orderId);
       return NextResponse.json(
-        { error: 'Invalid order ID format' },
+        { error: `Invalid order ID: ${notification.order_id} (parsed as ${orderId})` },
         { status: 400 }
       );
     }
@@ -146,11 +169,23 @@ export async function POST(request: NextRequest) {
     if (transactionStatus === 'capture' && fraudStatus === 'accept') {
       // Payment successful
       console.log(`✅ Payment captured for order ${orderId}`);
-      await updateOrderToPaid(orderId);
+      try {
+        await updateOrderToPaid(orderId);
+        console.log(`✅ Successfully updated order ${orderId} to paid`);
+      } catch (error: any) {
+        console.error(`❌ Failed to update order ${orderId} to paid:`, error);
+        throw error;
+      }
     } else if (transactionStatus === 'settlement') {
       // Payment settled
       console.log(`✅ Payment settled for order ${orderId}`);
-      await updateOrderToPaid(orderId);
+      try {
+        await updateOrderToPaid(orderId);
+        console.log(`✅ Successfully updated order ${orderId} to paid (settlement)`);
+      } catch (error: any) {
+        console.error(`❌ Failed to update order ${orderId} to paid (settlement):`, error);
+        throw error;
+      }
     } else if (transactionStatus === 'pending') {
       // Payment pending
       console.log(`⏳ Payment pending for order ${orderId}`);

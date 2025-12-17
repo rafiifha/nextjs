@@ -9,18 +9,85 @@ export async function GET() {
       include: {
         items: {
           include: {
-            product: true,
-            variant: true,
+            product: {
+              include: {
+                category: true,
+              },
+            },
+            variant: true, // variant bisa null untuk pesanan lama
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
-    return NextResponse.json(orders);
-  } catch (error) {
+    
+    // Normalize data to ensure all fields are properly formatted
+    const normalizedOrders = orders.map(order => {
+      try {
+        return {
+          id: order.id,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          status: order.status,
+          totalHarga: order.totalHarga,
+          discount: order.discount ?? null,
+          cashReceived: order.cashReceived ?? null,
+          change: order.change ?? null,
+          deliveryMethod: order.deliveryMethod ?? null,
+          shippingFee: order.shippingFee ?? null,
+          trackingId: order.trackingId ?? null,
+          waybillId: order.waybillId ?? null,
+          biteshipOrderId: order.biteshipOrderId ?? null,
+          expiredAt: order.expiredAt ? order.expiredAt.toISOString() : null,
+          createdAt: order.createdAt.toISOString(),
+          updatedAt: order.updatedAt.toISOString(),
+          items: order.items.map(item => ({
+            id: item.id,
+            orderId: item.orderId,
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            priceType: item.priceType ?? 'dus',
+            quantity: item.quantity,
+            price: item.price,
+            product: {
+              id: item.product.id,
+              name: item.product.name,
+              categoryId: item.product.categoryId,
+              category: item.product.category ? {
+                id: item.product.category.id,
+                name: item.product.category.name,
+              } : null,
+            },
+            variant: item.variant ? {
+              id: item.variant.id,
+              productId: item.variant.productId,
+              priceType: item.variant.priceType,
+              price: item.variant.price,
+              stock_online: item.variant.stock_online,
+              stock_offline: item.variant.stock_offline,
+            } : null,
+          })),
+        };
+      } catch (itemError) {
+        console.error('Error normalizing order:', order.id, itemError);
+        return null;
+      }
+    }).filter(order => order !== null);
+    
+    return NextResponse.json(normalizedOrders);
+  } catch (error: any) {
     console.error('Get orders error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack
+    });
     return NextResponse.json(
-      { error: 'Gagal mengambil data pesanan' },
+      { 
+        error: 'Gagal mengambil data pesanan',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     );
   }

@@ -234,10 +234,12 @@ export interface TrackingResponse {
 
 export async function getTracking(trackingId: string): Promise<TrackingResponse> {
   try {
+    console.log('🚀 Fetching tracking info for:', trackingId);
     const response = await biteshipApi.get(`/trackings/${trackingId}`);
+    console.log('✅ Tracking response:', JSON.stringify(response.data, null, 2));
     return response.data;
   } catch (error: any) {
-    console.error('Biteship tracking error:', error.response?.data || error.message);
+    console.error('❌ Biteship tracking error:', error.response?.data || error.message);
     throw error;
   }
 }

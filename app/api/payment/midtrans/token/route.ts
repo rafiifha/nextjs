@@ -64,11 +64,15 @@ export async function POST(request: NextRequest) {
       finalErrorUrl = `${baseUrl}/payment/failed`;
     }
 
+    // Construct notification URL - must be publicly accessible
+    const notificationUrl = `${baseUrl}/api/payment/midtrans/notify`;
+    
     console.log('🔗 Redirect URLs (validated):');
     console.log('  - Base URL:', baseUrl);
     console.log('  - Finish URL:', finalFinishUrl);
     console.log('  - Unfinish URL:', finalUnfinishUrl);
     console.log('  - Error URL:', finalErrorUrl);
+    console.log('  - Notification URL:', notificationUrl);
 
     const transaction = await createSnapTransaction({
       orderId: `ORDER-${orderId}-${Date.now()}`,
@@ -80,6 +84,7 @@ export async function POST(request: NextRequest) {
       finishRedirectUrl: finalFinishUrl,
       unfinishRedirectUrl: finalUnfinishUrl,
       errorRedirectUrl: finalErrorUrl,
+      notificationUrl: notificationUrl, // Explicitly pass notification URL
     });
 
     return NextResponse.json({ token: transaction.token });

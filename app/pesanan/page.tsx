@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
-import { Package, Loader2, ShoppingCart, Calendar, MapPin, Truck, CreditCard, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Package, Loader2, ShoppingCart, Calendar, MapPin, Truck, CreditCard, CheckCircle, Clock, XCircle, Navigation, Phone, User, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 
 interface OrderItem {
@@ -36,11 +37,16 @@ interface Order {
 export default function PesananPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [highlightOrderId, setHighlightOrderId] = useState<number | null>(null);
+  const [hasShownPaymentNotification, setHasShownPaymentNotification] = useState(false);
+  const [trackingData, setTrackingData] = useState<{ [key: number]: any }>({});
+  const [loadingTracking, setLoadingTracking] = useState<{ [key: number]: boolean }>({});
+  const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     // Check authentication
@@ -59,31 +65,103 @@ export default function PesananPage() {
       
       // Check if there's orderId in URL (from payment success redirect)
       const orderIdParam = searchParams?.get('orderId');
-      if (orderIdParam) {
-        const orderId = parseInt(orderIdParam);
-        if (!isNaN(orderId)) {
-          setHighlightOrderId(orderId);
-          // Scroll to highlighted order after a short delay
-          setTimeout(() => {
-            const element = document.getElementById(`order-${orderId}`);
-            if (element) {
-              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          }, 500);
-        }
-      }
+      const paymentStatus = searchParams?.get('payment');
       
-      // Fetch orders after user is set
-      setTimeout(() => {
-        // Fetch orders after user is set
-      setTimeout(() => {
-        fetchOrders();
-      }, 100);
-      }, 100);
+      // Fetch orders first
+      fetchOrders().then(() => {
+        // After orders are loaded, handle notification and scroll
+        if (orderIdParam) {
+          const orderId = parseInt(orderIdParam);
+          if (!isNaN(orderId)) {
+            setHighlightOrderId(orderId);
+            console.log('📦 Highlighting order:', orderId);
+            
+            // Show notification if payment was successful
+            if (paymentStatus === 'success' && !hasShownPaymentNotification) {
+              setHasShownPaymentNotification(true);
+              // Expand the order automatically
+              setExpandedOrders(prev => new Set(prev).add(orderId));
+              // Show notification
+              toast({
+                variant: "success",
+                title: "✅ Pembayaran Berhasil!",
+                description: `Pesanan #${orderId} Anda berhasil dibayar dan sedang diproses.`,
+              });
+            }
+            
+            // Scroll to highlighted order after orders are loaded
+            const scrollToOrder = () => {
+              const element = document.getElementById(`order-${orderId}`);
+              if (element) {
+                console.log('📍 Scrolling to order:', orderId);
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } else {
+                console.log('⚠️ Order element not found, retrying...');
+                setTimeout(scrollToOrder, 500);
+              }
+            };
+            
+            // Wait a bit for DOM to render
+            setTimeout(scrollToOrder, 800);
+            
+            // Clean up URL parameters after showing notification
+            if (paymentStatus) {
+              setTimeout(() => {
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, '', newUrl);
+              }, 3000);
+            }
+          }
+        }
+      });
     } catch (e) {
       router.push('/login?redirect=/pesanan');
     }
   }, [router, searchParams]);
+
+  // Auto-refresh orders every 10 seconds if there are pending orders
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    const hasPendingOrders = orders.some(order => order.status === 'pending');
+    if (!hasPendingOrders) return;
+    
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing orders...');
+      fetchOrders();
+    }, 10000); // Refresh every 10 seconds
+    
+    return () => clearInterval(interval);
+  }, [orders, isAuthenticated]);
+
+  // Fetch tracking for paid orders with trackingId
+  const fetchTracking = async (orderId: number, trackingId: string) => {
+    if (loadingTracking[orderId] || trackingData[orderId]) return;
+    
+    setLoadingTracking(prev => ({ ...prev, [orderId]: true }));
+    try {
+      const res = await fetch(`/api/delivery/biteship/tracking?trackingId=${trackingId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTrackingData(prev => ({ ...prev, [orderId]: data }));
+      } else {
+        console.error('Failed to fetch tracking:', res.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching tracking:', error);
+    } finally {
+      setLoadingTracking(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  // Auto-fetch tracking for paid orders with trackingId
+  useEffect(() => {
+    orders.forEach(order => {
+      if (order.status === 'paid' && order.trackingId && !trackingData[order.id] && !loadingTracking[order.id]) {
+        fetchTracking(order.id, order.trackingId);
+      }
+    });
+  }, [orders]);
 
   const fetchOrders = async () => {
     try {
@@ -128,16 +206,44 @@ export default function PesananPage() {
           
           console.log(`✅ Filtered orders for user:`, filtered);
           setOrders(filtered);
+          return filtered;
         } else {
-          setOrders(Array.isArray(data) ? data : []);
+          const ordersData = Array.isArray(data) ? data : [];
+          setOrders(ordersData);
+          return ordersData;
         }
       } else {
         console.error('❌ Failed to fetch orders:', res.status, res.statusText);
-        const errorData = await res.json().catch(() => ({}));
+        let errorData: any = {};
+        try {
+          const text = await res.text();
+          if (text) {
+            errorData = JSON.parse(text);
+          }
+        } catch (e) {
+          console.error('Failed to parse error response:', e);
+        }
         console.error('Error details:', errorData);
+        
+        // Show error toast to user
+        if (res.status === 500) {
+          toast({
+            variant: "error",
+            title: "❌ Gagal Memuat Pesanan",
+            description: errorData.error || "Terjadi kesalahan saat memuat data pesanan. Silakan refresh halaman.",
+          });
+        }
+        
+        return [];
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error fetching orders:', error);
+      toast({
+        variant: "error",
+        title: "❌ Gagal Memuat Pesanan",
+        description: error.message || "Terjadi kesalahan saat memuat data pesanan. Silakan refresh halaman.",
+      });
+      return [];
     } finally {
       setLoading(false);
     }
@@ -203,124 +309,324 @@ export default function PesananPage() {
         </div>
 
         {orders.length > 0 ? (
-          <div className="space-y-4">
-            {orders.map((order) => (
-              <Card 
-                key={order.id} 
-                className={`border-gray-200 shadow-md hover:shadow-lg transition-shadow ${
-                  highlightOrderId === order.id ? 'ring-2 ring-[#ffd700] bg-[#ffd700]/5' : ''
-                }`}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg font-bold">Pesanan #{order.id}</CardTitle>
-                      <CardDescription className="mt-1">
-                        <Calendar className="h-4 w-4 inline mr-1" />
-                        {formatDate(order.createdAt)}
-                      </CardDescription>
-                      {order.expiredAt && order.status === 'pending' && (
-                        <CardDescription className="mt-1 text-xs text-red-600">
-                          ⏰ Kedaluwarsa: {formatDate(order.expiredAt)}
-                        </CardDescription>
-                      )}
-                    </div>
-                    {getStatusBadge(order.status)}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Order Items */}
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Item Pesanan:</h4>
-                      <div className="space-y-2">
-                        {order.items.map((item) => (
-                          <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                            <div>
-                              <p className="font-medium text-gray-900">{item.product.name}</p>
-                              <p className="text-sm text-gray-600">
-                                {item.quantity} x {formatRupiah(item.price)}
-                              </p>
-                            </div>
-                            <p className="font-semibold text-gray-900">
-                              {formatRupiah(item.price * item.quantity)}
+          <div className="space-y-3">
+            {orders.map((order) => {
+              const isExpanded = expandedOrders.has(order.id);
+              const itemsCount = order.items.length;
+              const itemsSummary = order.items.slice(0, 2).map(item => item.product.name).join(', ');
+              const moreItems = itemsCount > 2 ? ` +${itemsCount - 2} item lainnya` : '';
+              
+              return (
+                <Card 
+                  key={order.id}
+                  id={`order-${order.id}`}
+                  className={`border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer ${
+                    highlightOrderId === order.id ? 'ring-2 ring-[#ffd700] bg-[#ffd700]/5' : ''
+                  }`}
+                  onClick={() => {
+                    setExpandedOrders(prev => {
+                      const newSet = new Set(prev);
+                      if (newSet.has(order.id)) {
+                        newSet.delete(order.id);
+                      } else {
+                        newSet.add(order.id);
+                      }
+                      return newSet;
+                    });
+                  }}
+                >
+                  <CardContent className="p-4">
+                    {/* Compact Header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <h3 className="font-bold text-gray-900">Pesanan #{order.id}</h3>
+                            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(order.createdAt).toLocaleDateString('id-ID', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
                             </p>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Delivery Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                      <div>
-                        <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                          {order.deliveryMethod === 'delivery' ? (
-                            <Truck className="h-4 w-4 text-[#ffd700]" />
-                          ) : (
-                            <MapPin className="h-4 w-4 text-[#ffd700]" />
-                          )}
-                          {order.deliveryMethod === 'delivery' ? 'Pengiriman' : 'Ambil Sendiri'}
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {order.deliveryMethod === 'delivery' 
-                            ? `Ongkir: ${formatRupiah(order.shippingFee || 0)}`
-                            : 'Tidak ada biaya pengiriman'}
-                        </p>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                          <CreditCard className="h-4 w-4 text-[#ffd700]" />
-                          Total Pembayaran
-                        </h4>
-                        <p className="text-2xl font-bold text-[#ffd700]">
-                          {formatRupiah(order.totalHarga)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Order IDs & Tracking Info */}
-                    {(order.trackingId || order.waybillId || order.biteshipOrderId) && (
-                      <div className="pt-4 border-t border-gray-200">
-                        <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                          <Package className="h-4 w-4 text-[#ffd700]" />
-                          Informasi Pengiriman
-                        </h4>
-                        <div className="space-y-1 text-sm">
-                          {order.trackingId && (
-                            <p className="text-gray-600">
-                              <span className="font-medium">Tracking ID:</span>{' '}
-                              <span className="font-mono text-gray-900">{order.trackingId}</span>
-                            </p>
-                          )}
-                          {order.waybillId && (
-                            <p className="text-gray-600">
-                              <span className="font-medium">Waybill ID:</span>{' '}
-                              <span className="font-mono text-gray-900">{order.waybillId}</span>
-                            </p>
-                          )}
-                          {order.biteshipOrderId && (
-                            <p className="text-gray-600">
-                              <span className="font-medium">Biteship Order ID:</span>{' '}
-                              <span className="font-mono text-gray-900">{order.biteshipOrderId}</span>
-                            </p>
-                          )}
+                          {getStatusBadge(order.status)}
                         </div>
                       </div>
-                    )}
-
-                    {/* Customer Info */}
-                    <div className="pt-4 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Pelanggan:</span> {order.customerName}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Kontak:</span> {order.customerPhone}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">Total</p>
+                          <p className="text-lg font-bold text-[#ffd700]">
+                            {formatRupiah(order.totalHarga)}
+                          </p>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="h-5 w-5 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-gray-400" />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+
+                    {/* Compact Summary */}
+                    <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                      <div className="flex items-center gap-4">
+                        <span className="flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5" />
+                          {itemsCount} item
+                        </span>
+                        <span className="flex items-center gap-1">
+                          {order.deliveryMethod === 'delivery' ? (
+                            <>
+                              <Truck className="h-3.5 w-3.5" />
+                              Pengiriman
+                            </>
+                          ) : (
+                            <>
+                              <MapPin className="h-3.5 w-3.5" />
+                              Ambil Sendiri
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Expanded Detail */}
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                        {/* Order Items */}
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-2 text-sm">Item Pesanan:</h4>
+                          <div className="space-y-2">
+                            {order.items.map((item) => (
+                              <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                                <div>
+                                  <p className="font-medium text-gray-900">{item.product.name}</p>
+                                  <p className="text-xs text-gray-600">
+                                    {item.quantity} x {formatRupiah(item.price)}
+                                  </p>
+                                </div>
+                                <p className="font-semibold text-gray-900">
+                                  {formatRupiah(item.price * item.quantity)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Delivery Info */}
+                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                          <div>
+                            <p className="text-xs text-gray-600 mb-1">Metode Pengiriman</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {order.deliveryMethod === 'delivery' ? 'Pengiriman' : 'Ambil Sendiri'}
+                            </p>
+                            {order.deliveryMethod === 'delivery' && order.shippingFee && (
+                              <p className="text-xs text-gray-600 mt-1">
+                                Ongkir: {formatRupiah(order.shippingFee)}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-600 mb-1">Total Pembayaran</p>
+                            <p className="text-lg font-bold text-[#ffd700]">
+                              {formatRupiah(order.totalHarga)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Tracking Info - Only for paid orders with trackingId */}
+                        {order.status === 'paid' && order.trackingId && (
+                          <div className="pt-4 border-t border-gray-200">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
+                                <Navigation className="h-4 w-4 text-[#ffd700]" />
+                                Tracking Pengiriman
+                              </h4>
+                              {!trackingData[order.id] && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    fetchTracking(order.id, order.trackingId!);
+                                  }}
+                                  disabled={loadingTracking[order.id]}
+                                  className="text-xs"
+                                >
+                                  {loadingTracking[order.id] ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      Memuat...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RefreshCw className="h-3 w-3 mr-1" />
+                                      Refresh
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+
+                            {loadingTracking[order.id] && !trackingData[order.id] && (
+                              <div className="flex items-center justify-center py-4">
+                                <Loader2 className="h-5 w-5 animate-spin text-[#ffd700]" />
+                                <span className="ml-2 text-sm text-gray-600">Memuat tracking...</span>
+                              </div>
+                            )}
+
+                            {trackingData[order.id] && (
+                              <div className="space-y-3">
+                                {/* Tracking Status */}
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-blue-900">Status:</span>
+                                    <span className="text-sm font-semibold text-blue-700 capitalize">
+                                      {trackingData[order.id].status}
+                                    </span>
+                                  </div>
+                                  {trackingData[order.id].waybill_id && (
+                                    <div className="mt-2 flex items-center justify-between">
+                                      <span className="text-xs text-blue-700">Waybill ID:</span>
+                                      <span className="text-xs font-mono text-blue-900">
+                                        {trackingData[order.id].waybill_id}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Courier Info */}
+                                {trackingData[order.id].courier && (
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <h5 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                                      <Truck className="h-4 w-4 text-[#ffd700]" />
+                                      Informasi Kurir
+                                    </h5>
+                                    <div className="space-y-1 text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-gray-600 w-20">Kurir:</span>
+                                        <span className="font-medium text-gray-900 capitalize">
+                                          {trackingData[order.id].courier.company}
+                                        </span>
+                                      </div>
+                                      {trackingData[order.id].courier.driver_name && (
+                                        <div className="flex items-center gap-2">
+                                          <User className="h-3 w-3 text-gray-400" />
+                                          <span className="text-gray-600 w-20">Driver:</span>
+                                          <span className="font-medium text-gray-900">
+                                            {trackingData[order.id].courier.driver_name}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {trackingData[order.id].courier.driver_phone && (
+                                        <div className="flex items-center gap-2">
+                                          <Phone className="h-3 w-3 text-gray-400" />
+                                          <span className="text-gray-600 w-20">Telepon:</span>
+                                          <a
+                                            href={`tel:${trackingData[order.id].courier.driver_phone}`}
+                                            className="font-medium text-blue-600 hover:text-blue-800"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            {trackingData[order.id].courier.driver_phone}
+                                          </a>
+                                        </div>
+                                      )}
+                                      {trackingData[order.id].courier.driver_plate_number && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-gray-600 w-20">Plat:</span>
+                                          <span className="font-medium text-gray-900">
+                                            {trackingData[order.id].courier.driver_plate_number}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Tracking History */}
+                                {trackingData[order.id].history && trackingData[order.id].history.length > 0 && (
+                                  <div>
+                                    <h5 className="font-semibold text-gray-900 mb-2 text-sm">Riwayat Pengiriman</h5>
+                                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                                      {trackingData[order.id].history.map((history: any, index: number) => (
+                                        <div
+                                          key={index}
+                                          className="flex gap-3 pb-2 border-l-2 border-gray-200 pl-3 relative"
+                                        >
+                                          <div className="absolute -left-2 top-0 w-3 h-3 bg-[#ffd700] rounded-full border-2 border-white"></div>
+                                          <div className="flex-1">
+                                            <p className="text-xs font-medium text-gray-900">{history.note}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                              <span className="text-xs text-gray-500">
+                                                {new Date(history.updated_at).toLocaleString('id-ID')}
+                                              </span>
+                                              <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded capitalize">
+                                                {history.status}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Tracking Link */}
+                                {trackingData[order.id].link && (
+                                  <div className="pt-2">
+                                    <a
+                                      href={trackingData[order.id].link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Navigation className="h-3 w-3" />
+                                      Buka tracking di website kurir
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {!loadingTracking[order.id] && !trackingData[order.id] && (
+                              <div className="text-center py-3">
+                                <p className="text-xs text-gray-600 mb-2">Tracking belum tersedia</p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    fetchTracking(order.id, order.trackingId!);
+                                  }}
+                                  className="text-xs"
+                                >
+                                  <RefreshCw className="h-3 w-3 mr-1" />
+                                  Muat Tracking
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Expired Info */}
+                        {order.expiredAt && order.status === 'pending' && (
+                          <div className="pt-3 border-t border-gray-100">
+                            <p className="text-xs text-red-600">
+                              ⏰ Kedaluwarsa: {formatDate(order.expiredAt)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         ) : (
           <Card className="border-gray-200 shadow-md">

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatRupiah } from '@/lib/utils';
-import { Search, Filter, Package, Loader2, Send, Clock, CheckCircle, XCircle, Truck, Printer, Eye } from 'lucide-react';
+import { Search, Filter, Package, Loader2, Send, Clock, CheckCircle, XCircle, Truck, Printer, Eye, Navigation, RefreshCw, User, Phone } from 'lucide-react';
 
 interface OrderItem {
   id: number;
@@ -49,6 +49,8 @@ export default function ManajemenPesananPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [trackingData, setTrackingData] = useState<{ [key: number]: any }>({});
+  const [loadingTracking, setLoadingTracking] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
     fetchOrders();
@@ -164,6 +166,28 @@ export default function ManajemenPesananPage() {
         return 'bg-gray-100 text-gray-700 border-gray-300';
       default:
         return 'bg-gray-100 text-gray-700 border-gray-300';
+    }
+  };
+
+  // Fetch tracking for orders with trackingId
+  const fetchTracking = async (orderId: number, trackingId: string) => {
+    if (loadingTracking[orderId] || trackingData[orderId]) return;
+    
+    setLoadingTracking(prev => ({ ...prev, [orderId]: true }));
+    try {
+      const res = await fetch(`/api/delivery/biteship/tracking?trackingId=${trackingId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTrackingData(prev => ({ ...prev, [orderId]: data }));
+      } else {
+        console.error('Failed to fetch tracking:', res.statusText);
+        alert('Gagal mengambil data tracking');
+      }
+    } catch (error) {
+      console.error('Error fetching tracking:', error);
+      alert('Terjadi kesalahan saat mengambil data tracking');
+    } finally {
+      setLoadingTracking(prev => ({ ...prev, [orderId]: false }));
     }
   };
 
@@ -426,7 +450,6 @@ export default function ManajemenPesananPage() {
                     <option value="paid">Sudah Dibayar</option>
                     <option value="processing">Diproses</option>
                     <option value="delivered">Terkirim</option>
-                    <option value="cancelled">Dibatalkan</option>
                     <option value="expired">Kedaluwarsa</option>
                   </select>
                 </div>
@@ -618,6 +641,173 @@ export default function ManajemenPesananPage() {
                   </div>
                 )}
 
+                {/* Tracking Info - For orders with trackingId */}
+                {!isOfflineOrder(selectedOrder) && selectedOrder.trackingId && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-gray-900 text-lg flex items-center gap-2">
+                        <Navigation className="h-5 w-5 text-[#ffd700]" />
+                        Tracking Pengiriman
+                      </h3>
+                      {!trackingData[selectedOrder.id] && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => fetchTracking(selectedOrder.id, selectedOrder.trackingId!)}
+                          disabled={loadingTracking[selectedOrder.id]}
+                          className="text-xs"
+                        >
+                          {loadingTracking[selectedOrder.id] ? (
+                            <>
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Memuat...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="h-3 w-3 mr-1" />
+                              Refresh
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+
+                    {loadingTracking[selectedOrder.id] && !trackingData[selectedOrder.id] && (
+                      <div className="flex items-center justify-center py-4 bg-gray-50 rounded-lg">
+                        <Loader2 className="h-5 w-5 animate-spin text-[#ffd700]" />
+                        <span className="ml-2 text-sm text-gray-600">Memuat tracking...</span>
+                      </div>
+                    )}
+
+                    {trackingData[selectedOrder.id] && (
+                      <div className="space-y-4 bg-white border rounded-lg p-4">
+                        {/* Tracking Status */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-blue-900">Status:</span>
+                            <span className="text-sm font-semibold text-blue-700 capitalize">
+                              {trackingData[selectedOrder.id].status}
+                            </span>
+                          </div>
+                          {trackingData[selectedOrder.id].waybill_id && (
+                            <div className="mt-2 flex items-center justify-between">
+                              <span className="text-xs text-blue-700">Waybill ID:</span>
+                              <span className="text-xs font-mono text-blue-900">
+                                {trackingData[selectedOrder.id].waybill_id}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Courier Info */}
+                        {trackingData[selectedOrder.id].courier && (
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <h5 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                              <Truck className="h-4 w-4 text-[#ffd700]" />
+                              Informasi Kurir
+                            </h5>
+                            <div className="space-y-1 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-600 w-20">Kurir:</span>
+                                <span className="font-medium text-gray-900 capitalize">
+                                  {trackingData[selectedOrder.id].courier.company}
+                                </span>
+                              </div>
+                              {trackingData[selectedOrder.id].courier.driver_name && (
+                                <div className="flex items-center gap-2">
+                                  <User className="h-3 w-3 text-gray-400" />
+                                  <span className="text-gray-600 w-20">Driver:</span>
+                                  <span className="font-medium text-gray-900">
+                                    {trackingData[selectedOrder.id].courier.driver_name}
+                                  </span>
+                                </div>
+                              )}
+                              {trackingData[selectedOrder.id].courier.driver_phone && (
+                                <div className="flex items-center gap-2">
+                                  <Phone className="h-3 w-3 text-gray-400" />
+                                  <span className="text-gray-600 w-20">Telepon:</span>
+                                  <a
+                                    href={`tel:${trackingData[selectedOrder.id].courier.driver_phone}`}
+                                    className="font-medium text-blue-600 hover:text-blue-800"
+                                  >
+                                    {trackingData[selectedOrder.id].courier.driver_phone}
+                                  </a>
+                                </div>
+                              )}
+                              {trackingData[selectedOrder.id].courier.driver_plate_number && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-gray-600 w-20">Plat:</span>
+                                  <span className="font-medium text-gray-900">
+                                    {trackingData[selectedOrder.id].courier.driver_plate_number}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tracking History */}
+                        {trackingData[selectedOrder.id].history && trackingData[selectedOrder.id].history.length > 0 && (
+                          <div>
+                            <h5 className="font-semibold text-gray-900 mb-3 text-sm">Riwayat Pengiriman</h5>
+                            <div className="space-y-3 max-h-60 overflow-y-auto">
+                              {trackingData[selectedOrder.id].history.map((history: any, index: number) => (
+                                <div
+                                  key={index}
+                                  className="flex gap-3 pb-3 border-l-2 border-gray-200 pl-4 relative"
+                                >
+                                  <div className="absolute -left-2 top-0 w-4 h-4 bg-[#ffd700] rounded-full border-2 border-white"></div>
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-gray-900">{history.note}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <span className="text-xs text-gray-500">
+                                        {new Date(history.updated_at).toLocaleString('id-ID')}
+                                      </span>
+                                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded capitalize">
+                                        {history.status}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tracking Link */}
+                        {trackingData[selectedOrder.id].link && (
+                          <div className="pt-2">
+                            <a
+                              href={trackingData[selectedOrder.id].link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            >
+                              <Navigation className="h-4 w-4" />
+                              Buka tracking di website kurir
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!loadingTracking[selectedOrder.id] && !trackingData[selectedOrder.id] && (
+                      <div className="text-center py-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-600 mb-2">Tracking belum tersedia</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => fetchTracking(selectedOrder.id, selectedOrder.trackingId!)}
+                          className="text-xs"
+                        >
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Muat Tracking
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Items */}
                 <div className="mb-6">
                   <h3 className="font-semibold text-gray-900 mb-3 text-lg">Detail Items</h3>
@@ -672,33 +862,52 @@ export default function ManajemenPesananPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3">
+                <div className="space-y-4 pt-4 border-t">
                   {!isOfflineOrder(selectedOrder) && (
                     <>
+                      {/* Print Button */}
                       <Button
                         onClick={() => handlePrintOrder(selectedOrder)}
-                        className="flex-1"
+                        className="w-full bg-[#ffd700] hover:bg-[#e6c200] text-gray-900"
                       >
                         <Printer className="h-4 w-4 mr-2" />
                         Print Detail Pesanan
                       </Button>
-                      <div className="flex-1 space-y-2">
-                        <h4 className="font-semibold text-gray-900 mb-2 text-sm">Update Status</h4>
-                        <div className="grid grid-cols-2 gap-2">
-                          {['paid', 'processing', 'delivered', 'cancelled'].map((status) => (
-                            <Button
-                              key={status}
-                              variant={selectedOrder.status === status ? 'default' : 'outline'}
-                              size="sm"
-                              onClick={() => {
-                                updateOrderStatus(selectedOrder.id, status);
-                                setShowDetailModal(false);
-                              }}
-                              className="text-xs"
-                            >
-                              {getStatusIndonesian(status)}
-                            </Button>
-                          ))}
+                      
+                      {/* Update Status */}
+                      <div>
+                        <h4 className="font-semibold text-gray-900 mb-3 text-sm">Update Status</h4>
+                        <div className="space-y-2">
+                          {[
+                            { value: 'paid', label: 'Sudah Dibayar', icon: CheckCircle },
+                            { value: 'processing', label: 'Diproses', icon: Package },
+                            { value: 'delivered', label: 'Terkirim', icon: Truck },
+                          ].map((status) => {
+                            const Icon = status.icon;
+                            const isActive = selectedOrder.status === status.value;
+                            return (
+                              <Button
+                                key={status.value}
+                                variant={isActive ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => {
+                                  if (!isActive) {
+                                    updateOrderStatus(selectedOrder.id, status.value);
+                                    setShowDetailModal(false);
+                                  }
+                                }}
+                                disabled={isActive}
+                                className={`w-full justify-start gap-2 text-xs ${
+                                  isActive 
+                                    ? 'bg-[#ffd700] hover:bg-[#e6c200] text-gray-900 cursor-not-allowed' 
+                                    : 'hover:bg-gray-50'
+                                }`}
+                              >
+                                <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-gray-900' : 'text-gray-600'}`} />
+                                {status.label}
+                              </Button>
+                            );
+                          })}
                         </div>
                       </div>
                     </>
@@ -706,7 +915,7 @@ export default function ManajemenPesananPage() {
                   {isOfflineOrder(selectedOrder) && (
                     <Button
                       onClick={() => sendReceipt(selectedOrder.id)}
-                      className="flex-1"
+                      className="w-full"
                       variant="outline"
                     >
                       <Send className="h-4 w-4 mr-2" />
@@ -716,7 +925,7 @@ export default function ManajemenPesananPage() {
                   <Button
                     onClick={() => setShowDetailModal(false)}
                     variant="outline"
-                    className="flex-1"
+                    className="w-full"
                   >
                     Tutup
                   </Button>

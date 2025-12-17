@@ -5,58 +5,79 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Home, Package } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { toast } = useToast();
   const [orderId, setOrderId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [extractedOrderId, setExtractedOrderId] = useState<number | null>(null);
+  const [hasShownNotification, setHasShownNotification] = useState(false);
 
   useEffect(() => {
     const orderIdParam = searchParams.get('order_id');
     const statusParam = searchParams.get('transaction_status');
     
+    if (!orderIdParam) {
+      // If no order_id, redirect to home after 3 seconds
+      setTimeout(() => {
+        router.push('/');
+      }, 3000);
+      return;
+    }
+    
     setOrderId(orderIdParam);
     setStatus(statusParam);
 
     // Extract actual order ID from Midtrans order_id format: ORDER-{id}-{timestamp}
-    if (orderIdParam) {
-      const parts = orderIdParam.split('-');
-      if (parts.length >= 2 && parts[0] === 'ORDER') {
-        const actualOrderId = parseInt(parts[1]);
-        if (!isNaN(actualOrderId)) {
-          setExtractedOrderId(actualOrderId);
+    const parts = orderIdParam.split('-');
+    if (parts.length >= 2 && parts[0] === 'ORDER') {
+      const actualOrderId = parseInt(parts[1]);
+      if (!isNaN(actualOrderId)) {
+        setExtractedOrderId(actualOrderId);
+        
+        console.log('📦 Payment Success - Order ID:', actualOrderId);
+        console.log('📦 Payment Status:', statusParam);
+        
+        // Show success notification immediately
+        if ((statusParam === 'settlement' || statusParam === 'capture') && !hasShownNotification) {
+          setHasShownNotification(true);
+          
+          // Show toast notification immediately
+          toast({
+            variant: "success",
+            title: "✅ Pembayaran Berhasil!",
+            description: `Pesanan #${actualOrderId} berhasil dibayar. Mengarahkan ke halaman pesanan...`,
+          });
           
           // Update order status if payment is successful (fallback if callback not received)
-          // Note: This will also reduce stock via the API
-          if (statusParam === 'settlement' || statusParam === 'capture') {
-            fetch(`/api/pesanan/${actualOrderId}/pay`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-            }).then(res => {
-              if (res.ok) {
-                console.log(`✅ Order ${actualOrderId} status updated to paid and stock reduced`);
-              } else {
-                console.error(`❌ Failed to update order ${actualOrderId} status`);
-              }
-            }).catch(error => {
-              console.error('Error updating order status:', error);
-            });
-          }
+          fetch(`/api/pesanan/${actualOrderId}/pay`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          }).then(res => {
+            if (res.ok) {
+              console.log(`✅ Order ${actualOrderId} status updated to paid and stock reduced`);
+            } else {
+              console.error(`❌ Failed to update order ${actualOrderId} status`);
+            }
+          }).catch(error => {
+            console.error('Error updating order status:', error);
+          });
           
-          // Auto-redirect to pesanan page with orderId after 2 seconds
-          setTimeout(() => {
-            router.push(`/pesanan?orderId=${actualOrderId}`);
-          }, 2000);
+          // Auto-redirect to pesanan page with orderId after 2.5 seconds
+          const redirectTimer = setTimeout(() => {
+            console.log('🔄 Redirecting to pesanan page with orderId:', actualOrderId);
+            window.location.href = `/pesanan?orderId=${actualOrderId}&payment=success`;
+          }, 2500);
           
-          console.log('Order ID:', orderIdParam);
-          console.log('Extracted Order ID:', actualOrderId);
+          return () => clearTimeout(redirectTimer);
         }
       }
     }
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -88,11 +109,14 @@ export default function PaymentSuccessPage() {
           )}
 
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-            <p className="text-sm text-blue-900">
+            <p className="text-sm text-blue-900 font-medium">
+              ✅ Pembayaran Anda berhasil!
+            </p>
+            <p className="text-sm text-blue-800 mt-1">
               Pesanan Anda sedang diproses. Kami akan mengirimkan konfirmasi melalui WhatsApp.
             </p>
             {extractedOrderId && (
-              <p className="text-sm text-blue-700 mt-2">
+              <p className="text-sm text-blue-700 mt-2 font-medium">
                 Mengarahkan ke halaman pesanan dalam beberapa detik...
               </p>
             )}
