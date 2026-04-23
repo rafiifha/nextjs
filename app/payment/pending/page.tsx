@@ -1,21 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Clock, Home, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 export default function PaymentPendingPage() {
-  const searchParams = useSearchParams();
   const router = useRouter();
   const [orderId, setOrderId] = useState<string | null>(null);
 
   useEffect(() => {
-    const orderIdParam = searchParams.get('order_id');
+    const orderIdParam = new URLSearchParams(window.location.search).get('order_id');
     setOrderId(orderIdParam);
-  }, [searchParams]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

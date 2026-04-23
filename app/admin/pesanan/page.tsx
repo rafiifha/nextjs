@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatRupiah } from '@/lib/utils';
-import { Search, Filter, Package, Loader2, Send, Clock, CheckCircle, XCircle, Truck, Printer, Eye, Navigation, RefreshCw, User, Phone } from 'lucide-react';
+import { Search, Filter, Package, Loader2, XCircle, Printer, Phone, User, Calendar, Wallet, Truck, CreditCard, FileText } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface OrderItem {
   id: number;
@@ -33,27 +34,38 @@ interface Order {
   change: number | null;
   deliveryMethod: string | null;
   shippingFee: number | null;
-  trackingId: string | null;
-  waybillId: string | null;
-  biteshipOrderId: string | null;
+  paymentMethod: string | null;
+  paymentNumber: string | null;
   expiredAt: string | null;
+  shippingAddress?: string | null;
+  shippingZone?: number | null;
+  shippingNotes?: string | null;
+  courierId?: number | null;
   createdAt: string;
   updatedAt: string;
   items: OrderItem[];
 }
 
+interface Courier {
+  id: number;
+  name: string;
+  phone: string;
+}
+
 export default function ManajemenPesananPage() {
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [couriers, setCouriers] = useState<Courier[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedCourierId, setSelectedCourierId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [trackingData, setTrackingData] = useState<{ [key: number]: any }>({});
-  const [loadingTracking, setLoadingTracking] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
     fetchOrders();
+    fetchCouriers();
   }, []);
 
   const fetchOrders = async () => {
@@ -62,15 +74,13 @@ export default function ManajemenPesananPage() {
       if (res.ok) {
         const data = await res.json();
         const ordersData = Array.isArray(data) ? data : [];
-        // Ensure all orders have required fields with defaults
         const normalizedOrders = ordersData.map((order: any) => ({
           ...order,
           discount: order.discount || null,
           cashReceived: order.cashReceived || null,
           change: order.change || null,
-          trackingId: order.trackingId || null,
-          waybillId: order.waybillId || null,
-          biteshipOrderId: order.biteshipOrderId || null,
+          paymentMethod: order.paymentMethod || null,
+          paymentNumber: order.paymentNumber || null,
           expiredAt: order.expiredAt || null,
           items: order.items?.map((item: any) => ({
             ...item,
@@ -87,17 +97,30 @@ export default function ManajemenPesananPage() {
     }
   };
 
-  const updateOrderStatus = async (orderId: number, newStatus: string) => {
+  const fetchCouriers = async () => {
     try {
+      const res = await fetch('/api/delivery/couriers');
+      if (res.ok) {
+        const data = await res.json();
+        setCouriers(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Error fetching couriers:', error);
+    }
+  };
+
+  const updateOrderStatus = async (orderId: number, newStatus: string, courierId?: number) => {
+    try {
+      const body: Record<string, any> = { status: newStatus };
+      if (courierId) body.courierId = courierId;
       const res = await fetch(`/api/pesanan/${orderId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
         await fetchOrders();
-        // Update selected order if it's the one being updated
         const updatedOrders = await fetch('/api/pesanan').then(r => r.json());
         const updatedOrder = updatedOrders.find((o: Order) => o.id === orderId);
         if (updatedOrder && selectedOrder && selectedOrder.id === orderId) {
@@ -108,41 +131,24 @@ export default function ManajemenPesananPage() {
         throw new Error(errorData.error || 'Gagal mengupdate status');
       }
     } catch (error: any) {
-      console.error('Error updating order:', error);
-      alert(error.message || 'Gagal mengupdate status pesanan');
-    }
-  };
-
-  const sendReceipt = async (orderId: number) => {
-    try {
-      const res = await fetch('/api/pesanan/send-receipt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId }),
+      toast({
+        variant: 'error',
+        title: 'Gagal update status',
+        description: error.message || 'Gagal mengupdate status pesanan',
       });
-
-      if (res.ok) {
-        alert('E-receipt berhasil dikirim via WhatsApp');
-      } else {
-        alert('Gagal mengirim e-receipt');
-      }
-    } catch (error) {
-      console.error('Error sending receipt:', error);
-      alert('Gagal mengirim e-receipt');
     }
   };
 
-  // Check if order is from offline (kasir)
   const isOfflineOrder = (order: Order) => {
-    return order.deliveryMethod === 'pickup' && (!order.shippingFee || order.shippingFee === 0);
+    return order.deliveryMethod === 'pickup' && (!order.shippingFee || order.shippingFee === 0) && order.paymentMethod === 'tunai';
   };
 
-  // Get status in Indonesian
   const getStatusIndonesian = (status: string) => {
     const statusMap: { [key: string]: string } = {
       'pending': 'Menunggu Pembayaran',
       'paid': 'Sudah Dibayar',
       'processing': 'Diproses',
+      'shipped': 'Dalam Pengiriman',
       'delivered': 'Terkirim',
       'cancelled': 'Dibatalkan',
       'expired': 'Kedaluwarsa',
@@ -152,47 +158,28 @@ export default function ManajemenPesananPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-300';
-      case 'paid':
-        return 'bg-green-100 text-green-700 border-green-300';
-      case 'processing':
-        return 'bg-blue-100 text-blue-700 border-blue-300';
-      case 'delivered':
-        return 'bg-purple-100 text-purple-700 border-purple-300';
-      case 'cancelled':
-        return 'bg-red-100 text-red-700 border-red-300';
-      case 'expired':
-        return 'bg-gray-100 text-gray-700 border-gray-300';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-300';
+      case 'pending': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
+      case 'paid': return 'bg-green-100 text-green-700 border-green-300';
+      case 'processing': return 'bg-blue-100 text-blue-700 border-blue-300';
+      case 'shipped': return 'bg-orange-100 text-orange-700 border-orange-300';
+      case 'delivered': return 'bg-purple-100 text-purple-700 border-purple-300';
+      case 'cancelled': return 'bg-red-100 text-red-700 border-red-300';
+      case 'expired': return 'bg-gray-100 text-gray-700 border-gray-300';
+      default: return 'bg-gray-100 text-gray-700 border-gray-300';
     }
   };
 
-  // Fetch tracking for orders with trackingId
-  const fetchTracking = async (orderId: number, trackingId: string) => {
-    if (loadingTracking[orderId] || trackingData[orderId]) return;
-    
-    setLoadingTracking(prev => ({ ...prev, [orderId]: true }));
-    try {
-      const res = await fetch(`/api/delivery/biteship/tracking?trackingId=${trackingId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTrackingData(prev => ({ ...prev, [orderId]: data }));
-      } else {
-        console.error('Failed to fetch tracking:', res.statusText);
-        alert('Gagal mengambil data tracking');
-      }
-    } catch (error) {
-      console.error('Error fetching tracking:', error);
-      alert('Terjadi kesalahan saat mengambil data tracking');
-    } finally {
-      setLoadingTracking(prev => ({ ...prev, [orderId]: false }));
-    }
+  const getStatusPill = (status: string) => {
+    if (status === 'pending') return 'bg-yellow-100 text-yellow-700 border-yellow-300';
+    if (status === 'paid') return 'bg-green-100 text-green-700 border-green-300';
+    if (status === 'processing') return 'bg-blue-100 text-blue-700 border-blue-300';
+    if (status === 'shipped') return 'bg-orange-100 text-orange-700 border-orange-300';
+    if (status === 'delivered') return 'bg-purple-100 text-purple-700 border-purple-300';
+    if (status === 'cancelled') return 'bg-red-100 text-red-700 border-red-300';
+    return 'bg-gray-100 text-gray-700 border-gray-300';
   };
 
   const handlePrintOrder = async (order: Order) => {
-    // Update status to 'processing' if it's online order and status is 'paid'
     if (!isOfflineOrder(order) && order.status === 'paid') {
       try {
         const res = await fetch(`/api/pesanan/${order.id}`, {
@@ -202,14 +189,11 @@ export default function ManajemenPesananPage() {
         });
 
         if (res.ok) {
-          // Refresh orders
           await fetchOrders();
-          // Update selected order
           const updatedOrders = await fetch('/api/pesanan').then(r => r.json());
           const updatedOrder = updatedOrders.find((o: Order) => o.id === order.id);
           if (updatedOrder) {
             setSelectedOrder(updatedOrder);
-            // Use updated order for print
             order = updatedOrder;
           }
         }
@@ -218,7 +202,6 @@ export default function ManajemenPesananPage() {
       }
     }
     
-    // Create print window
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     
@@ -228,75 +211,20 @@ export default function ManajemenPesananPage() {
         <head>
           <title>Detail Pesanan #${order.id}</title>
           <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 20px;
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 2px solid #333;
-              padding-bottom: 20px;
-              margin-bottom: 30px;
-            }
-            .header h1 {
-              margin: 0;
-              color: #333;
-            }
-            .section {
-              margin-bottom: 25px;
-            }
-            .section h3 {
-              border-bottom: 1px solid #ddd;
-              padding-bottom: 10px;
-              margin-bottom: 15px;
-              color: #333;
-            }
-            .info-row {
-              display: flex;
-              justify-content: space-between;
-              padding: 8px 0;
-              border-bottom: 1px solid #f0f0f0;
-            }
-            .info-label {
-              font-weight: 600;
-              color: #666;
-            }
-            .info-value {
-              color: #333;
-            }
-            .items-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 10px;
-            }
-            .items-table th {
-              background-color: #f5f5f5;
-              padding: 12px;
-              text-align: left;
-              border-bottom: 2px solid #ddd;
-            }
-            .items-table td {
-              padding: 12px;
-              border-bottom: 1px solid #eee;
-            }
-            .total-row {
-              font-weight: bold;
-              font-size: 18px;
-              background-color: #f9f9f9;
-            }
-            .footer {
-              margin-top: 40px;
-              text-align: center;
-              color: #666;
-              font-size: 12px;
-            }
-            @media print {
-              body {
-                padding: 0;
-              }
-            }
+            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+            .header h1 { margin: 0; color: #333; }
+            .section { margin-bottom: 25px; }
+            .section h3 { border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 15px; color: #333; }
+            .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+            .info-label { font-weight: 600; color: #666; }
+            .info-value { color: #333; }
+            .items-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            .items-table th { background-color: #f5f5f5; padding: 12px; text-align: left; border-bottom: 2px solid #ddd; }
+            .items-table td { padding: 12px; border-bottom: 1px solid #eee; }
+            .total-row { font-weight: bold; font-size: 18px; background-color: #f9f9f9; }
+            .footer { margin-top: 40px; text-align: center; color: #666; font-size: 12px; }
+            @media print { body { padding: 0; } }
           </style>
         </head>
         <body>
@@ -308,34 +236,11 @@ export default function ManajemenPesananPage() {
           
           <div class="section">
             <h3>Informasi Pelanggan</h3>
-            <div class="info-row">
-              <span class="info-label">Nama:</span>
-              <span class="info-value">${order.customerName}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Telepon:</span>
-              <span class="info-value">${order.customerPhone}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Metode Pengiriman:</span>
-              <span class="info-value">${order.deliveryMethod === 'delivery' ? 'Pengiriman' : 'Ambil di Toko'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Status:</span>
-              <span class="info-value">${getStatusIndonesian(order.status)}</span>
-            </div>
-            ${order.trackingId ? `
-            <div class="info-row">
-              <span class="info-label">Tracking ID:</span>
-              <span class="info-value">${order.trackingId}</span>
-            </div>
-            ` : ''}
-            ${order.waybillId ? `
-            <div class="info-row">
-              <span class="info-label">Waybill ID:</span>
-              <span class="info-value">${order.waybillId}</span>
-            </div>
-            ` : ''}
+            <div class="info-row"><span class="info-label">Nama:</span><span class="info-value">${order.customerName}</span></div>
+            <div class="info-row"><span class="info-label">Telepon:</span><span class="info-value">${order.customerPhone}</span></div>
+            <div class="info-row"><span class="info-label">Metode Pengiriman:</span><span class="info-value">${order.deliveryMethod === 'delivery' ? 'Pengiriman' : 'Ambil di Toko'}</span></div>
+            <div class="info-row"><span class="info-label">Status:</span><span class="info-value">${getStatusIndonesian(order.status)}</span></div>
+            <div class="info-row"><span class="info-label">Pembayaran:</span><span class="info-value uppercase">${order.paymentMethod ? order.paymentMethod.replace('_va', ' Virtual Account') : '-'}</span></div>
           </div>
           
           <div class="section">
@@ -367,20 +272,11 @@ export default function ManajemenPesananPage() {
           <div class="section">
             <h3>Ringkasan Pembayaran</h3>
             ${order.discount && order.discount > 0 ? `
-            <div class="info-row">
-              <span class="info-label">Subtotal:</span>
-              <span class="info-value">${formatRupiah(order.totalHarga + order.discount)}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Diskon:</span>
-              <span class="info-value" style="color: red;">-${formatRupiah(order.discount)}</span>
-            </div>
+            <div class="info-row"><span class="info-label">Subtotal:</span><span class="info-value">${formatRupiah(order.totalHarga + order.discount)}</span></div>
+            <div class="info-row"><span class="info-label">Diskon:</span><span class="info-value" style="color: red;">-${formatRupiah(order.discount)}</span></div>
             ` : ''}
             ${order.shippingFee && order.shippingFee > 0 ? `
-            <div class="info-row">
-              <span class="info-label">Ongkir:</span>
-              <span class="info-value">${formatRupiah(order.shippingFee)}</span>
-            </div>
+            <div class="info-row"><span class="info-label">Ongkir:</span><span class="info-value">${formatRupiah(order.shippingFee)}</span></div>
             ` : ''}
             <div class="info-row total-row">
               <span class="info-label">Total:</span>
@@ -400,10 +296,7 @@ export default function ManajemenPesananPage() {
     printWindow.document.close();
     printWindow.focus();
     
-    // Wait for content to load, then print
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
+    setTimeout(() => { printWindow.print(); }, 250);
   };
 
   const filteredOrders = orders.filter((order) => {
@@ -423,7 +316,6 @@ export default function ManajemenPesananPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Order List */}
         <div className="lg:col-span-2">
           <Card className="border-gray-200 shadow-md">
             <CardHeader>
@@ -431,24 +323,16 @@ export default function ManajemenPesananPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <Input
-                    placeholder="Cari nama, telepon, atau ID pesanan..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+                  <Input placeholder="Cari nama, telepon, atau ID pesanan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
                 </div>
                 <div className="relative">
                   <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full h-10 pl-10 pr-4 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ffd700]"
-                  >
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full h-10 pl-10 pr-4 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ffd700]">
                     <option value="all">Semua Status</option>
                     <option value="pending">Menunggu Pembayaran</option>
                     <option value="paid">Sudah Dibayar</option>
                     <option value="processing">Diproses</option>
+                    <option value="shipped">Dalam Pengiriman</option>
                     <option value="delivered">Terkirim</option>
                     <option value="expired">Kedaluwarsa</option>
                   </select>
@@ -459,51 +343,51 @@ export default function ManajemenPesananPage() {
               {loading ? (
                 <div className="text-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-[#ffd700] mx-auto mb-4" />
-                  <p className="text-gray-600">Memuat pesanan...</p>
+                  <p className="text-sm text-gray-500">Memuat data pesanan...</p>
                 </div>
               ) : filteredOrders.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {filteredOrders.map((order) => (
                     <Card
                       key={order.id}
-                      className={`cursor-pointer transition-all duration-200 hover:shadow-lg border-2 ${
+                      className={`cursor-pointer transition-all duration-200 hover:shadow-md border ${
                         selectedOrder?.id === order.id
-                          ? 'border-[#ffd700] bg-[#ffd700]/10'
+                          ? 'border-[#ffd700] bg-[#ffd700]/10 shadow-sm'
                           : 'border-gray-200 hover:border-[#ffd700]/50'
                       }`}
                       onClick={() => {
                         setSelectedOrder(order);
+                        setSelectedCourierId(order.courierId ? String(order.courierId) : '');
                         setShowDetailModal(true);
                       }}
                     >
-                      <CardContent className="pt-4 pb-4">
-                        <div className="flex justify-between items-start">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start gap-3">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-bold text-gray-900">Pesanan #{order.id}</h3>
-                              <span
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border ${getStatusColor(
-                                  order.status
-                                )}`}
-                              >
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <h3 className="font-semibold text-gray-900 text-base">Pesanan #{order.id}</h3>
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusColor(order.status)}`}>
                                 {getStatusIndonesian(order.status)}
                               </span>
                               {isOfflineOrder(order) && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-medium">
+                                <span className="inline-flex items-center px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold border border-gray-200">
                                   Offline
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-gray-600 mb-1">{order.customerName}</p>
-                            <p className="text-sm text-gray-600">{order.customerPhone}</p>
-                            <div className="mt-2 flex items-center gap-4">
-                              <div className="text-sm font-semibold text-gray-900">
-                                {formatRupiah(order.totalHarga)}
-                              </div>
-                              <div className="text-xs text-gray-700 font-medium">
-                                {order.items.length} item{order.items.length > 1 ? 's' : ''}
-                              </div>
+                            <p className="text-sm text-gray-700 font-medium">{order.customerName}</p>
+                            <p className="text-sm text-gray-500">{order.customerPhone}</p>
+                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
+                              <span>{new Date(order.createdAt).toLocaleString('id-ID')}</span>
+                              <span>{order.items.length} item{order.items.length > 1 ? 's' : ''}</span>
+                              <span>{order.deliveryMethod === 'delivery' ? 'Pengiriman' : 'Pickup'}</span>
                             </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">Total</p>
+                            <p className="text-base font-bold text-gray-900">
+                              {formatRupiah(order.totalHarga + (order.shippingFee || 0) - (order.discount || 0))}
+                            </p>
                           </div>
                         </div>
                       </CardContent>
@@ -511,477 +395,178 @@ export default function ManajemenPesananPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12 text-gray-600">
-                  Tidak ada pesanan ditemukan
-                </div>
+                <div className="text-center py-12 text-gray-500">Tidak ada pesanan ditemukan</div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Order Detail Modal */}
         {showDetailModal && selectedOrder && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDetailModal(false)}>
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setShowDetailModal(false); setSelectedCourierId(''); }}>
+            <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-gray-100" onClick={(e) => e.stopPropagation()}>
               <div className="p-6">
-                {/* Header */}
-                <div className="flex justify-between items-start mb-6 border-b pb-4">
+                <div className="flex justify-between items-start mb-6 border-b border-gray-200 pb-4">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">Detail Pesanan</h2>
-                    <p className="text-sm text-gray-600 mt-1">Pesanan #{selectedOrder.id}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <p className="text-sm text-gray-600">Pesanan #{selectedOrder.id}</p>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusPill(selectedOrder.status)}`}>
+                        {getStatusIndonesian(selectedOrder.status)}
+                      </span>
+                      {isOfflineOrder(selectedOrder) && (
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
+                          Offline
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button
-                    onClick={() => setShowDetailModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
+                    onClick={() => { setShowDetailModal(false); setSelectedCourierId(''); }}
+                    className="rounded-full p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
                   >
                     <XCircle className="h-6 w-6" />
                   </button>
                 </div>
 
-                {/* Informasi Pelanggan */}
                 <div className="mb-6">
                   <h3 className="font-semibold text-gray-900 mb-3 text-lg">Informasi Pelanggan</h3>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Nama:</span>
-                      <span className="font-medium text-gray-900">{selectedOrder.customerName}</span>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <p className="flex items-center gap-2 text-gray-700"><User className="h-4 w-4 text-gray-500" /> {selectedOrder.customerName}</p>
+                      <p className="flex items-center gap-2 text-gray-700"><Phone className="h-4 w-4 text-gray-500" /> {selectedOrder.customerPhone}</p>
+                      <p className="flex items-center gap-2 text-gray-700"><Truck className="h-4 w-4 text-gray-500" /> {selectedOrder.deliveryMethod === 'delivery' ? 'Pengiriman' : 'Ambil di Toko'}</p>
+                      <p className="flex items-center gap-2 text-gray-700"><Calendar className="h-4 w-4 text-gray-500" /> {new Date(selectedOrder.createdAt).toLocaleString('id-ID')}</p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Telepon:</span>
-                      <span className="font-medium text-gray-900">{selectedOrder.customerPhone}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Metode Pengiriman:</span>
-                      <span className="font-medium text-gray-900">
-                        {selectedOrder.deliveryMethod === 'delivery' ? 'Pengiriman' : 'Ambil di Toko'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Status:</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border ${getStatusColor(selectedOrder.status)}`}>
-                        {getStatusIndonesian(selectedOrder.status)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Tanggal Pesanan:</span>
-                      <span className="font-medium text-gray-900">{new Date(selectedOrder.createdAt).toLocaleString('id-ID')}</span>
-                    </div>
-                    {selectedOrder.updatedAt && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Terakhir Diupdate:</span>
-                        <span className="font-medium text-gray-900">{new Date(selectedOrder.updatedAt).toLocaleString('id-ID')}</span>
-                      </div>
-                    )}
-                    {isOfflineOrder(selectedOrder) && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Tipe:</span>
-                        <span className="font-medium text-gray-900">Pesanan Offline (Kasir)</span>
-                      </div>
-                    )}
                   </div>
                 </div>
 
-                {/* Informasi Pembayaran (untuk offline) */}
                 {isOfflineOrder(selectedOrder) && (selectedOrder.discount || selectedOrder.cashReceived || selectedOrder.change) && (
                   <div className="mb-6">
-                    <h3 className="font-semibold text-gray-900 mb-3 text-lg">Informasi Pembayaran</h3>
-                    <div className="bg-blue-50 rounded-lg p-4 space-y-2 text-sm">
-                      {selectedOrder.discount && selectedOrder.discount > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Diskon:</span>
-                          <span className="font-medium text-red-600">-{formatRupiah(selectedOrder.discount)}</span>
-                        </div>
-                      )}
-                      {selectedOrder.cashReceived && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Uang Diterima:</span>
-                          <span className="font-medium text-gray-900">{formatRupiah(selectedOrder.cashReceived)}</span>
-                        </div>
-                      )}
-                      {selectedOrder.change && selectedOrder.change > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Kembalian:</span>
-                          <span className="font-medium text-green-600">{formatRupiah(selectedOrder.change)}</span>
-                        </div>
-                      )}
+                    <h3 className="font-semibold text-gray-900 mb-3 text-lg">Informasi Pembayaran Kasir</h3>
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 space-y-2 text-sm">
+                      {selectedOrder.discount && selectedOrder.discount > 0 && <div className="flex justify-between"><span className="text-gray-600">Diskon:</span><span className="font-medium text-red-600">-{formatRupiah(selectedOrder.discount)}</span></div>}
+                      {selectedOrder.cashReceived && <div className="flex justify-between"><span className="text-gray-600">Uang Diterima:</span><span className="font-medium text-gray-900">{formatRupiah(selectedOrder.cashReceived)}</span></div>}
+                      {selectedOrder.change && selectedOrder.change > 0 && <div className="flex justify-between"><span className="text-gray-600">Kembalian:</span><span className="font-medium text-green-600">{formatRupiah(selectedOrder.change)}</span></div>}
                     </div>
                   </div>
                 )}
 
-                {/* Informasi Pengiriman (untuk online) */}
                 {!isOfflineOrder(selectedOrder) && (
                   <div className="mb-6">
-                    <h3 className="font-semibold text-gray-900 mb-3 text-lg">Informasi Pengiriman</h3>
-                    <div className="bg-green-50 rounded-lg p-4 space-y-2 text-sm">
-                      {selectedOrder.shippingFee && selectedOrder.shippingFee > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Ongkir:</span>
-                          <span className="font-medium text-gray-900">{formatRupiah(selectedOrder.shippingFee)}</span>
-                        </div>
-                      )}
-                      {selectedOrder.trackingId && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Tracking ID:</span>
-                          <span className="font-medium text-gray-900">{selectedOrder.trackingId}</span>
-                        </div>
-                      )}
-                      {selectedOrder.waybillId && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Waybill ID:</span>
-                          <span className="font-medium text-gray-900">{selectedOrder.waybillId}</span>
-                        </div>
-                      )}
-                      {selectedOrder.expiredAt && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Batas Pembayaran:</span>
-                          <span className="font-medium text-gray-900">{new Date(selectedOrder.expiredAt).toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
+                    <h3 className="font-semibold text-gray-900 mb-3 text-lg">Informasi Pengiriman & Pembayaran Online</h3>
+                    <div className="rounded-xl border border-green-100 bg-green-50 p-4 space-y-2 text-sm">
+                      <div className="flex justify-between"><span className="text-gray-600">Metode Pembayaran:</span><span className="font-medium text-gray-900 uppercase flex items-center gap-2"><CreditCard className="h-4 w-4 text-gray-500" />{selectedOrder.paymentMethod ? selectedOrder.paymentMethod.replace('_va', ' Virtual Account') : '-'}</span></div>
+                      {selectedOrder.paymentNumber && <div className="flex justify-between"><span className="text-gray-600">Nomor Pembayaran (VA/QRIS):</span><span className="font-medium text-gray-900">{selectedOrder.paymentNumber}</span></div>}
+                      {selectedOrder.shippingFee && selectedOrder.shippingFee > 0 && <div className="flex justify-between"><span className="text-gray-600">Ongkir:</span><span className="font-medium text-gray-900">{formatRupiah(selectedOrder.shippingFee)}</span></div>}
+                      {selectedOrder.deliveryMethod === 'delivery' && <div className="flex justify-between"><span className="text-gray-600">Alamat Pengiriman:</span><span className="font-medium text-gray-900">{selectedOrder.shippingAddress || '-'}</span></div>}
+                      {selectedOrder.deliveryMethod === 'delivery' && <div className="flex justify-between"><span className="text-gray-600">Zona:</span><span className="font-medium text-gray-900">{selectedOrder.shippingZone || '-'}</span></div>}
+                      {selectedOrder.deliveryMethod === 'delivery' && <div className="flex justify-between"><span className="text-gray-600">Catatan Kurir:</span><span className="font-medium text-gray-900">{selectedOrder.shippingNotes || '-'}</span></div>}
+                      {selectedOrder.expiredAt && <div className="flex justify-between"><span className="text-gray-600">Batas Pembayaran:</span><span className="font-medium text-gray-900">{new Date(selectedOrder.expiredAt).toLocaleString('id-ID')}</span></div>}
                     </div>
                   </div>
                 )}
 
-                {/* Tracking Info - For orders with trackingId */}
-                {!isOfflineOrder(selectedOrder) && selectedOrder.trackingId && (
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-gray-900 text-lg flex items-center gap-2">
-                        <Navigation className="h-5 w-5 text-[#ffd700]" />
-                        Tracking Pengiriman
-                      </h3>
-                      {!trackingData[selectedOrder.id] && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => fetchTracking(selectedOrder.id, selectedOrder.trackingId!)}
-                          disabled={loadingTracking[selectedOrder.id]}
-                          className="text-xs"
-                        >
-                          {loadingTracking[selectedOrder.id] ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Memuat...
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="h-3 w-3 mr-1" />
-                              Refresh
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </div>
-
-                    {loadingTracking[selectedOrder.id] && !trackingData[selectedOrder.id] && (
-                      <div className="flex items-center justify-center py-4 bg-gray-50 rounded-lg">
-                        <Loader2 className="h-5 w-5 animate-spin text-[#ffd700]" />
-                        <span className="ml-2 text-sm text-gray-600">Memuat tracking...</span>
-                      </div>
-                    )}
-
-                    {trackingData[selectedOrder.id] && (
-                      <div className="space-y-4 bg-white border rounded-lg p-4">
-                        {/* Tracking Status */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-blue-900">Status:</span>
-                            <span className="text-sm font-semibold text-blue-700 capitalize">
-                              {trackingData[selectedOrder.id].status}
-                            </span>
-                          </div>
-                          {trackingData[selectedOrder.id].waybill_id && (
-                            <div className="mt-2 flex items-center justify-between">
-                              <span className="text-xs text-blue-700">Waybill ID:</span>
-                              <span className="text-xs font-mono text-blue-900">
-                                {trackingData[selectedOrder.id].waybill_id}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Courier Info */}
-                        {trackingData[selectedOrder.id].courier && (
-                          <div className="bg-gray-50 rounded-lg p-3">
-                            <h5 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
-                              <Truck className="h-4 w-4 text-[#ffd700]" />
-                              Informasi Kurir
-                            </h5>
-                            <div className="space-y-1 text-xs">
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-600 w-20">Kurir:</span>
-                                <span className="font-medium text-gray-900 capitalize">
-                                  {trackingData[selectedOrder.id].courier.company}
-                                </span>
-                              </div>
-                              {trackingData[selectedOrder.id].courier.driver_name && (
-                                <div className="flex items-center gap-2">
-                                  <User className="h-3 w-3 text-gray-400" />
-                                  <span className="text-gray-600 w-20">Driver:</span>
-                                  <span className="font-medium text-gray-900">
-                                    {trackingData[selectedOrder.id].courier.driver_name}
-                                  </span>
-                                </div>
-                              )}
-                              {trackingData[selectedOrder.id].courier.driver_phone && (
-                                <div className="flex items-center gap-2">
-                                  <Phone className="h-3 w-3 text-gray-400" />
-                                  <span className="text-gray-600 w-20">Telepon:</span>
-                                  <a
-                                    href={`tel:${trackingData[selectedOrder.id].courier.driver_phone}`}
-                                    className="font-medium text-blue-600 hover:text-blue-800"
-                                  >
-                                    {trackingData[selectedOrder.id].courier.driver_phone}
-                                  </a>
-                                </div>
-                              )}
-                              {trackingData[selectedOrder.id].courier.driver_plate_number && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-gray-600 w-20">Plat:</span>
-                                  <span className="font-medium text-gray-900">
-                                    {trackingData[selectedOrder.id].courier.driver_plate_number}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Tracking History */}
-                        {trackingData[selectedOrder.id].history && trackingData[selectedOrder.id].history.length > 0 && (
-                          <div>
-                            <h5 className="font-semibold text-gray-900 mb-3 text-sm">Riwayat Pengiriman</h5>
-                            <div className="space-y-3 max-h-60 overflow-y-auto">
-                              {trackingData[selectedOrder.id].history.map((history: any, index: number) => (
-                                <div
-                                  key={index}
-                                  className="flex gap-3 pb-3 border-l-2 border-gray-200 pl-4 relative"
-                                >
-                                  <div className="absolute -left-2 top-0 w-4 h-4 bg-[#ffd700] rounded-full border-2 border-white"></div>
-                                  <div className="flex-1">
-                                    <p className="text-sm font-medium text-gray-900">{history.note}</p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                      <span className="text-xs text-gray-500">
-                                        {new Date(history.updated_at).toLocaleString('id-ID')}
-                                      </span>
-                                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded capitalize">
-                                        {history.status}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Tracking Link */}
-                        {trackingData[selectedOrder.id].link && (
-                          <div className="pt-2">
-                            <a
-                              href={trackingData[selectedOrder.id].link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                            >
-                              <Navigation className="h-4 w-4" />
-                              Buka tracking di website kurir
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {!loadingTracking[selectedOrder.id] && !trackingData[selectedOrder.id] && (
-                      <div className="text-center py-4 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-600 mb-2">Tracking belum tersedia</p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => fetchTracking(selectedOrder.id, selectedOrder.trackingId!)}
-                          className="text-xs"
-                        >
-                          <RefreshCw className="h-3 w-3 mr-1" />
-                          Muat Tracking
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Items */}
                 <div className="mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-3 text-lg">Detail Items</h3>
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="divide-y">
-                      {selectedOrder.items.map((item) => (
-                        <div key={item.id} className="p-4 flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-semibold text-gray-900">{item.product.name}</p>
-                            <p className="text-sm text-gray-600 mt-1">
-                              {item.priceType.charAt(0).toUpperCase() + item.priceType.slice(1)} × {item.quantity}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {formatRupiah(item.price)} per unit
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-gray-900">{formatRupiah(item.price * item.quantity)}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <h3 className="font-semibold text-gray-900 mb-3 text-lg flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-gray-600" />
+                    Daftar Item
+                  </h3>
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-50 text-gray-700">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold">Produk</th>
+                          <th className="px-4 py-3 font-semibold">Jenis</th>
+                          <th className="px-4 py-3 font-semibold text-center">Qty</th>
+                          <th className="px-4 py-3 font-semibold text-right">Harga</th>
+                          <th className="px-4 py-3 font-semibold text-right">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {selectedOrder.items.map((item) => (
+                          <tr key={item.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-medium text-gray-900">{item.product.name}</td>
+                            <td className="px-4 py-3 capitalize">{item.priceType}</td>
+                            <td className="px-4 py-3 text-center">{item.quantity}</td>
+                            <td className="px-4 py-3 text-right">{formatRupiah(item.price)}</td>
+                            <td className="px-4 py-3 text-right font-medium text-gray-900">{formatRupiah(item.price * item.quantity)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
-                {/* Summary */}
-                <div className="mb-6 border-t pt-4">
-                  <div className="space-y-2">
-                    {selectedOrder.discount && selectedOrder.discount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Subtotal:</span>
-                        <span className="font-semibold">{formatRupiah(selectedOrder.totalHarga + selectedOrder.discount)}</span>
-                      </div>
-                    )}
-                    {selectedOrder.discount && selectedOrder.discount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Diskon:</span>
-                        <span className="font-semibold text-red-600">-{formatRupiah(selectedOrder.discount)}</span>
-                      </div>
-                    )}
-                    {selectedOrder.shippingFee && selectedOrder.shippingFee > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Ongkir:</span>
-                        <span className="font-semibold">{formatRupiah(selectedOrder.shippingFee)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center pt-2 border-t font-bold text-lg">
-                      <span>Total:</span>
-                      <span className="text-[#ffd700]">{formatRupiah(selectedOrder.totalHarga + (selectedOrder.shippingFee || 0))}</span>
-                    </div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2 mb-6">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 flex items-center gap-2"><Wallet className="h-4 w-4 text-gray-500" />Subtotal Items:</span>
+                    <span className="font-medium text-gray-900">{formatRupiah(selectedOrder.totalHarga)}</span>
                   </div>
-                </div>
-
-                {/* Actions */}
-                <div className="space-y-4 pt-4 border-t">
-                  {!isOfflineOrder(selectedOrder) && (
-                    <>
-                      {/* Print Button */}
-                      <Button
-                        onClick={() => handlePrintOrder(selectedOrder)}
-                        className="w-full bg-[#ffd700] hover:bg-[#e6c200] text-gray-900"
-                      >
-                        <Printer className="h-4 w-4 mr-2" />
-                        Print Detail Pesanan
-                      </Button>
-                      
-                      {/* Update Status */}
-                      <div>
-                        <h4 className="font-semibold text-gray-900 mb-3 text-sm">Update Status</h4>
-                        <div className="space-y-2">
-                          {[
-                            { value: 'paid', label: 'Sudah Dibayar', icon: CheckCircle },
-                            { value: 'processing', label: 'Diproses', icon: Package },
-                            { value: 'delivered', label: 'Terkirim', icon: Truck },
-                          ].map((status) => {
-                            const Icon = status.icon;
-                            const isActive = selectedOrder.status === status.value;
-                            return (
-                              <Button
-                                key={status.value}
-                                variant={isActive ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => {
-                                  if (!isActive) {
-                                    updateOrderStatus(selectedOrder.id, status.value);
-                                    setShowDetailModal(false);
-                                  }
-                                }}
-                                disabled={isActive}
-                                className={`w-full justify-start gap-2 text-xs ${
-                                  isActive 
-                                    ? 'bg-[#ffd700] hover:bg-[#e6c200] text-gray-900 cursor-not-allowed' 
-                                    : 'hover:bg-gray-50'
-                                }`}
-                              >
-                                <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-gray-900' : 'text-gray-600'}`} />
-                                {status.label}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </>
+                  {selectedOrder.discount && selectedOrder.discount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Diskon:</span>
+                      <span className="font-medium text-red-600">-{formatRupiah(selectedOrder.discount)}</span>
+                    </div>
                   )}
-                  {isOfflineOrder(selectedOrder) && (
-                    <Button
-                      onClick={() => sendReceipt(selectedOrder.id)}
-                      className="w-full"
-                      variant="outline"
-                    >
-                      <Send className="h-4 w-4 mr-2" />
-                      Kirim E-Receipt via WA
+                  {selectedOrder.shippingFee && selectedOrder.shippingFee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Ongkos Kirim:</span>
+                      <span className="font-medium text-gray-900">{formatRupiah(selectedOrder.shippingFee)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
+                    <span className="text-gray-900">Total Keseluruhan:</span>
+                    <span className="text-[#ffd700]">{formatRupiah(selectedOrder.totalHarga + (selectedOrder.shippingFee || 0) - (selectedOrder.discount || 0))}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-4 border-t">
+                  <Button className="flex-1 bg-gray-900 text-white" onClick={() => handlePrintOrder(selectedOrder)}><Printer className="h-4 w-4 mr-2" />Cetak Resi</Button>
+                  
+                  {selectedOrder.status === 'pending' && <Button className="flex-1 bg-green-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'paid')}>Set Sudah Dibayar</Button>}
+                  {selectedOrder.status === 'paid' && <Button className="flex-1 bg-blue-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}>Set Diproses</Button>}
+                  {selectedOrder.status === 'processing' && selectedOrder.deliveryMethod === 'delivery' && (
+                    <div className="w-full space-y-2">
+                      <select
+                        className="w-full h-10 rounded-md border border-gray-300 bg-white px-3 text-sm"
+                        value={selectedCourierId}
+                        onChange={(e) => setSelectedCourierId(e.target.value)}
+                      >
+                        <option value="">Pilih kurir pengiriman</option>
+                        {couriers.map((courier) => (
+                          <option key={courier.id} value={courier.id}>
+                            {courier.name} - {courier.phone}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        className="w-full bg-orange-600 text-white"
+                        onClick={() => {
+                          const courierId = Number(selectedCourierId || selectedOrder.courierId || 0);
+                          if (!courierId) {
+                            toast({ variant: 'warning', title: 'Kurir belum dipilih', description: 'Pilih kurir sebelum ubah status pengiriman.' });
+                            return;
+                          }
+                          updateOrderStatus(selectedOrder.id, 'shipped', courierId);
+                        }}
+                      >
+                        Set Dalam Pengiriman
+                      </Button>
+                    </div>
+                  )}
+                  {selectedOrder.status === 'processing' && selectedOrder.deliveryMethod !== 'delivery' && (
+                    <Button className="flex-1 bg-purple-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}>
+                      Set Terkirim
                     </Button>
                   )}
-                  <Button
-                    onClick={() => setShowDetailModal(false)}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    Tutup
-                  </Button>
+                  {selectedOrder.status === 'shipped' && <Button className="flex-1 bg-purple-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}>Set Terkirim</Button>}
+                  {(selectedOrder.status === 'pending' || selectedOrder.status === 'paid') && <Button className="flex-1 bg-red-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'cancelled')}>Batalkan</Button>}
                 </div>
               </div>
             </div>
           </div>
         )}
-
-        {/* Order Detail Sidebar (for quick view) */}
-        <div className="lg:col-span-1">
-          {selectedOrder ? (
-            <Card className="border-gray-200 shadow-md sticky top-4">
-              <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
-                <CardTitle className="text-xl font-bold">Pesanan #{selectedOrder.id}</CardTitle>
-                <CardDescription className="mt-1.5 text-sm text-gray-700">
-                  {isOfflineOrder(selectedOrder) ? 'Pesanan Offline' : 'Pesanan Online'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                <div className="text-sm">
-                  <p className="font-medium text-gray-900">{selectedOrder.customerName}</p>
-                  <p className="text-gray-600">{selectedOrder.customerPhone}</p>
-                </div>
-                <div>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border ${getStatusColor(selectedOrder.status)}`}>
-                    {getStatusIndonesian(selectedOrder.status)}
-                  </span>
-                </div>
-                <div className="border-t pt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-gray-900">Total:</span>
-                    <span className="text-lg font-bold text-[#ffd700]">{formatRupiah(selectedOrder.totalHarga + (selectedOrder.shippingFee || 0))}</span>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => setShowDetailModal(true)}
-                  className="w-full"
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  Lihat Detail Lengkap
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="border-gray-200 shadow-md">
-              <CardContent className="pt-16 pb-16 text-center">
-                <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-700 font-semibold mb-1.5">Pilih pesanan</p>
-                <p className="text-sm text-gray-600">Pilih pesanan untuk melihat detail</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
       </div>
     </div>
   );
 }
-

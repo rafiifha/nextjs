@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { triggerOrderEvent } from '@/services/pusherService';
+import { pakasirService } from '@/services/pakasirService';
 
 // API khusus untuk transaksi kasir (offline)
 // Menggunakan stock_offline dan langsung mengurangi stok
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     // Validate products exist and check stock_offline per variant
     const productIds = normalizedItems.map((item: any) => item.productId);
-    const uniqueProductIds = [...new Set(productIds)];
+    const uniqueProductIds = [...new Set(productIds)] as number[];
     
     const products = await prisma.product.findMany({
       where: { id: { in: uniqueProductIds } },
@@ -125,8 +126,9 @@ export async function POST(request: NextRequest) {
       ? Math.max(0, cashReceivedAmount - totalHarga)
       : null;
 
-    // Determine order status based on payment method
-    const orderStatus = paymentMethod === 'non-tunai' ? 'pending' : 'paid';
+    const isTunai = paymentMethod === 'tunai';
+    // Any method selain tunai harus pending sampai callback Pakasir
+    const orderStatus = isTunai ? 'paid' : 'pending';
     
     // Create order
     const order = await prisma.order.create({
@@ -140,6 +142,7 @@ export async function POST(request: NextRequest) {
         change: changeAmount,
         deliveryMethod: 'pickup',
         shippingFee: 0,
+        paymentMethod: paymentMethod || 'tunai',
         items: {
           create: normalizedItems.map((item: any) => {
             const product = products.find(p => p.id === item.productId);
@@ -180,10 +183,56 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    let updatedOrder = order;
+
+    // Create transaksi Pakasir untuk non-tunai
+    if (!isTunai) {
+      try {
+        const pakasirRes = await pakasirService.createTransaction(paymentMethod, {
+          order_id: `INV-${order.id}`,
+          amount: totalHarga,
+        });
+
+        if (!pakasirRes?.payment?.payment_number) {
+          throw new Error('Pakasir tidak mengembalikan payment number');
+        }
+
+        updatedOrder = await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            paymentNumber: pakasirRes.payment.payment_number,
+            paymentFee: pakasirRes.payment.fee,
+            expiredAt: pakasirRes.payment.expired_at ? new Date(pakasirRes.payment.expired_at) : null,
+          },
+          include: {
+            items: {
+              include: {
+                product: {
+                  include: {
+                    category: true,
+                    variants: true,
+                  },
+                },
+                variant: true,
+              },
+            },
+          },
+        });
+      } catch (pakasirErr: any) {
+        console.error('❌ Error calling Pakasir (kasir):', pakasirErr);
+        // Hapus order agar tidak ada order pending tanpa instruksi bayar
+        await prisma.order.delete({ where: { id: order.id } });
+        return NextResponse.json(
+          { error: pakasirErr?.message || 'Gagal membuat transaksi Pakasir' },
+          { status: 502 }
+        );
+      }
+    }
+
     // Reduce stock_offline for each variant (only for tunai payment)
-    // For non-tunai, stock will be reduced after payment confirmation via Midtrans callback
-    if (paymentMethod === 'tunai') {
-      for (const item of order.items) {
+    // For non-tunai, stock will be reduced after payment confirmation via Pakasir callback
+    if (isTunai) {
+      for (const item of updatedOrder.items) {
         if (!item.variantId) {
           console.error(`❌ VariantId is null for order item ${item.id}, product ${item.productId}, priceType ${item.priceType}`);
           continue;
@@ -205,13 +254,13 @@ export async function POST(request: NextRequest) {
         }
       }
     } else {
-      console.log(`⏳ Stock will be reduced after payment confirmation for order ${order.id}`);
+      console.log(`⏳ Stock will be reduced after payment confirmation for order ${updatedOrder.id}`);
     }
 
     // Trigger Pusher event
-    await triggerOrderEvent('order-created', order);
+    await triggerOrderEvent('order-created', updatedOrder);
 
-    return NextResponse.json(order, { status: 201 });
+    return NextResponse.json(updatedOrder, { status: 201 });
   } catch (error: any) {
     console.error('❌ Create kasir order error:', error);
     return NextResponse.json(

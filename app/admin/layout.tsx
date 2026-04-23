@@ -14,7 +14,8 @@ import {
   X,
   LogOut,
   ShoppingBag,
-  MessageSquare
+  MessageSquare,
+  Users
 } from 'lucide-react';
 import { cartService } from '@/lib/cart';
 
@@ -39,7 +40,7 @@ export default function AdminLayout({
 
     try {
       const userData = JSON.parse(userStr);
-      if (userData.role !== 'admin') {
+      if (userData.role !== 'admin' && userData.role !== 'kasir') {
         router.push('/');
         return;
       }
@@ -64,14 +65,22 @@ export default function AdminLayout({
     router.push('/');
   };
 
-  const menuItems = [
+  const adminMenuItems = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin/kasir', label: 'Kasir', icon: ShoppingCart },
     { href: '/admin/produk', label: 'Manajemen Produk', icon: Package },
-    { href: '/admin/pesanan', label: 'Manajemen Pesanan', icon: FileText },
     { href: '/admin/permintaan-barang', label: 'Permintaan Barang', icon: MessageSquare },
     { href: '/admin/laporan', label: 'Laporan Penjualan', icon: BarChart3 },
+    { href: '/admin/pegawai', label: 'Kelola Pegawai', icon: Users },
   ];
+
+  const kasirMenuItems = [
+    { href: '/admin/kasir', label: 'Kasir', icon: ShoppingCart },
+    { href: '/admin/pesanan', label: 'Manajemen Pesanan', icon: FileText },
+  ];
+
+  const isKasir = user?.role === 'kasir';
+  const panelText = isKasir ? 'Kasir Panel' : 'Admin Panel';
+  const menuItems = isKasir ? kasirMenuItems : adminMenuItems;
 
   if (!user) {
     return null;
@@ -86,7 +95,7 @@ export default function AdminLayout({
             <ShoppingBag className="h-6 w-6 text-[#ffd700]" />
             <div>
               <div className="font-bold text-gray-900 text-lg">Toko Naning</div>
-              <div className="text-xs text-gray-500 font-medium">Admin Panel</div>
+              <div className="text-xs text-gray-500 font-medium">{panelText}</div>
             </div>
           </Link>
           <Button
@@ -112,7 +121,7 @@ export default function AdminLayout({
               <ShoppingBag className="h-6 w-6 text-[#ffd700]" />
               <div>
                 <div className="font-bold text-gray-900 text-lg">Toko Naning</div>
-                <div className="text-xs text-gray-600 font-medium">Admin Panel</div>
+                <div className="text-xs text-gray-600 font-medium">{panelText}</div>
               </div>
             </div>
 

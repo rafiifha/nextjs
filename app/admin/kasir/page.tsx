@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,7 +41,6 @@ interface CartItem {
 }
 
 export default function KasirPage() {
-  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -51,123 +49,42 @@ export default function KasirPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'tunai' | 'non-tunai'>('tunai');
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [cashReceived, setCashReceived] = useState<string>('');
   const [discount, setDiscount] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<number, number>>({});
 
   useEffect(() => {
     fetchProducts();
     fetchCategories();
   }, []);
 
-  // Handle payment redirect from Midtrans
-  useEffect(() => {
-    const paymentStatus = searchParams?.get('payment');
-    const orderId = searchParams?.get('orderId');
-    
-    // Check if redirected from Midtrans with order_id parameter (from example.com)
-    const midtransOrderId = searchParams?.get('order_id');
-    const midtransStatus = searchParams?.get('transaction_status');
-    const midtransStatusCode = searchParams?.get('status_code');
-    
-    if (midtransOrderId && midtransStatusCode === '200') {
-      // Extract actual order ID from Midtrans order_id format: ORDER-{id}-{timestamp}
-      const orderIdMatch = midtransOrderId.match(/ORDER-(\d+)-/);
-      const actualOrderId = orderIdMatch ? orderIdMatch[1] : null;
-      
-      if (actualOrderId) {
-        // Redirect to kasir page with proper parameters
-        const redirectUrl = `${window.location.origin}/admin/kasir?payment=success&orderId=${actualOrderId}`;
-        console.log('Redirecting from example.com to:', redirectUrl);
-        window.location.replace(redirectUrl);
-        return;
-      }
-    }
-    
-    if (paymentStatus && orderId) {
-      if (paymentStatus === 'success') {
-        // Fetch order details for receipt
-        fetch(`/api/pesanan/${orderId}`)
-          .then(res => res.json())
-          .then(order => {
-            if (order) {
-              const subtotal = order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-              setReceiptData({
-                orderId: order.id,
-                customerName: order.customerName,
-                customerPhone: order.customerPhone,
-                items: order.items,
-                subtotal: subtotal,
-                discount: order.discount || 0,
-                total: order.totalHarga,
-                cashReceived: order.cashReceived,
-                change: order.change,
-                paymentMethod: 'Non-Tunai',
-                date: new Date(order.createdAt).toLocaleString('id-ID'),
-              });
-              setShowReceipt(true);
-            }
-          })
-          .catch(err => console.error('Error fetching order:', err));
-        
-        toast({
-          title: '✅ Pembayaran Berhasil',
-          description: `Pesanan #${orderId} berhasil dibayar!`,
-        });
-        // Reset form
-        setCart([]);
-        setCustomerName('');
-        setCustomerPhone('');
-        setCashReceived('');
-        setDiscount('');
-        setSearchQuery('');
-        fetchProducts();
-        // Remove query params from URL
-        window.history.replaceState({}, '', '/admin/kasir');
-      } else if (paymentStatus === 'pending') {
-        toast({
-          title: '⏳ Pembayaran Pending',
-          description: 'Menunggu konfirmasi pembayaran',
-        });
-        // Remove query params from URL
-        window.history.replaceState({}, '', '/admin/kasir');
-      } else if (paymentStatus === 'failed') {
-        toast({
-          variant: 'error',
-          title: '❌ Pembayaran Gagal',
-          description: 'Silakan coba lagi atau gunakan metode pembayaran lain',
-        });
-        // Remove query params from URL
-        window.history.replaceState({}, '', '/admin/kasir');
-      }
-    }
-  }, [searchParams, toast]);
+  // Pakasir does not use Snap popup, we redirect to instruction page
 
-  // Load Midtrans script
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
-    script.setAttribute('data-client-key', process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || '');
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
+  // Removed Pakasir snap script loader (atau Midtrans yang sebelumnya)
 
   const fetchProducts = async () => {
     try {
       const res = await fetch('/api/produk');
       if (res.ok) {
         const data = await res.json();
-        setProducts(Array.isArray(data) ? data : []);
+        const productsData = Array.isArray(data) ? data : [];
+        setProducts(productsData);
+        setSelectedVariantByProduct((prev) => {
+          const next = { ...prev };
+          for (const product of productsData) {
+            if (next[product.id]) continue;
+            const firstAvailable = product.variants.find(
+              (v: ProductVariant) => (v.stock_offline ?? 0) > 0 && v.price !== null && v.price !== undefined
+            );
+            if (firstAvailable) next[product.id] = firstAvailable.id;
+          }
+          return next;
+        });
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -272,7 +189,7 @@ export default function KasirPage() {
         product, 
         priceType: variant.priceType, 
         quantity, 
-        price: variant.price 
+        price: variant.price! 
       }];
     });
   };
@@ -358,6 +275,15 @@ export default function KasirPage() {
       toast({
         title: '❌ Error',
         description: 'Keranjang masih kosong',
+        variant: 'error',
+      });
+      return;
+    }
+
+    if (!paymentMethod) {
+      toast({
+        title: '❌ Error',
+        description: 'Pilih metode pembayaran terlebih dahulu',
         variant: 'error',
       });
       return;
@@ -474,133 +400,16 @@ export default function KasirPage() {
         return;
       }
 
-      // If payment method is non-tunai, generate Midtrans token
-      if (paymentMethod === 'non-tunai') {
-        const totalPrice = getTotalPrice();
-        
-        // Get current base URL - ensure it's a full URL
-        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-        
-        // Construct full redirect URLs
-        // Use payment/redirect page as intermediate to handle Midtrans redirect properly
-        // This page will extract order_id from Midtrans format and redirect to kasir page
-        const finishUrl = `${baseUrl}/payment/redirect`;
-        const unfinishUrl = `${baseUrl}/payment/redirect`;
-        const errorUrl = `${baseUrl}/payment/redirect`;
-        
-        console.log('🔗 Sending redirect URLs to API:');
-        console.log('  - Base URL:', baseUrl);
-        console.log('  - Finish URL:', finishUrl);
-        console.log('  - Unfinish URL:', unfinishUrl);
-        console.log('  - Error URL:', errorUrl);
-        
-        // Generate Midtrans token
-        const tokenResponse = await fetch('/api/payment/midtrans/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId: data.id,
-            grossAmount: totalPrice,
-            customerName,
-            customerPhone,
-            finishRedirectUrl: finishUrl,
-            unfinishRedirectUrl: unfinishUrl,
-            errorRedirectUrl: errorUrl,
-          }),
+      // If payment method is not tunai, redirect to instruction page
+      if (paymentMethod !== 'tunai') {
+        toast({
+          title: '✅ Berhasil',
+          description: 'Pesanan berhasil dibuat! Mengarahkan ke halaman pembayaran...',
         });
-
-        const tokenData = await tokenResponse.json();
-
-        if (!tokenResponse.ok) {
-          toast({
-            variant: 'error',
-            title: '❌ Gagal Membuat Payment Token',
-            description: tokenData.error || 'Silakan coba lagi atau hubungi admin',
-          });
-          setSubmitting(false);
-          return;
-        }
-
-        // Open Midtrans Snap popup
-        const openSnapPopup = () => {
-          if (typeof window !== 'undefined' && (window as any).snap) {
-            (window as any).snap.pay(tokenData.token, {
-              onSuccess: (result: any) => {
-                console.log('Payment success:', result);
-                
-                // Redirect manually to kasir page with success status
-                const currentOrigin = window.location.origin;
-                const redirectUrl = `${currentOrigin}/admin/kasir?payment=success&orderId=${data.id}`;
-                console.log('Redirecting to:', redirectUrl);
-                
-                // Show toast first
-                toast({
-                  title: '✅ Pembayaran Berhasil',
-                  description: 'Pesanan berhasil dibayar! Mengarahkan ke halaman kasir...',
-                });
-                
-                // Redirect after short delay
-                setTimeout(() => {
-                  window.location.href = redirectUrl;
-                }, 1000);
-              },
-              onPending: (result: any) => {
-                console.log('Payment pending:', result);
-                
-                // Redirect manually to kasir page with pending status
-                const currentOrigin = window.location.origin;
-                const redirectUrl = `${currentOrigin}/admin/kasir?payment=pending&orderId=${data.id}`;
-                console.log('Redirecting to:', redirectUrl);
-                
-                toast({
-                  title: '⏳ Pembayaran Pending',
-                  description: 'Menunggu konfirmasi pembayaran. Mengarahkan ke halaman kasir...',
-                });
-                
-                setTimeout(() => {
-                  window.location.href = redirectUrl;
-                }, 1000);
-              },
-              onError: (result: any) => {
-                console.log('Payment error:', result);
-                
-                // Redirect manually to kasir page with failed status
-                const currentOrigin = window.location.origin;
-                const redirectUrl = `${currentOrigin}/admin/kasir?payment=failed&orderId=${data.id}`;
-                console.log('Redirecting to:', redirectUrl);
-                
-                toast({
-                  variant: 'error',
-                  title: '❌ Pembayaran Gagal',
-                  description: 'Silakan coba lagi. Mengarahkan ke halaman kasir...',
-                });
-                
-                setTimeout(() => {
-                  window.location.href = redirectUrl;
-                }, 1000);
-              },
-              onClose: () => {
-                console.log('Payment popup closed by user');
-                setSubmitting(false);
-              },
-            });
-          } else {
-            setTimeout(() => {
-              if (typeof window !== 'undefined' && (window as any).snap) {
-                openSnapPopup();
-              } else {
-                toast({
-                  variant: 'error',
-                  title: '❌ Gagal Memuat Halaman Pembayaran',
-                  description: 'Silakan refresh halaman atau coba lagi',
-                });
-                setSubmitting(false);
-              }
-            }, 1000);
-          }
-        };
-
-        openSnapPopup();
+        
+        setTimeout(() => {
+          window.location.href = `/payment/instruction/${data.id}`;
+        }, 1000);
       }
     } catch (error: any) {
       console.error('Checkout error:', error);
@@ -669,87 +478,64 @@ export default function KasirPage() {
                   Memuat produk...
                 </div>
               ) : filteredProducts.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {filteredProducts.map((product) => {
                     const availableVariants = product.variants.filter(v => (v.stock_offline ?? 0) > 0 && v.price !== null && v.price !== undefined);
+                    const selectedVariantId = selectedVariantByProduct[product.id];
+                    const selectedVariant = availableVariants.find(v => v.id === selectedVariantId) || availableVariants[0] || null;
                     
                     return (
                       <Card
                         key={product.id}
-                        className="border-gray-200 shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden"
+                        className="border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
                       >
-                        <CardHeader className="bg-gradient-to-r from-[#ffd700]/10 to-[#ffd700]/5 pb-3">
+                        <CardHeader className="bg-gradient-to-r from-[#ffd700]/10 to-[#ffd700]/5 py-3">
                           <div className="flex justify-between items-start">
                             <div className="flex-1 min-w-0">
-                              <CardTitle className="text-base font-bold text-gray-900 mb-2 line-clamp-2">
+                              <CardTitle className="text-sm font-semibold text-gray-900 line-clamp-2">
                                 {product.name}
                               </CardTitle>
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 mt-2 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
                                 <Box className="h-3 w-3" />
                                 {product.category.name}
                               </div>
                             </div>
-                            <div className="ml-2 p-2 bg-[#ffd700]/20 rounded-lg">
-                              <Package className="h-4 w-4 text-[#ffd700]" />
+                            <div className="ml-2 p-1.5 bg-[#ffd700]/20 rounded-lg">
+                              <Package className="h-3.5 w-3.5 text-[#ffd700]" />
                             </div>
                           </div>
                         </CardHeader>
-                        <CardContent className="pt-4">
-                          {/* Variants List */}
-                          <div className="space-y-2.5 mb-4">
-                            {product.variants.map((variant) => {
-                              const hasStock = (variant.stock_offline ?? 0) > 0;
-                              const hasPrice = variant.price !== null && variant.price !== undefined;
-                              const isAvailable = hasStock && hasPrice;
-                              
-                              return (
-                                <div
-                                  key={variant.id}
-                                  onClick={() => {
-                                    if (isAvailable) {
-                                      addToCart(product, variant, 1);
-                                    }
-                                  }}
-                                  className={`border rounded-lg p-3 transition-all cursor-pointer ${
-                                    isAvailable
-                                      ? 'border-gray-200 bg-white hover:border-[#ffd700] hover:bg-[#ffd700]/5 hover:shadow-md active:scale-[0.98]'
-                                      : 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
-                                  }`}
-                                >
-                                  <div className="flex justify-between items-center mb-2">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-semibold text-gray-800 capitalize text-sm">
-                                        {variant.priceType}
-                                      </span>
-                                      {hasPrice && (
-                                        <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">
-                                          Ada Harga
-                                        </span>
-                                      )}
-                                      {hasStock && (
-                                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium flex items-center gap-1">
-                                          <CheckCircle className="h-3 w-3" />
-                                          Tersedia
-                                        </span>
-                                      )}
-                                    </div>
-                                    {hasPrice ? (
-                                      <span className="font-bold text-[#ffd700] text-sm">
-                                        {formatRupiah(variant.price!)}
-                                      </span>
-                                    ) : (
-                                      <span className="text-xs text-gray-400 italic">Belum ada harga</span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1 px-2 py-1 rounded text-xs">
-                                    <TrendingDown className={`h-3 w-3 ${hasStock ? 'text-gray-600' : 'text-red-500'}`} />
-                                    <span className={`font-medium ${hasStock ? 'text-gray-700' : 'text-red-600'}`}>
-                                      Stok: {variant.stock_offline !== null && variant.stock_offline !== undefined ? variant.stock_offline : '-'}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                        <CardContent className="pt-3">
+                          <div className="space-y-2">
+                            <select
+                              className="w-full h-9 rounded-md border border-gray-300 bg-white px-3 text-sm"
+                              value={selectedVariant?.id || ''}
+                              onChange={(e) =>
+                                setSelectedVariantByProduct((prev) => ({
+                                  ...prev,
+                                  [product.id]: Number(e.target.value),
+                                }))
+                              }
+                              disabled={availableVariants.length === 0}
+                            >
+                              {availableVariants.length === 0 ? (
+                                <option value="">Varian tidak tersedia</option>
+                              ) : (
+                                availableVariants.map((variant) => (
+                                  <option key={variant.id} value={variant.id}>
+                                    {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stock_offline ?? 0})
+                                  </option>
+                                ))
+                              )}
+                            </select>
+                            <Button
+                              size="sm"
+                              className="w-full h-8 text-xs"
+                              disabled={!selectedVariant}
+                              onClick={() => selectedVariant && addToCart(product, selectedVariant, 1)}
+                            >
+                              + Tambah
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>
@@ -866,40 +652,36 @@ export default function KasirPage() {
               {cart.length > 0 && (
                 <div className="border-t border-gray-200 pt-4">
                   <Label className="text-sm font-semibold text-gray-900 mb-3 block">Metode Pembayaran</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod('tunai');
+                  <select 
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                    value={paymentMethod}
+                    onChange={(e) => {
+                      setPaymentMethod(e.target.value);
+                      if (e.target.value !== 'tunai') {
                         setCashReceived('');
                         setDiscount('');
-                      }}
-                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all ${
-                        paymentMethod === 'tunai'
-                          ? 'border-[#ffd700] bg-[#ffd700]/10'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <Wallet className="h-4 w-4" />
-                      <span className="text-sm font-medium">Tunai</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod('non-tunai');
-                        setCashReceived('');
-                        setDiscount('');
-                      }}
-                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all ${
-                        paymentMethod === 'non-tunai'
-                          ? 'border-[#ffd700] bg-[#ffd700]/10'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      <span className="text-sm font-medium">Non-Tunai</span>
-                    </button>
-                  </div>
+                      }
+                    }}
+                  >
+                    <option value="">Pilih metode pembayaran</option>
+                    <option value="tunai">💵 Tunai</option>
+                    <option value="qris">💳 QRIS</option>
+                    <option value="bca_va">🏦 BCA Virtual Account</option>
+                    <option value="bni_va">🏦 BNI Virtual Account</option>
+                    <option value="bri_va">🏦 BRI Virtual Account</option>
+                    <option value="cimb_niaga_va">🏦 CIMB Niaga VA</option>
+                    <option value="maybank_va">🏦 Maybank VA</option>
+                    <option value="permata_va">🏦 Permata VA</option>
+                    <option value="sampoerna_va">🏦 Sampoerna VA</option>
+                    <option value="bnc_va">🏦 BNC VA</option>
+                    <option value="atm_bersama_va">🏦 ATM Bersama VA</option>
+                    <option value="artha_graha_va">🏦 Artha Graha VA</option>
+                  </select>
+                  {paymentMethod !== 'tunai' && (
+                    <p className="mt-2 text-xs text-gray-600">
+                      Pembayaran non-tunai: setelah pesanan dibuat, kasir diarahkan ke halaman instruksi bayar.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -997,6 +779,7 @@ export default function KasirPage() {
                   disabled={
                     submitting || 
                     cart.length === 0 || 
+                    !paymentMethod ||
                     (paymentMethod === 'tunai' && (getChange() < 0 || !cashReceived || parseFloat(cashReceived) <= 0))
                   }
                 >

@@ -1,261 +1,126 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShoppingCart, Package, Truck, Shield, ArrowRight, DollarSign, Users, Award } from 'lucide-react';
+import { ShoppingCart, Package, Truck, ArrowRight, DollarSign, CheckCircle2 } from 'lucide-react';
 
 export default function Home() {
   return (
     <div className="flex flex-col bg-white">
-      {/* Hero Section */}
-      <section className="bg-white py-16 sm:py-24 lg:py-32">
+      <section className="bg-gradient-to-b from-[#fff8d6] to-white py-14 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl text-center">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
-              Toko{' '}
-              <span className="text-[#ffd700]">Naning</span>
-          </h1>
-            <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
-              Supplier sembako terpercaya dengan harga grosir terbaik. 
-              Stok lengkap, harga kompetitif, dan pelayanan cepat untuk kebutuhan usaha Anda.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/pesanan">
-                <Button size="lg" className="w-full sm:w-auto px-8">
-                  Pesan Sekarang
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-              <Link href="/produk">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto px-8">
-                  Lihat Katalog
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-16 sm:py-20 bg-gray-50">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Mengapa Pilih Toko Naning?
-            </h2>
-            <p className="text-lg text-gray-600">
-              Solusi terbaik untuk kebutuhan grosir sembako Anda
-            </p>
-          </div>
-          <div className="mx-auto max-w-6xl">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border border-gray-200 bg-white">
-                <CardContent className="p-8">
-                  <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-[#ffd700]/20">
-                    <DollarSign className="h-6 w-6 text-[#ffd700]" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-3">
-                    Harga Grosir Terbaik
-                  </h3>
-                  <p className="text-base text-gray-600 leading-relaxed">
-                    Harga grosir yang sangat kompetitif dengan sistem dus, pak, dan renceng. 
-                    Semakin banyak beli, semakin hemat.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border border-gray-200 bg-white">
-                <CardContent className="p-8">
-                  <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-                    <Package className="h-6 w-6 text-green-600" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-3">
-                    Stok Lengkap & Terjamin
-                  </h3>
-                  <p className="text-base text-gray-600 leading-relaxed">
-                    Stok sembako lengkap dan selalu tersedia. 
-                    Berbagai varian produk dengan kualitas terjamin untuk kebutuhan usaha Anda.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border border-gray-200 bg-white">
-                <CardContent className="p-8">
-                  <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100">
-                    <Truck className="h-6 w-6 text-purple-600" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-3">
-                    Pengiriman Cepat & Aman
-                  </h3>
-                  <p className="text-base text-gray-600 leading-relaxed">
-                    Layanan pengiriman. 
-                    Pilihan pickup atau delivery dengan berbagai kurir terpercaya.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border border-gray-200 bg-white">
-                <CardContent className="p-8">
-                  <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
-                    <Shield className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-3">
-                    Pembayaran Fleksibel
-                  </h3>
-                  <p className="text-base text-gray-600 leading-relaxed">
-                    Sistem pembayaran aman dan fleksibel. 
-                    Mendukung berbagai metode pembayaran untuk kenyamanan transaksi Anda.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border border-gray-200 bg-white">
-                <CardContent className="p-8">
-                  <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-orange-100">
-                    <Users className="h-6 w-6 text-orange-600" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-3">
-                    Pelayanan Profesional
-                  </h3>
-                  <p className="text-base text-gray-600 leading-relaxed">
-                    Tim kami siap membantu anda. 
-                    Respon cepat dan solusi tepat untuk setiap kebutuhan grosir Anda.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border border-gray-200 bg-white">
-                <CardContent className="p-8">
-                  <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-red-100">
-                    <Award className="h-6 w-6 text-red-600" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-3">
-                    Kualitas Terjamin
-                  </h3>
-                  <p className="text-base text-gray-600 leading-relaxed">
-                    Semua produk sembako berkualitas tinggi dengan standar terbaik. 
-                    Fresh dan terjamin keasliannya untuk kepuasan pelanggan.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Product Categories Section */}
-      <section className="py-16 sm:py-20 bg-white">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Kategori Produk
-            </h2>
-            <p className="text-lg text-gray-600">
-              Berbagai kategori dengan harga grosir terbaik
-            </p>
-          </div>
-          <div className="mx-auto max-w-5xl">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="border border-gray-200 bg-white text-center hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <Package className="h-10 w-10 text-[#ffd700] mx-auto mb-3" />
-                  <h3 className="font-semibold text-gray-900">Rokok</h3>
-                </CardContent>
-              </Card>
-              <Card className="border border-gray-200 bg-white text-center hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <Package className="h-10 w-10 text-[#ffd700] mx-auto mb-3" />
-                  <h3 className="font-semibold text-gray-900">Sembako</h3>
-                </CardContent>
-              </Card>
-              <Card className="border border-gray-200 bg-white text-center hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <Package className="h-10 w-10 text-[#ffd700] mx-auto mb-3" />
-                  <h3 className="font-semibold text-gray-900">Mie Instan</h3>
-                </CardContent>
-              </Card>
-              <Card className="border border-gray-200 bg-white text-center hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <Package className="h-10 w-10 text-[#ffd700] mx-auto mb-3" />
-                  <h3 className="font-semibold text-gray-900">Snack & Camilan</h3>
-                </CardContent>
-              </Card>
-              <Card className="border border-gray-200 bg-white text-center hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <Package className="h-10 w-10 text-[#ffd700] mx-auto mb-3" />
-                  <h3 className="font-semibold text-gray-900">Minuman</h3>
-                </CardContent>
-              </Card>
-              <Card className="border border-gray-200 bg-white text-center hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <Package className="h-10 w-10 text-[#ffd700] mx-auto mb-3" />
-                  <h3 className="font-semibold text-gray-900">Susu & Produk Olahan</h3>
-                </CardContent>
-              </Card>
-              <Card className="border border-gray-200 bg-white text-center hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <Package className="h-10 w-10 text-[#ffd700] mx-auto mb-3" />
-                  <h3 className="font-semibold text-gray-900">Kebutuhan Dapur</h3>
-                </CardContent>
-              </Card>
-              <Card className="border border-gray-200 bg-white text-center hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <Package className="h-10 w-10 text-[#ffd700] mx-auto mb-3" />
-                  <h3 className="font-semibold text-gray-900">Lainnya</h3>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-16 sm:py-20 bg-gray-50">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Toko Naning dalam Angka
-            </h2>
-            <p className="text-lg text-gray-600">
-              Bukti komitmen kami melayani kebutuhan Anda
-            </p>
-          </div>
-          <div className="mx-auto max-w-4xl">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-8">
-              <div className="text-center">
-                <div className="text-5xl font-bold text-[#ffd700] mb-2">500+</div>
-                <div className="text-lg font-semibold text-gray-900 mb-1">Produk Sembako</div>
-                <div className="text-sm text-gray-600">Stok lengkap berbagai kategori</div>
+          <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+            <div>
+              <div className="inline-flex items-center rounded-full border border-[#ffd700]/40 bg-white px-3 py-1 text-xs font-medium text-gray-700">
+                Supplier sembako grosir
               </div>
-              <div className="text-center">
-                <div className="text-5xl font-bold text-[#ffd700] mb-2">98%</div>
-                <div className="text-lg font-semibold text-gray-900 mb-1">Kepuasan Pelanggan</div>
-                <div className="text-sm text-gray-600">Rating tinggi dari mitra</div>
+              <h1 className="mt-4 text-4xl sm:text-5xl font-bold text-gray-900 leading-tight">
+                Belanja grosir lebih cepat di <span className="text-[#d4a800]">Toko Naning</span>
+              </h1>
+              <p className="mt-4 text-base sm:text-lg text-gray-600 max-w-xl">
+                Stok lengkap, harga stabil, proses order simpel. Cocok untuk warung, toko kelontong, dan reseller.
+              </p>
+              <div className="mt-7 flex flex-col sm:flex-row gap-3">
+                <Link href="/produk">
+                  <Button size="lg" className="w-full sm:w-auto">
+                    Lihat Katalog
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="/checkout">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    Pesan Sekarang
+                  </Button>
+                </Link>
+              </div>
+              <div className="mt-6 flex flex-wrap gap-4 text-sm text-gray-600">
+                <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-4 w-4 text-green-600" /> Harga grosir</span>
+                <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-4 w-4 text-green-600" /> Stok terpantau</span>
+                <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-4 w-4 text-green-600" /> Pembayaran fleksibel</span>
               </div>
             </div>
+
+            <Card className="border-gray-200 shadow-lg">
+              <CardContent className="p-6 sm:p-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-5">Kenapa pelanggan pilih kami</h3>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-md bg-yellow-100 p-2"><DollarSign className="h-4 w-4 text-yellow-700" /></div>
+                    <div>
+                      <p className="font-medium text-gray-900">Harga lebih kompetitif</p>
+                      <p className="text-sm text-gray-600">Cocok untuk belanja rutin dan restok.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-md bg-blue-100 p-2"><Package className="h-4 w-4 text-blue-700" /></div>
+                    <div>
+                      <p className="font-medium text-gray-900">Stok varian jelas</p>
+                      <p className="text-sm text-gray-600">Online/offline dipisah, minim salah input.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-md bg-purple-100 p-2"><Truck className="h-4 w-4 text-purple-700" /></div>
+                    <div>
+                      <p className="font-medium text-gray-900">Pengiriman terkontrol</p>
+                      <p className="text-sm text-gray-600">Zona ongkir jelas dan update status real-time.</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-16 sm:py-20 bg-[#ffd700]">
+      <section className="py-12 sm:py-16 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-[#d4a800]">500+</div>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">Produk aktif</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-[#d4a800]">98%</div>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">Kepuasan pelanggan</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-[#d4a800]">24/7</div>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">Monitoring pesanan</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-[#d4a800]">1 Hari</div>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">Rata-rata proses</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-14 sm:py-16 bg-gray-50 border-y border-gray-100">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Siap Memulai Bisnis Grosir Sembako?
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              Siap restok untuk usaha?
             </h2>
-            <p className="text-lg text-gray-700 mb-8 max-w-2xl mx-auto">
-              Dapatkan harga grosir terbaik dengan stok lengkap. 
-              Mulai pesan sekarang dan tingkatkan keuntungan bisnis Anda!
+            <p className="mt-3 text-gray-600">
+              Mulai dari katalog, pilih varian, checkout, selesai. Tidak ribet.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link href="/checkout">
-                <Button size="lg" variant="secondary" className="px-8 bg-white text-gray-900 hover:bg-gray-50 font-semibold shadow-lg">
-                  <ShoppingCart className="mr-2 h-5 w-5" />
+                <Button size="lg" className="px-8">
+                  <ShoppingCart className="mr-2 h-4 w-4" />
                   Pesan Sekarang
                 </Button>
               </Link>
               <Link href="/produk">
-                <Button size="lg" variant="outline" className="px-8 border-2 border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white">
+                <Button size="lg" variant="outline" className="px-8">
                   Lihat Katalog Produk
                 </Button>
               </Link>

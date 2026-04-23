@@ -16,10 +16,7 @@ export const prisma =
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
 
-// Handle connection errors gracefully
-prisma.$connect().catch((error) => {
-  console.error('Database connection error:', error);
-});
+// Eager connect removed to prevent connection exhaustion during hot-reload
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { triggerOrderEvent } from '@/services/pusherService';
+import { sendReceipt } from '@/services/whatsappService';
 
 // Endpoint to manually mark order as paid and reduce stock
-// Used as fallback when Midtrans callback is not received
+// Used as fallback when Pakasir callback is not received
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -25,7 +26,10 @@ export async function POST(
       include: {
         items: {
           include: {
-            product: true,
+            product: {
+              include: { variants: true }
+            },
+            variant: true,
           },
         },
       },
@@ -69,15 +73,16 @@ export async function POST(
       
       // If variant is null, find by priceType
       if (!variant) {
-        variant = item.product.variants.find(v => v.priceType === item.priceType);
+        variant = item.product.variants.find(v => v.priceType === item.priceType) || null;
         if (!variant) {
           stockErrors.push(`${item.product.name}: varian "${item.priceType}" tidak ditemukan`);
           continue;
         }
       }
 
-      if (variant.stock_online < item.quantity) {
-        stockErrors.push(`${item.product.name} (${variant.priceType}): stok online tersedia ${variant.stock_online}, diminta ${item.quantity}`);
+      const availableStock = variant.stock_online ?? 0;
+      if (availableStock < item.quantity) {
+        stockErrors.push(`${item.product.name} (${variant.priceType}): stok online tersedia ${availableStock}, diminta ${item.quantity}`);
       }
     }
 
@@ -132,6 +137,25 @@ export async function POST(
       await triggerOrderEvent('order-updated', updatedOrder);
     } catch (error) {
       console.error('Pusher error:', error);
+    }
+
+    // Kirim invoice/receipt via WhatsApp (Fonnte)
+    try {
+      await sendReceipt(order.customerPhone, {
+        orderId: order.id,
+        customerName: order.customerName,
+        totalHarga: order.totalHarga,
+        status: 'paid',
+        items: order.items.map(item => ({
+          name: item.product.name,
+          quantity: item.quantity,
+          price: item.price * item.quantity,
+        })),
+        createdAt: order.createdAt.toISOString(),
+      });
+      console.log(`📱 Invoice WhatsApp berhasil dikirim ke ${order.customerPhone}`);
+    } catch (waErr) {
+      console.error('❌ Gagal kirim WhatsApp invoice:', waErr);
     }
 
     return NextResponse.json(updatedOrder);

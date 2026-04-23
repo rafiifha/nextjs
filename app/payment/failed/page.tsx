@@ -1,25 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { XCircle, Home, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 export default function PaymentFailedPage() {
-  const searchParams = useSearchParams();
   const router = useRouter();
   const [orderId, setOrderId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const orderIdParam = searchParams.get('order_id');
-    const statusParam = searchParams.get('transaction_status');
+    const params = new URLSearchParams(window.location.search);
+    const orderIdParam = params.get('order_id');
+    const statusParam = params.get('transaction_status');
     
     setOrderId(orderIdParam);
     setStatus(statusParam);
-  }, [searchParams]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

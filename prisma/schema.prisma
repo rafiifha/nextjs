@@ -45,20 +45,42 @@ model ProductVariant {
   items       OrderItem[] @relation("VariantOrderItems")
 }
 
+model Courier {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]  @relation("CourierOrders")
+}
+
 model Order {
   id            Int         @id @default(autoincrement())
   customerName  String
   customerPhone String
-  status        String      @default("pending") // pending, paid, processing, delivered, cancelled, expired
+  status        String      @default("pending") // pending, paid, processing, shipped, delivered, cancelled, expired
   totalHarga    Int
   discount      Int?        @default(0) // Diskon dalam rupiah
   cashReceived  Int?        // Uang yang diterima (untuk pembayaran tunai)
   change        Int?         // Kembalian (untuk pembayaran tunai)
   deliveryMethod String?
   shippingFee   Int?
-  trackingId    String?     // Biteship tracking ID
-  waybillId     String?     // Biteship waybill ID
-  biteshipOrderId String?   // Biteship order ID
+  // Shipping fields
+  shippingAddress  String?    // Alamat lengkap pengiriman
+  shippingLat      Float?     // Latitude tujuan
+  shippingLng      Float?     // Longitude tujuan
+  shippingDistance  Float?    // Jarak dalam km
+  shippingZone     Int?      // Zona (1, 2, 3)
+  trackingNumber   String?   // Nomor resi internal (TN-{id}-{timestamp})
+  shippingNotes    String?   // Catatan untuk kurir
+  courierId        Int?      // FK ke Courier
+  courier          Courier?  @relation("CourierOrders", fields: [courierId], references: [id])
+  shippedAt        DateTime? // Waktu mulai dikirim
+  deliveredAt      DateTime? // Waktu sampai
+  paymentMethod String?     // e.g., 'qris', 'bca_va'
+  paymentNumber String?     // VA number or QRIS string
+  paymentFee    Int?        // Admin fee from Pakasir
   expiredAt     DateTime?   // Waktu kedaluwarsa pembayaran
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -39,7 +39,6 @@ interface Product {
 
 export default function ProdukPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +46,7 @@ export default function ProdukPage() {
   const [user, setUser] = useState<any>(null);
   const [cart, setCart] = useState<any[]>([]);
   const [addingToCart, setAddingToCart] = useState<{ [key: string]: boolean }>({});
+  const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<number, number>>({});
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -79,7 +79,7 @@ export default function ProdukPage() {
       toast({
         title: "⚠️ Harga Belum Tersedia",
         description: "Produk ini belum memiliki harga. Silakan hubungi admin.",
-        variant: 'destructive',
+        variant: 'error',
       });
       return;
     }
@@ -126,7 +126,7 @@ export default function ProdukPage() {
       toast({
         title: "❌ Gagal Menambahkan",
         description: "Gagal menambahkan produk ke keranjang. Silakan coba lagi",
-        variant: 'destructive',
+        variant: 'error',
       });
       setAddingToCart({ ...addingToCart, [key]: false });
     }
@@ -141,7 +141,21 @@ export default function ProdukPage() {
       const res = await fetch('/api/produk');
       if (res.ok) {
         const data = await res.json();
-        setProducts(Array.isArray(data) ? data : []);
+        const productsData = Array.isArray(data) ? data : [];
+        setProducts(productsData);
+        setSelectedVariantByProduct((prev) => {
+          const next = { ...prev };
+          for (const product of productsData) {
+            if (next[product.id]) continue;
+            const firstAvailable = product.variants.find(
+              (v: ProductVariant) => (v.stock_online ?? 0) > 0 && v.price !== null && v.price !== undefined
+            );
+            if (firstAvailable) {
+              next[product.id] = firstAvailable.id;
+            }
+          }
+          return next;
+        });
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -190,17 +204,17 @@ export default function ProdukPage() {
             <p className="text-gray-600">Memuat produk...</p>
           </div>
         ) : filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredProducts.map((product) => (
               <Card
                 key={product.id}
-                className="border-gray-200 shadow-md hover:shadow-lg transition-shadow duration-200"
+                className="border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
               >
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between mb-4">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-gray-900 mb-2">{product.name}</h3>
-                      <div className="flex items-center gap-2 mb-3 flex-wrap">
+                      <h3 className="text-base font-semibold text-gray-900">{product.name}</h3>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           {product.category.name}
                         </span>
@@ -215,49 +229,62 @@ export default function ProdukPage() {
                         )}
                       </div>
                     </div>
-                    <Package className="h-8 w-8 text-[#ffd700]" />
+                    <Package className="h-6 w-6 text-[#ffd700]" />
                   </div>
 
-                  <div className="space-y-3 mb-4">
-                    {product.variants.map((variant) => {
-                      const key = `${product.id}-${variant.priceType}`;
-                      const inCart = isInCart(product.id, variant.priceType);
-                      const isAdding = addingToCart[key];
-                      const isDisabled = (variant.stock_online ?? 0) === 0 || isAdding;
-                      
-                      return (
-                        <div key={variant.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                          <div>
-                            <span className="text-sm text-gray-600 capitalize">{variant.priceType}:</span>
-                            <span className="font-semibold text-gray-900 ml-2">
-                              {variant.price ? formatRupiah(variant.price) : 'Belum ada harga'}
-                            </span>
-                            <div className="text-xs text-gray-500 mt-1">
-                              Stok: {variant.stock_online !== null && variant.stock_online !== undefined ? variant.stock_online : 'Belum ada'}
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant={inCart ? 'default' : 'outline'}
-                            onClick={() => handleAddToCart(product, variant)}
-                            disabled={isDisabled || !variant.price}
-                            className="h-7 px-3 text-xs"
-                          >
-                            {isAdding ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : inCart ? (
-                              <>
-                                <Check className="h-3 w-3 mr-1" />
-                                Di Keranjang
-                              </>
-                            ) : (
-                              `+ ${variant.priceType.charAt(0).toUpperCase() + variant.priceType.slice(1)}`
-                            )}
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {(() => {
+                    const availableVariants = product.variants.filter((v) => (v.stock_online ?? 0) > 0 && v.price !== null && v.price !== undefined);
+                    const selectedVariantId = selectedVariantByProduct[product.id];
+                    const selectedVariant = availableVariants.find((v) => v.id === selectedVariantId) || availableVariants[0];
+                    const key = selectedVariant ? `${product.id}-${selectedVariant.priceType}` : `${product.id}-none`;
+                    const inCart = selectedVariant ? isInCart(product.id, selectedVariant.priceType) : false;
+                    const isAdding = addingToCart[key];
+                    const disabledAdd = !selectedVariant || isAdding || !selectedVariant.price;
+
+                    return (
+                      <div className="mb-4 space-y-2">
+                        <select
+                          className="w-full h-9 rounded-md border border-gray-300 bg-white px-3 text-sm"
+                          value={selectedVariant?.id || ''}
+                          onChange={(e) =>
+                            setSelectedVariantByProduct((prev) => ({
+                              ...prev,
+                              [product.id]: Number(e.target.value),
+                            }))
+                          }
+                          disabled={availableVariants.length === 0}
+                        >
+                          {availableVariants.length === 0 ? (
+                            <option value="">Varian tidak tersedia</option>
+                          ) : (
+                            availableVariants.map((variant) => (
+                              <option key={variant.id} value={variant.id}>
+                                {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stock_online ?? 0})
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        <Button
+                          size="sm"
+                          variant={inCart ? 'default' : 'outline'}
+                          onClick={() => selectedVariant && handleAddToCart(product, selectedVariant)}
+                          disabled={disabledAdd}
+                          className="h-8 w-full text-xs"
+                        >
+                          {isAdding ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : inCart ? (
+                            <>
+                              <Check className="h-3 w-3 mr-1" />
+                              Di Keranjang
+                            </>
+                          ) : (
+                            '+ Tambah ke Keranjang'
+                          )}
+                        </Button>
+                      </div>
+                    );
+                  })()}
 
                   <div className="flex gap-2">
                     <Link href="/keranjang" className="flex-1">

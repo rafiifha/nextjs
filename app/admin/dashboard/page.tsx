@@ -411,13 +411,25 @@ export default function AdminDashboard() {
 
       const data = await res.json();
       if (data.success) {
-        alert('E-receipt berhasil dikirim ke WhatsApp!');
+        toast({
+          variant: 'success',
+          title: 'E-receipt terkirim',
+          description: 'E-receipt berhasil dikirim ke WhatsApp pelanggan.',
+        });
       } else {
-        alert('Error: ' + data.error);
+        toast({
+          variant: 'error',
+          title: 'Gagal kirim e-receipt',
+          description: data.error || 'Terjadi kesalahan',
+        });
       }
     } catch (error) {
       console.error('Error sending receipt:', error);
-      alert('Terjadi kesalahan saat mengirim e-receipt');
+      toast({
+        variant: 'error',
+        title: 'Gagal kirim e-receipt',
+        description: 'Terjadi kesalahan saat mengirim e-receipt',
+      });
     }
   };
 

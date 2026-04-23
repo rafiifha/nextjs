@@ -21,10 +21,6 @@ interface ProductVariant {
   price: number | null;
   stock_online: number | null;
   stock_offline: number | null;
-  length?: number | null;
-  width?: number | null;
-  height?: number | null;
-  weight?: number | null;
 }
 
 interface Product {
@@ -52,10 +48,6 @@ export default function ManajemenProdukPage() {
       price: string; 
       stock_online: string; 
       stock_offline: string;
-      length: string;
-      width: string;
-      height: string;
-      weight: string;
     }>,
   });
 
@@ -99,10 +91,6 @@ export default function ManajemenProdukPage() {
         price: '',
         stock_online: '',
         stock_offline: '',
-        length: '',
-        width: '',
-        height: '',
-        weight: '',
       }));
       setFormData({ ...formData, categoryId, variants: newVariants });
     }
@@ -136,20 +124,11 @@ export default function ManajemenProdukPage() {
         const stockOnline = v.stock_online && v.stock_online !== '' ? (isNaN(parseInt(v.stock_online)) ? null : parseInt(v.stock_online)) : null;
         const stockOffline = v.stock_offline && v.stock_offline !== '' ? (isNaN(parseInt(v.stock_offline)) ? null : parseInt(v.stock_offline)) : null;
         
-        const length = v.length && v.length !== '' ? (isNaN(parseInt(v.length)) ? null : parseInt(v.length)) : null;
-        const width = v.width && v.width !== '' ? (isNaN(parseInt(v.width)) ? null : parseInt(v.width)) : null;
-        const height = v.height && v.height !== '' ? (isNaN(parseInt(v.height)) ? null : parseInt(v.height)) : null;
-        const weight = v.weight && v.weight !== '' ? (isNaN(parseInt(v.weight)) ? null : parseInt(v.weight)) : null;
-        
         return {
           priceType: v.priceType,
           price,
           stock_online: stockOnline,
           stock_offline: stockOffline,
-          length,
-          width,
-          height,
-          weight,
         };
       }),
     };
@@ -232,10 +211,6 @@ export default function ManajemenProdukPage() {
         price: v.price ? v.price.toString() : '',
         stock_online: v.stock_online !== null && v.stock_online !== undefined ? v.stock_online.toString() : '',
         stock_offline: v.stock_offline !== null && v.stock_offline !== undefined ? v.stock_offline.toString() : '',
-        length: v.length !== null && v.length !== undefined ? v.length.toString() : '',
-        width: v.width !== null && v.width !== undefined ? v.width.toString() : '',
-        height: v.height !== null && v.height !== undefined ? v.height.toString() : '',
-        weight: v.weight !== null && v.weight !== undefined ? v.weight.toString() : '',
       })),
     });
     setShowForm(true);
@@ -387,54 +362,6 @@ export default function ManajemenProdukPage() {
                               value={variant.stock_offline}
                               onChange={(e) => updateVariant(index, 'stock_offline', e.target.value)}
                               placeholder="Kosongkan jika belum ada stok"
-                            />
-                          </div>
-                        </div>
-                        
-                        {/* Dimensi dan Berat untuk Pengiriman */}
-                        <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-gray-200">
-                          <div>
-                            <Label htmlFor={`length-${index}`}>Panjang (cm) - Opsional</Label>
-                            <Input
-                              id={`length-${index}`}
-                              type="number"
-                              min="0"
-                              value={variant.length || ''}
-                              onChange={(e) => updateVariant(index, 'length', e.target.value)}
-                              placeholder="Panjang dalam cm"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`width-${index}`}>Lebar (cm) - Opsional</Label>
-                            <Input
-                              id={`width-${index}`}
-                              type="number"
-                              min="0"
-                              value={variant.width || ''}
-                              onChange={(e) => updateVariant(index, 'width', e.target.value)}
-                              placeholder="Lebar dalam cm"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`height-${index}`}>Tinggi (cm) - Opsional</Label>
-                            <Input
-                              id={`height-${index}`}
-                              type="number"
-                              min="0"
-                              value={variant.height || ''}
-                              onChange={(e) => updateVariant(index, 'height', e.target.value)}
-                              placeholder="Tinggi dalam cm"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`weight-${index}`}>Berat (gram) - Opsional</Label>
-                            <Input
-                              id={`weight-${index}`}
-                              type="number"
-                              min="0"
-                              value={variant.weight || ''}
-                              onChange={(e) => updateVariant(index, 'weight', e.target.value)}
-                              placeholder="Berat dalam gram"
                             />
                           </div>
                         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,10 @@ import { cartService } from '@/lib/cart';
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [redirectUrl] = useState(() => {
+    if (typeof window === 'undefined') return '/';
+    return new URLSearchParams(window.location.search).get('redirect') || '/';
+  });
   const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -69,8 +72,9 @@ export default function LoginPage() {
 
       if (data.user.role === 'admin') {
         router.push('/admin/dashboard');
+      } else if (data.user.role === 'kasir') {
+        router.push('/admin/kasir');
       } else {
-        const redirectUrl = searchParams?.get('redirect') || '/';
         router.push(redirectUrl);
       }
     } catch (err: any) {

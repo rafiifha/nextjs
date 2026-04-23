@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { triggerOrderEvent } from '@/services/pusherService';
 import { sendOrderNotification } from '@/services/whatsappService';
+import { pakasirService } from '@/services/pakasirService';
 
 export async function GET() {
   try {
@@ -35,9 +36,18 @@ export async function GET() {
           change: order.change ?? null,
           deliveryMethod: order.deliveryMethod ?? null,
           shippingFee: order.shippingFee ?? null,
-          trackingId: order.trackingId ?? null,
-          waybillId: order.waybillId ?? null,
-          biteshipOrderId: order.biteshipOrderId ?? null,
+          shippingAddress: order.shippingAddress ?? null,
+          shippingLat: order.shippingLat ?? null,
+          shippingLng: order.shippingLng ?? null,
+          shippingDistance: order.shippingDistance ?? null,
+          shippingZone: order.shippingZone ?? null,
+          shippingNotes: order.shippingNotes ?? null,
+          courierId: order.courierId ?? null,
+          shippedAt: order.shippedAt ? order.shippedAt.toISOString() : null,
+          deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
+          paymentMethod: order.paymentMethod ?? null,
+          paymentNumber: order.paymentNumber ?? null,
+          paymentFee: order.paymentFee ?? null,
           expiredAt: order.expiredAt ? order.expiredAt.toISOString() : null,
           createdAt: order.createdAt.toISOString(),
           updatedAt: order.updatedAt.toISOString(),
@@ -96,7 +106,20 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { customerName, customerPhone, items, deliveryMethod, shippingFee, trackingId, waybillId, biteshipOrderId } = body;
+    const {
+      customerName,
+      customerPhone,
+      items,
+      deliveryMethod,
+      shippingFee,
+      paymentMethod,
+      shippingAddress,
+      shippingLat,
+      shippingLng,
+      shippingDistance,
+      shippingZone,
+      shippingNotes,
+    } = body;
 
     if (!customerName || !customerPhone || !items || items.length === 0) {
       return NextResponse.json(
@@ -105,9 +128,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (deliveryMethod === 'delivery' && paymentMethod === 'tunai') {
+      return NextResponse.json(
+        { error: 'Pesanan antar wajib menggunakan pembayaran non-tunai' },
+        { status: 400 }
+      );
+    }
+
     // Validate products exist and check stock
     const productIds = items.map((item: any) => parseInt(item.productId));
-    const uniqueProductIds = [...new Set(productIds)];
+    const uniqueProductIds = Array.from(new Set(productIds)) as number[];
     
     console.log('🔍 Looking for products with IDs:', uniqueProductIds);
     
@@ -145,18 +175,17 @@ export async function POST(request: NextRequest) {
       // Find variant by variantId or priceType
       let variant;
       if (item.variantId) {
-        variant = product.variants.find(v => v.id === parseInt(item.variantId));
+        variant = product.variants.find((v: any) => v.id === parseInt(item.variantId));
         if (!variant) {
           console.error(`❌ Variant dengan ID ${item.variantId} tidak ditemukan untuk produk ${product.name}`);
           stockErrors.push(`${product.name}: varian dengan ID ${item.variantId} tidak ditemukan`);
           continue;
         }
       } else if (item.priceType) {
-        variant = product.variants.find(v => v.priceType === item.priceType);
+        variant = product.variants.find((v: any) => v.priceType === item.priceType);
         if (!variant) {
           console.error(`❌ Variant dengan priceType "${item.priceType}" tidak ditemukan untuk produk ${product.name}`);
-          console.error(`   Variants yang tersedia:`, product.variants.map(v => v.priceType));
-          stockErrors.push(`${product.name}: varian harga "${item.priceType}" tidak ditemukan. Varian yang tersedia: ${product.variants.map(v => v.priceType).join(', ')}`);
+          stockErrors.push(`${product.name}: varian harga "${item.priceType}" tidak ditemukan. Varian yang tersedia: ${product.variants.map((v: any) => v.priceType).join(', ')}`);
           continue;
         }
       } else {
@@ -192,16 +221,20 @@ export async function POST(request: NextRequest) {
         totalHarga,
         deliveryMethod: deliveryMethod || null,
         shippingFee: shippingFee || null,
-        trackingId: trackingId || null,
-        waybillId: waybillId || null,
-        biteshipOrderId: biteshipOrderId || null,
+        shippingAddress: shippingAddress || null,
+        shippingLat: typeof shippingLat === 'number' ? shippingLat : null,
+        shippingLng: typeof shippingLng === 'number' ? shippingLng : null,
+        shippingDistance: typeof shippingDistance === 'number' ? shippingDistance : null,
+        shippingZone: typeof shippingZone === 'number' ? shippingZone : null,
+        shippingNotes: shippingNotes || null,
+        paymentMethod: paymentMethod || 'tunai',
         expiredAt: expiredAt, // 24 jam dari sekarang
         items: {
           create: items.map((item: any) => {
             const product = products.find(p => p.id === item.productId);
             const variant = item.variantId 
-              ? product?.variants.find(v => v.id === item.variantId)
-              : product?.variants.find(v => v.priceType === item.priceType);
+              ? product?.variants.find((v: any) => v.id === item.variantId)
+              : product?.variants.find((v: any) => v.priceType === item.priceType);
 
             if (!product) {
               throw new Error(`Produk dengan ID ${item.productId} tidak ditemukan saat membuat order`);
@@ -230,9 +263,52 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    let updatedOrder = order;
+
+    // Call Pakasir if paymentMethod is not 'tunai'
+    if (paymentMethod && paymentMethod !== 'tunai') {
+      try {
+        const pakasirRes = await pakasirService.createTransaction(paymentMethod, {
+          order_id: `INV-${order.id}`,
+          amount: totalHarga,
+        });
+
+        if (!pakasirRes?.payment?.payment_number) {
+          throw new Error('Pakasir tidak mengembalikan payment number');
+        }
+
+        const { payment_number, fee, expired_at } = pakasirRes.payment;
+        
+        updatedOrder = await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            paymentNumber: payment_number,
+            paymentFee: fee,
+            expiredAt: expired_at ? new Date(expired_at) : expiredAt,
+          },
+          include: {
+            items: {
+              include: { product: true },
+            },
+          },
+        });
+      } catch (pakasirErr) {
+        console.error('❌ Error calling Pakasir:', pakasirErr);
+        // Jangan simpan order tanpa instruksi bayar
+        await prisma.order.delete({ where: { id: order.id } });
+        return NextResponse.json(
+          {
+            error: 'Gagal membuat transaksi pembayaran',
+            details: pakasirErr instanceof Error ? pakasirErr.message : 'Pakasir error',
+          },
+          { status: 502 }
+        );
+      }
+    }
+
     // Trigger Pusher event
     try {
-      await triggerOrderEvent('order-created', order);
+      await triggerOrderEvent('order-created', updatedOrder);
     } catch (error) {
       console.error('Pusher error:', error);
     }
@@ -253,7 +329,7 @@ export async function POST(request: NextRequest) {
       console.error('WhatsApp error:', error);
     }
 
-    return NextResponse.json(order, { status: 201 });
+    return NextResponse.json(updatedOrder, { status: 201 });
   } catch (error: any) {
     console.error('❌ Create order error:', error);
     console.error('Error details:', {

@@ -110,19 +110,21 @@ export default function Navbar() {
     return null;
   }
 
+  const isHome = pathname === '/';
+
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+    <nav className={`sticky top-0 z-50 ${isHome ? 'bg-white/90 backdrop-blur border-b border-gray-100' : 'bg-white border-b border-gray-200 shadow-sm'}`}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className={`flex items-center justify-between ${isHome ? 'h-18 py-3' : 'h-16'}`}>
           <Link href="/" className="flex items-center gap-2">
             <ShoppingBag className="h-6 w-6 text-[#ffd700]" />
             <div>
-              <div className="font-bold text-gray-900 text-lg">Toko Naning</div>
-              <div className="text-xs text-gray-500">Grosir Sembako Terpercaya</div>
+              <div className="font-bold text-gray-900 text-base sm:text-lg">Toko Naning</div>
+              <div className="text-[11px] text-gray-500">Grosir Sembako</div>
             </div>
           </Link>
 
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-5">
             <Link
               href="/"
               className={`text-sm font-medium transition-colors ${
@@ -161,7 +163,7 @@ export default function Navbar() {
                 pathname === '/permintaan-barang' ? 'text-[#ffd700]' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Permintaan Barang
+              Request Barang
             </Link>
           </div>
 
