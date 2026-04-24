@@ -116,7 +116,7 @@ model ProductRequest {
   categoryId    Int?     // ID kategori (opsional)
   category      Category? @relation(fields: [categoryId], references: [id])
   customerName  String   // Nama pelanggan yang meminta
-  customerPhone String   // Nomor telepon pelanggan
+  customerPhone String   // Nomor whatsapp pelanggan
   notes         String?  // Catatan tambahan (opsional)
   status        String   @default("pending") // pending, approved, rejected, completed
   createdAt     DateTime @default(now())

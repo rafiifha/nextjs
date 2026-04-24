@@ -149,14 +149,17 @@ export default function CheckoutPage() {
     setCart(cartService.removeFromCart(productId, priceType));
   };
 
+  const getItemsTotal = () => {
+    return cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+  };
+
   const getTotalPrice = () => {
-    const itemsTotal = cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
-    return itemsTotal + (deliveryMethod === 'delivery' ? shippingFee : 0);
+    return getItemsTotal() + (deliveryMethod === 'delivery' ? shippingFee : 0);
   };
 
   const handleCheckout = async () => {
     if (!customerName || !customerPhone) {
-      toast({ variant: "warning", title: "Data Belum Lengkap", description: "Nama dan nomor telepon harus diisi" });
+      toast({ variant: "warning", title: "Data Belum Lengkap", description: "Nama dan nomor whatsapp harus diisi" });
       return;
     }
     if (cart.length === 0) {
@@ -289,11 +292,11 @@ export default function CheckoutPage() {
                   <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
                 </div>
                 <div>
-                  <Label>Nomor Telepon</Label>
+                  <Label>Nomor WhatsApp</Label>
                   <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required />
                 </div>
                 <div>
-                  <Label>Metode Pengiriman</Label>
+                  <Label>Metode Pembelian</Label>
                   <div className="flex gap-2 mt-2">
                     <Button type="button" variant={deliveryMethod === 'pickup' ? 'default' : 'outline'} onClick={() => { setDeliveryMethod('pickup'); setShippingFee(0); setPaymentMethod('tunai'); }} className="flex-1">
                       <MapPin className="h-4 w-4 mr-2" /> Ambil Sendiri
@@ -305,9 +308,10 @@ export default function CheckoutPage() {
                 </div>
 
                 {deliveryMethod === 'delivery' && (
-                  <div className="space-y-3">
-                    <Label>Alamat Lengkap (Pengiriman Internal)</Label>
-                    <Input value={destinationAddress} onChange={(e) => setDestinationAddress(e.target.value)} placeholder="Jl. Raya No 1..." className="mt-1" required />
+                  <div className="space-y-4">
+                    <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
+                      <strong>Informasi:</strong> Pengiriman pesanan hanya akan dilakukan pada pukul <strong>11:00 - 15:00</strong>.
+                    </div>
                     <div>
                       <Label>Pilih Lokasi di Peta</Label>
                       <MapPicker
@@ -315,6 +319,13 @@ export default function CheckoutPage() {
                           setShippingLat(lat);
                           setShippingLng(lng);
                           try {
+                            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                            if (geoRes.ok) {
+                              const geoData = await geoRes.json();
+                              if (geoData && geoData.display_name) {
+                                setDestinationAddress(geoData.display_name);
+                              }
+                            }
                             const res = await fetch('/api/delivery/calculate', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
@@ -334,23 +345,27 @@ export default function CheckoutPage() {
                             setShippingZone(data.zone);
                             setShippingFee(data.shippingFee);
                           } catch (error) {
-                            toast({ variant: "error", title: "Gagal Hitung Ongkir", description: 'Coba pilih lokasi lagi.' });
+                            toast({ variant: "error", title: "Gagal", description: 'Coba pilih lokasi lagi.' });
                           }
                         }}
                         initialPosition={shippingLat && shippingLng ? [shippingLat, shippingLng] : undefined}
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {deliveryOutOfRange
+                          ? 'Lokasi di luar jangkauan 10km'
+                          : shippingZone
+                            ? `Zona ${shippingZone} • Jarak ${shippingDistance}km • Ongkir ${formatRupiah(shippingFee)}`
+                            : 'Klik peta untuk hitung ongkir zona'}
+                      </p>
+                    </div>
+                    <div>
+                      <Label>Alamat Lengkap (Pengiriman Internal)</Label>
+                      <Input value={destinationAddress} onChange={(e) => setDestinationAddress(e.target.value)} placeholder="Jl. Raya No 1..." className="mt-1" required />
                     </div>
                     <div>
                       <Label>Catatan Kurir</Label>
                       <Input value={shippingNotes} onChange={(e) => setShippingNotes(e.target.value)} placeholder="Contoh: taruh di pagar" />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {deliveryOutOfRange
-                        ? 'Lokasi di luar jangkauan 10km'
-                        : shippingZone
-                          ? `Zona ${shippingZone} • Jarak ${shippingDistance}km • Ongkir ${formatRupiah(shippingFee)}`
-                          : 'Klik peta untuk hitung ongkir zona'}
-                    </p>
                   </div>
                 )}
 
@@ -372,7 +387,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="pt-4 border-t border-gray-200">
-                  <div className="flex justify-between text-sm mb-1"><span className="text-gray-600">Subtotal:</span><span className="font-medium">{formatRupiah(getTotalPrice() - shippingFee)}</span></div>
+                  <div className="flex justify-between text-sm mb-1"><span className="text-gray-600">Subtotal:</span><span className="font-medium">{formatRupiah(getItemsTotal())}</span></div>
                   {deliveryMethod === 'delivery' && <div className="flex justify-between text-sm mb-1"><span className="text-gray-600">Ongkir:</span><span className="font-medium">{formatRupiah(shippingFee)}</span></div>}
                   <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200"><span>Total:</span><span className="text-[#ffd700]">{formatRupiah(getTotalPrice())}</span></div>
                 </div>

@@ -111,7 +111,7 @@ export async function sendReceipt(phone: string, orderData: {
     delivered: '🚚 Sudah Dikirim',
   }[orderData.status] || orderData.status;
 
-  const message = `🧾 *E-Receipt - Toko Naning*
+  const message = `🧾 *Bukti Transaksi - Toko Naning*
 
 ID Pesanan: #${orderData.orderId}
 Nama: ${orderData.customerName}

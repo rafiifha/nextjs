@@ -71,15 +71,15 @@ export async function PUT(
       );
     }
 
-    // Prevent status update for offline orders (kasir orders)
     // Offline orders are identified by: pickup delivery method with no shipping fee
     const isOfflineOrder = existingOrder.deliveryMethod === 'pickup' && (!existingOrder.shippingFee || existingOrder.shippingFee === 0);
     
-    if (status && isOfflineOrder) {
+    // Only prevent if trying to change an already completed offline order
+    if (status && isOfflineOrder && existingOrder.status === 'delivered' && status !== 'cancelled') {
       return NextResponse.json(
         { 
           success: false,
-          error: 'Status pesanan offline tidak dapat diubah. Pesanan ini sudah dibayar langsung di kasir.' 
+          error: 'Pesanan offline yang sudah selesai tidak dapat diubah statusnya.' 
         },
         { status: 400 }
       );

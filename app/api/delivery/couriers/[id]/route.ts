@@ -28,7 +28,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Kurir tidak ditemukan' }, { status: 404 });
     }
     if (error?.code === 'P2002') {
-      return NextResponse.json({ error: 'Nomor telepon kurir sudah dipakai' }, { status: 409 });
+      return NextResponse.json({ error: 'Nomor whatsapp kurir sudah dipakai' }, { status: 409 });
     }
     return NextResponse.json({ error: 'Gagal update kurir' }, { status: 500 });
   }

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const phone = String(body?.phone || '').trim();
 
     if (!name || !phone) {
-      return NextResponse.json({ error: 'Nama dan nomor telepon wajib diisi' }, { status: 400 });
+      return NextResponse.json({ error: 'Nama dan nomor whatsapp wajib diisi' }, { status: 400 });
     }
 
     const courier = await prisma.courier.create({
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Create courier error:', error);
     if (error?.code === 'P2002') {
-      return NextResponse.json({ error: 'Nomor telepon kurir sudah terdaftar' }, { status: 409 });
+      return NextResponse.json({ error: 'Nomor whatsapp kurir sudah terdaftar' }, { status: 409 });
     }
     return NextResponse.json({ error: 'Gagal menambah kurir' }, { status: 500 });
   }

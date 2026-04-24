@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'Email atau nomor telepon sudah terdaftar' },
+        { error: 'Email atau nomor whatsapp sudah terdaftar' },
         { status: 400 }
       );
     }

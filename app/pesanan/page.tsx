@@ -242,7 +242,7 @@ export default function PesananPage() {
                       <div className="flex items-center gap-2">
                         <div className="text-right">
                           <p className="text-sm text-gray-600">Total</p>
-                          <p className="text-lg font-bold text-[#ffd700]">{formatRupiah(order.totalHarga + (order.shippingFee || 0))}</p>
+                          <p className="text-lg font-bold text-[#ffd700]">{formatRupiah(order.totalHarga)}</p>
                         </div>
                         {isExpanded ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
                       </div>
@@ -294,7 +294,7 @@ export default function PesananPage() {
                           </div>
                           <div>
                             <p className="text-xs text-gray-600 mb-1">Total Pembayaran</p>
-                            <p className="text-lg font-bold text-[#ffd700]">{formatRupiah(order.totalHarga + (order.shippingFee || 0))}</p>
+                            <p className="text-lg font-bold text-[#ffd700]">{formatRupiah(order.totalHarga)}</p>
                           </div>
                         </div>
 

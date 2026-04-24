@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     if (!productName || !customerName || !customerPhone) {
       return NextResponse.json(
-        { error: 'Nama produk, nama pelanggan, dan nomor telepon harus diisi' },
+        { error: 'Nama produk, nama pelanggan, dan nomor whatsapp harus diisi' },
         { status: 400 }
       );
     }

@@ -160,20 +160,20 @@ export const cartService = {
   migrateCartToUser(userId: number): void {
     if (typeof window === 'undefined') return;
     
-    const oldKey = 'tokonaning_cart';
+    const guestKey = getCartStorageKey(null);
     const newKey = getCartStorageKey(userId);
     
     try {
-      const oldCartStr = localStorage.getItem(oldKey);
-      if (oldCartStr) {
-        const oldCart = JSON.parse(oldCartStr);
+      const guestCartStr = localStorage.getItem(guestKey);
+      if (guestCartStr) {
+        const guestCart = JSON.parse(guestCartStr);
         // Only migrate if new cart is empty
         const newCart = this.getCart(userId);
-        if (newCart.length === 0 && oldCart.length > 0) {
-          this.setCart(oldCart, userId);
-          // Optionally remove old cart
-          localStorage.removeItem(oldKey);
+        if (newCart.length === 0 && guestCart.length > 0) {
+          this.setCart(guestCart, userId);
         }
+        // Always remove guest cart after login to avoid items showing up after logout
+        localStorage.removeItem(guestKey);
       }
     } catch (e) {
       console.error('Error migrating cart:', e);

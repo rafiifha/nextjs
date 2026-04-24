@@ -265,7 +265,7 @@ export default function KasirPage() {
     if (!customerName || !customerPhone) {
       toast({
         title: '❌ Error',
-        description: 'Nama dan nomor telepon harus diisi',
+        description: 'Nama dan nomor whatsapp harus diisi',
         variant: 'error',
       });
       return;
@@ -586,7 +586,7 @@ export default function KasirPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="customerPhone">Nomor Telepon</Label>
+                  <Label htmlFor="customerPhone">Nomor WhatsApp</Label>
                   <Input
                     id="customerPhone"
                     value={customerPhone}

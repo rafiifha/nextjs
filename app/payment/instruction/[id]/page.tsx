@@ -60,7 +60,7 @@ export default function PaymentInstructionPage() {
   }
 
   const isQris = order.paymentMethod === 'qris';
-  const totalPayment = order.totalHarga + (order.shippingFee || 0) + (order.paymentFee || 0);
+  const totalPayment = order.totalHarga + (order.paymentFee || 0);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">

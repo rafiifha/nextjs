@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     // If no email or phone, return error
     if (whereClause.OR.length === 0) {
       return NextResponse.json(
-        { error: 'Email atau nomor telepon harus diisi' },
+        { error: 'Email atau nomor whatsapp harus diisi' },
         { status: 400 }
       );
     }

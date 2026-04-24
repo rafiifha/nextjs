@@ -280,7 +280,7 @@ export default function ManajemenPesananPage() {
             ` : ''}
             <div class="info-row total-row">
               <span class="info-label">Total:</span>
-              <span class="info-value">${formatRupiah(order.totalHarga + (order.shippingFee || 0))}</span>
+              <span class="info-value">${formatRupiah(order.totalHarga)}</span>
             </div>
           </div>
           
@@ -386,7 +386,7 @@ export default function ManajemenPesananPage() {
                           <div className="text-right">
                             <p className="text-xs text-gray-500">Total</p>
                             <p className="text-base font-bold text-gray-900">
-                              {formatRupiah(order.totalHarga + (order.shippingFee || 0) - (order.discount || 0))}
+                              {formatRupiah(order.totalHarga)}
                             </p>
                           </div>
                         </div>
@@ -500,7 +500,7 @@ export default function ManajemenPesananPage() {
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2 mb-6">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600 flex items-center gap-2"><Wallet className="h-4 w-4 text-gray-500" />Subtotal Items:</span>
-                    <span className="font-medium text-gray-900">{formatRupiah(selectedOrder.totalHarga)}</span>
+                    <span className="font-medium text-gray-900">{formatRupiah(selectedOrder.totalHarga - (selectedOrder.shippingFee || 0))}</span>
                   </div>
                   {selectedOrder.discount && selectedOrder.discount > 0 && (
                     <div className="flex justify-between text-sm">
@@ -516,7 +516,7 @@ export default function ManajemenPesananPage() {
                   )}
                   <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
                     <span className="text-gray-900">Total Keseluruhan:</span>
-                    <span className="text-[#ffd700]">{formatRupiah(selectedOrder.totalHarga + (selectedOrder.shippingFee || 0) - (selectedOrder.discount || 0))}</span>
+                    <span className="text-[#ffd700]">{formatRupiah(selectedOrder.totalHarga)}</span>
                   </div>
                 </div>
 

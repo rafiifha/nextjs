@@ -67,7 +67,7 @@ export default function PermintaanBarangPage() {
       toast({
         variant: "error",
         title: "❌ Form Tidak Lengkap",
-        description: "Harap isi nama produk, nama, dan nomor telepon",
+        description: "Harap isi nama produk, nama, dan nomor whatsapp",
       });
       return;
     }
@@ -185,7 +185,7 @@ export default function PermintaanBarangPage() {
 
               <div>
                 <Label htmlFor="customerPhone">
-                  Nomor Telepon / Email <span className="text-red-500">*</span>
+                  Nomor WhatsApp / Email <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="customerPhone"
@@ -236,7 +236,7 @@ export default function PermintaanBarangPage() {
                   <p className="font-medium mb-1">Informasi:</p>
                   <ul className="list-disc list-inside space-y-1 text-blue-800">
                     <li>Admin akan meninjau permintaan Anda dalam waktu 1x24 jam</li>
-                    <li>Anda akan dihubungi melalui nomor telepon/email yang Anda berikan</li>
+                    <li>Anda akan dihubungi melalui nomor whatsapp/email yang Anda berikan</li>
                     <li>Status permintaan dapat dilihat di halaman ini setelah login</li>
                   </ul>
                 </div>

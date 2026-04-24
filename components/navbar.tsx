@@ -99,7 +99,11 @@ export default function Navbar() {
     
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // Don't clear cart - it's saved per user, so it will be available when they login again
+    
+    // Clear guest cart just in case, so user starts fresh after logout
+    cartService.clearCart(null);
+    
+    // Don't clear user cart - it's saved per user, so it will be available when they login again
     // Dispatch custom event to notify other components
     window.dispatchEvent(new Event('userLogout'));
     window.location.href = '/';
@@ -149,14 +153,7 @@ export default function Navbar() {
             >
               Pesanan
             </Link>
-            <Link
-              href="/checkout"
-              className={`text-sm font-medium transition-colors ${
-                pathname === '/checkout' ? 'text-[#ffd700]' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Checkout
-            </Link>
+
             <Link
               href="/permintaan-barang"
               className={`text-sm font-medium transition-colors ${
@@ -183,11 +180,13 @@ export default function Navbar() {
             </Button>
             {user ? (
               <>
-                {/* Display user name */}
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-md">
-                  <User className="h-4 w-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-900">{user.name}</span>
-                </div>
+
+                <Link href="/profil">
+                  <Button variant="outline" size="sm">
+                    <User className="h-4 w-4 mr-2" />
+                    Profil
+                  </Button>
+                </Link>
                 {user.role === 'admin' && (
                   <Link href="/admin/dashboard">
                     <Button variant="outline" size="sm">

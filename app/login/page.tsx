@@ -16,9 +16,7 @@ export default function LoginPage() {
     if (typeof window === 'undefined') return '/';
     return new URLSearchParams(window.location.search).get('redirect') || '/';
   });
-  const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,7 +31,8 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          [loginType]: loginType === 'email' ? email : phone,
+          email: identifier,
+          phone: identifier,
           password,
         }),
       });
@@ -109,57 +108,18 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-lg">
-              <button
-                type="button"
-                onClick={() => setLoginType('email')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  loginType === 'email'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Email
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoginType('phone')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  loginType === 'phone'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                WhatsApp
-              </button>
-            </div>
-
             <form onSubmit={handleSubmit} className="space-y-4">
-              {loginType === 'email' ? (
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="nama@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-              ) : (
-                <div>
-                  <Label htmlFor="phone">Nomor WhatsApp</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="081234567890"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                  />
-                </div>
-              )}
+              <div>
+                <Label htmlFor="identifier">Email / Nomor WhatsApp</Label>
+                <Input
+                  id="identifier"
+                  type="text"
+                  placeholder="nama@email.com atau 0812..."
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  required
+                />
+              </div>
 
               <div>
                 <Label htmlFor="password">Password</Label>
@@ -191,11 +151,18 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-gray-600">
-              Belum punya akun?{' '}
-              <Link href="/register" className="text-[#ffd700] hover:underline font-medium">
-                Daftar sekarang
-              </Link>
+            <div className="mt-6 text-center space-y-2">
+              <div className="text-sm text-gray-600">
+                Belum punya akun?{' '}
+                <Link href="/register" className="text-[#ffd700] hover:underline font-medium">
+                  Daftar sekarang
+                </Link>
+              </div>
+              <div className="text-sm">
+                <Link href="/lupa-password" className="text-gray-500 hover:text-[#ffd700] hover:underline">
+                  Lupa Password?
+                </Link>
+              </div>
             </div>
           </CardContent>
         </Card>
