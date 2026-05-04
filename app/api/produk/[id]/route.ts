@@ -128,18 +128,11 @@ export async function PUT(
               price = isNaN(parsed) ? null : parsed;
             }
             
-            // Parse stock_online
-            let stockOnline: number | null = null;
-            if (variant.stock_online !== undefined && variant.stock_online !== null && variant.stock_online !== '') {
-              const parsed = typeof variant.stock_online === 'string' ? parseInt(variant.stock_online) : variant.stock_online;
-              stockOnline = isNaN(parsed) ? null : parsed;
-            }
-            
-            // Parse stock_offline
-            let stockOffline: number | null = null;
-            if (variant.stock_offline !== undefined && variant.stock_offline !== null && variant.stock_offline !== '') {
-              const parsed = typeof variant.stock_offline === 'string' ? parseInt(variant.stock_offline) : variant.stock_offline;
-              stockOffline = isNaN(parsed) ? null : parsed;
+            // Parse stock
+            let stock: number | null = null;
+            if (variant.stock !== undefined && variant.stock !== null && variant.stock !== '') {
+              const parsed = typeof variant.stock === 'string' ? parseInt(variant.stock) : variant.stock;
+              stock = isNaN(parsed) ? null : parsed;
             }
             
             // Parse dimensions and weight
@@ -170,8 +163,7 @@ export async function PUT(
             return {
               priceType: variant.priceType,
               price: price,
-              stock_online: stockOnline,
-              stock_offline: stockOffline,
+              stock: stock,
               length: length,
               width: width,
               height: height,

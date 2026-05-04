@@ -15,8 +15,7 @@ interface ProductVariant {
   id: number;
   priceType: string;
   price: number | null;
-  stock_online: number | null;
-  stock_offline: number | null;
+  stock: number | null;
   length?: number | null;
   width?: number | null;
   height?: number | null;
@@ -59,12 +58,12 @@ export default function ProdukPage() {
     }
     loadCart();
     fetchProducts();
-    
+
     // Listen for cart updates
     const handleCartUpdate = () => {
       loadCart();
     };
-    
+
     window.addEventListener('cartUpdated', handleCartUpdate);
     return () => window.removeEventListener('cartUpdated', handleCartUpdate);
   }, []);
@@ -86,7 +85,7 @@ export default function ProdukPage() {
 
     const key = `${product.id}-${variant.priceType}`;
     setAddingToCart({ ...addingToCart, [key]: true });
-    
+
     try {
       const userStr = localStorage.getItem('user');
       let userId: number | null = null;
@@ -98,7 +97,7 @@ export default function ProdukPage() {
           // ignore
         }
       }
-      
+
       cartService.addToCart(
         product.id,
         product,
@@ -109,14 +108,14 @@ export default function ProdukPage() {
         userId
       );
       loadCart();
-      
+
       // Show success notification
       const priceTypeLabel = variant.priceType.charAt(0).toUpperCase() + variant.priceType.slice(1);
       toast({
         title: "✅ Produk Ditambahkan",
         description: `${product.name} (${priceTypeLabel}) berhasil ditambahkan ke keranjang`,
       });
-      
+
       // Show success feedback
       setTimeout(() => {
         setAddingToCart({ ...addingToCart, [key]: false });
@@ -148,7 +147,7 @@ export default function ProdukPage() {
           for (const product of productsData) {
             if (next[product.id]) continue;
             const firstAvailable = product.variants.find(
-              (v: ProductVariant) => (v.stock_online ?? 0) > 0 && v.price !== null && v.price !== undefined
+              (v: ProductVariant) => (v.stock ?? 0) > 0 && v.price !== null && v.price !== undefined
             );
             if (firstAvailable) {
               next[product.id] = firstAvailable.id;
@@ -218,7 +217,7 @@ export default function ProdukPage() {
                         <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           {product.category.name}
                         </span>
-                        {product.variants.some(v => (v.stock_online ?? 0) > 0) ? (
+                        {product.variants.some(v => (v.stock ?? 0) > 0) ? (
                           <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
                             Tersedia
                           </span>
@@ -233,7 +232,7 @@ export default function ProdukPage() {
                   </div>
 
                   {(() => {
-                    const availableVariants = product.variants.filter((v) => (v.stock_online ?? 0) > 0 && v.price !== null && v.price !== undefined);
+                    const availableVariants = product.variants.filter((v) => (v.stock ?? 0) > 0 && v.price !== null && v.price !== undefined);
                     const selectedVariantId = selectedVariantByProduct[product.id];
                     const selectedVariant = availableVariants.find((v) => v.id === selectedVariantId) || availableVariants[0];
                     const key = selectedVariant ? `${product.id}-${selectedVariant.priceType}` : `${product.id}-none`;
@@ -259,7 +258,7 @@ export default function ProdukPage() {
                           ) : (
                             availableVariants.map((variant) => (
                               <option key={variant.id} value={variant.id}>
-                                {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stock_online ?? 0})
+                                {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stock ?? 0})
                               </option>
                             ))
                           )}

@@ -15,8 +15,7 @@ export interface CartItem {
       id: number;
       priceType: string;
       price: number | null;
-      stock_online: number | null;
-      stock_offline: number | null;
+      stock: number | null;
       length?: number | null;
       width?: number | null;
       height?: number | null;
@@ -59,7 +58,7 @@ export const cartService = {
     if (typeof window === 'undefined') return [];
     const currentUserId = userId !== undefined ? userId : getCurrentUserId();
     const storageKey = getCartStorageKey(currentUserId);
-    
+
     try {
       const cartStr = localStorage.getItem(storageKey);
       return cartStr ? JSON.parse(cartStr) : [];
@@ -72,7 +71,7 @@ export const cartService = {
     if (typeof window === 'undefined') return;
     const currentUserId = userId !== undefined ? userId : getCurrentUserId();
     const storageKey = getCartStorageKey(currentUserId);
-    
+
     try {
       localStorage.setItem(storageKey, JSON.stringify(cart));
       // Dispatch custom event untuk update UI
@@ -92,11 +91,11 @@ export const cartService = {
     userId?: number | null
   ): CartItem[] {
     const cart = this.getCart(userId);
-    
+
     const existingIndex = cart.findIndex(
       (item) => item.productId === productId && item.priceType === priceType
     );
-    
+
     if (existingIndex >= 0) {
       cart[existingIndex].quantity += quantity;
     } else {
@@ -109,27 +108,27 @@ export const cartService = {
         price,
       });
     }
-    
+
     this.setCart(cart, userId);
     return cart;
   },
 
   updateQuantity(productId: number, priceType: string, quantity: number, userId?: number | null): CartItem[] {
     const cart = this.getCart(userId);
-    
+
     if (quantity <= 0) {
       return this.removeFromCart(productId, priceType, userId);
     }
-    
+
     const item = cart.find(
       (item) => item.productId === productId && item.priceType === priceType
     );
-    
+
     if (item) {
       item.quantity = quantity;
       this.setCart(cart, userId);
     }
-    
+
     return cart;
   },
 
@@ -159,10 +158,10 @@ export const cartService = {
   // Migrate cart from old key to user-specific key (for existing users)
   migrateCartToUser(userId: number): void {
     if (typeof window === 'undefined') return;
-    
+
     const guestKey = getCartStorageKey(null);
     const newKey = getCartStorageKey(userId);
-    
+
     try {
       const guestCartStr = localStorage.getItem(guestKey);
       if (guestCartStr) {

@@ -22,7 +22,7 @@ interface Product {
     id: number;
     priceType: string;
     price: number | null;
-    stock_online: number | null;
+    stock: number | null;
   }>;
 }
 
@@ -46,11 +46,11 @@ export default function CheckoutPage() {
   const [cartLoaded, setCartLoaded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
+
   // Customer info
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  
+
   // Delivery info
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
   const [shippingFee, setShippingFee] = useState(0);
@@ -61,7 +61,7 @@ export default function CheckoutPage() {
   const [shippingDistance, setShippingDistance] = useState<number | null>(null);
   const [shippingZone, setShippingZone] = useState<number | null>(null);
   const [deliveryOutOfRange, setDeliveryOutOfRange] = useState(false);
-  
+
   // Payment info
   const [paymentMethod, setPaymentMethod] = useState<string>('tunai');
 
@@ -128,7 +128,7 @@ export default function CheckoutPage() {
           const product = data.find((p: Product) => p.id === Number(productId));
           if (product && product.variants) {
             const variantDus = product.variants.find((v: any) => v.priceType === 'dus');
-            if (variantDus && (variantDus.stock_online ?? 0) > 0) {
+            if (variantDus && (variantDus.stock ?? 0) > 0) {
               setCart(cartService.addToCart(product.id, product, variantDus.id, 'dus', variantDus.price, 1));
             }
           }
@@ -310,7 +310,7 @@ export default function CheckoutPage() {
                 {deliveryMethod === 'delivery' && (
                   <div className="space-y-4">
                     <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
-                      <strong>Informasi:</strong> Pengiriman pesanan hanya akan dilakukan pada pukul <strong>11:00 - 15:00</strong>.
+                      <strong>Informasi:</strong> Pengiriman pesanan hanya akan dilakukan pada pukul <strong>11:00 - 15:00</strong> dan maksimal jarak pengiriman <strong>10 KM</strong> dari lokasi toko.
                     </div>
                     <div>
                       <Label>Pilih Lokasi di Peta</Label>
@@ -359,7 +359,7 @@ export default function CheckoutPage() {
                       </p>
                     </div>
                     <div>
-                      <Label>Alamat Lengkap (Pengiriman Internal)</Label>
+                      <Label>Alamat Lengkap </Label>
                       <Input value={destinationAddress} onChange={(e) => setDestinationAddress(e.target.value)} placeholder="Jl. Raya No 1..." className="mt-1" required />
                     </div>
                     <div>
@@ -371,7 +371,7 @@ export default function CheckoutPage() {
 
                 <div className="pt-4 border-t border-gray-200">
                   <Label>Metode Pembayaran</Label>
-                  <select 
+                  <select
                     className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm mt-2"
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}

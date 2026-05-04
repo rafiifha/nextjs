@@ -4,7 +4,7 @@ import { triggerOrderEvent } from '@/services/pusherService';
 import { pakasirService } from '@/services/pakasirService';
 
 // API khusus untuk transaksi kasir (offline)
-// Menggunakan stock_offline dan langsung mengurangi stok
+// Menggunakan stock dan langsung mengurangi stok
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate products exist and check stock_offline per variant
+    // Validate products exist and check stock per variant
     const productIds = normalizedItems.map((item: any) => item.productId);
     const uniqueProductIds = [...new Set(productIds)] as number[];
     
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate stock_offline availability per variant
+    // Validate stock availability per variant
     const stockErrors: string[] = [];
     for (const item of normalizedItems) {
       const product = products.find(p => p.id === item.productId);
@@ -96,15 +96,15 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const availableStock = variant.stock_offline ?? 0;
+      const availableStock = variant.stock ?? 0;
       if (availableStock < item.quantity) {
-        stockErrors.push(`${product.name} (${variant.priceType}): stok offline tersedia ${availableStock}, diminta ${item.quantity}`);
+        stockErrors.push(`${product.name} (${variant.priceType}): stok tersedia ${availableStock}, diminta ${item.quantity}`);
       }
     }
 
     if (stockErrors.length > 0) {
       return NextResponse.json(
-        { error: 'Stok offline tidak mencukupi', details: stockErrors },
+        { error: 'Stok tidak mencukupi', details: stockErrors },
         { status: 400 }
       );
     }
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Reduce stock_offline for each variant (only for tunai payment)
+    // Reduce stock for each variant (only for tunai payment)
     // For non-tunai, stock will be reduced after payment confirmation via Pakasir callback
     if (isTunai) {
       for (const item of updatedOrder.items) {
@@ -242,12 +242,12 @@ export async function POST(request: NextRequest) {
           await prisma.productVariant.update({
             where: { id: item.variantId },
             data: {
-              stock_offline: {
+              stock: {
                 decrement: item.quantity,
               },
             },
           });
-          console.log(`✅ Reduced stock_offline for variant ${item.variantId} (${item.priceType}) by ${item.quantity}`);
+          console.log(`✅ Reduced stock for variant ${item.variantId} (${item.priceType}) by ${item.quantity}`);
         } catch (error: any) {
           console.error(`❌ Failed to reduce stock for variant ${item.variantId}:`, error);
           // Continue with other items even if one fails

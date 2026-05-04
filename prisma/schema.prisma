@@ -14,7 +14,6 @@ model Category {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   products    Product[]
-  productRequests ProductRequest[]
 }
 
 model Product {
@@ -34,8 +33,7 @@ model ProductVariant {
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   priceType   String   // "dus", "pak", "item", "bal", "kg", etc.
   price       Int?     // Harga untuk jenis ini (bisa kosong)
-  stock_online Int?    // Stok online untuk varian ini (bisa kosong)
-  stock_offline Int?   // Stok offline untuk varian ini (bisa kosong)
+  stock       Int?     // Stok untuk varian ini (bisa kosong)
   length      Int?     // Panjang dalam cm (untuk pengiriman)
   width       Int?     // Lebar dalam cm (untuk pengiriman)
   height      Int?     // Tinggi dalam cm (untuk pengiriman)
@@ -108,19 +106,6 @@ model User {
   password  String
   role      String   @default("admin")
   createdAt DateTime @default(now())
-}
-
-model ProductRequest {
-  id            Int      @id @default(autoincrement())
-  productName   String   // Nama produk yang diminta
-  categoryId    Int?     // ID kategori (opsional)
-  category      Category? @relation(fields: [categoryId], references: [id])
-  customerName  String   // Nama pelanggan yang meminta
-  customerPhone String   // Nomor whatsapp pelanggan
-  notes         String?  // Catatan tambahan (opsional)
-  status        String   @default("pending") // pending, approved, rejected, completed
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
 }
 
 

@@ -14,7 +14,6 @@ import {
   X,
   LogOut,
   ShoppingBag,
-  MessageSquare,
   Users
 } from 'lucide-react';
 import { cartService } from '@/lib/cart';
@@ -68,8 +67,6 @@ export default function AdminLayout({
   const adminMenuItems = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/produk', label: 'Manajemen Produk', icon: Package },
-    { href: '/admin/permintaan-barang', label: 'Permintaan Barang', icon: MessageSquare },
-    { href: '/admin/laporan', label: 'Laporan Penjualan', icon: BarChart3 },
     { href: '/admin/pegawai', label: 'Kelola Pegawai', icon: Users },
   ];
 

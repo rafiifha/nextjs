@@ -21,7 +21,7 @@ interface Order {
   }>;
 }
 
-export default function LaporanPenjualanPage() {
+export default function LaporanPenjualan() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');

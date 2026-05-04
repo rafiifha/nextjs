@@ -154,14 +154,6 @@ export default function Navbar() {
               Pesanan
             </Link>
 
-            <Link
-              href="/permintaan-barang"
-              className={`text-sm font-medium transition-colors ${
-                pathname === '/permintaan-barang' ? 'text-[#ffd700]' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Request Barang
-            </Link>
           </div>
 
           <div className="flex items-center gap-3">

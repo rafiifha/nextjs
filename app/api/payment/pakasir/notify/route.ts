@@ -84,7 +84,7 @@ export async function POST(req: Request) {
         await prisma.productVariant.update({
           where: { id: item.variantId },
           data: {
-            stock_online: {
+            stock: {
               decrement: item.quantity,
             },
           },
@@ -106,6 +106,7 @@ export async function POST(req: Request) {
         orderId: order.id,
         customerName: order.customerName,
         totalHarga: order.totalHarga,
+        shippingFee: order.shippingFee,
         status: 'paid',
         items: order.items.map(item => ({
           name: item.product.name,

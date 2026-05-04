@@ -66,7 +66,7 @@ export async function POST(
       );
     }
 
-    // Validate stock_online availability per variant before reducing
+    // Validate stock availability per variant before reducing
     const stockErrors: string[] = [];
     for (const item of order.items) {
       let variant = item.variant;
@@ -80,20 +80,20 @@ export async function POST(
         }
       }
 
-      const availableStock = variant.stock_online ?? 0;
+      const availableStock = variant.stock ?? 0;
       if (availableStock < item.quantity) {
-        stockErrors.push(`${item.product.name} (${variant.priceType}): stok online tersedia ${availableStock}, diminta ${item.quantity}`);
+        stockErrors.push(`${item.product.name} (${variant.priceType}): stok tersedia ${availableStock}, diminta ${item.quantity}`);
       }
     }
 
     if (stockErrors.length > 0) {
       return NextResponse.json(
-        { error: 'Stok online tidak mencukupi', details: stockErrors },
+        { error: 'Stok tidak mencukupi', details: stockErrors },
         { status: 400 }
       );
     }
 
-    // Reduce stock_online for each variant (transaksi online)
+    // Reduce stock for each variant
     for (const item of order.items) {
       let variantId = item.variantId;
       
@@ -109,12 +109,12 @@ export async function POST(
       await prisma.productVariant.update({
         where: { id: variantId },
         data: {
-          stock_online: {
+          stock: {
             decrement: item.quantity,
           },
         },
       });
-      console.log(`✅ Reduced stock_online for variant ${variantId} by ${item.quantity}`);
+      console.log(`✅ Reduced stock for variant ${variantId} by ${item.quantity}`);
     }
 
     // Update order status to paid
@@ -145,6 +145,7 @@ export async function POST(
         orderId: order.id,
         customerName: order.customerName,
         totalHarga: order.totalHarga,
+        shippingFee: order.shippingFee,
         status: 'paid',
         items: order.items.map(item => ({
           name: item.product.name,

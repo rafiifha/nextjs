@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
-import { Plus, Edit, Trash2, Package, Loader2, Search, X, ShoppingBag, Box, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Loader2, Search, X, ShoppingBag, Box } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Category {
@@ -19,8 +19,7 @@ interface ProductVariant {
   id: number;
   priceType: string;
   price: number | null;
-  stock_online: number | null;
-  stock_offline: number | null;
+  stock: number | null;
 }
 
 interface Product {
@@ -43,11 +42,10 @@ export default function ManajemenProdukPage() {
   const [formData, setFormData] = useState({
     name: '',
     categoryId: '',
-    variants: [] as Array<{ 
-      priceType: string; 
-      price: string; 
-      stock_online: string; 
-      stock_offline: string;
+    variants: [] as Array<{
+      priceType: string;
+      price: string;
+      stock: string;
     }>,
   });
 
@@ -89,8 +87,7 @@ export default function ManajemenProdukPage() {
       const newVariants = category.priceTypes.map(priceType => ({
         priceType,
         price: '',
-        stock_online: '',
-        stock_offline: '',
+        stock: '',
       }));
       setFormData({ ...formData, categoryId, variants: newVariants });
     }
@@ -104,7 +101,7 @@ export default function ManajemenProdukPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.categoryId || formData.variants.length === 0) {
       toast({
         title: '❌ Error',
@@ -121,14 +118,12 @@ export default function ManajemenProdukPage() {
       categoryId: parseInt(formData.categoryId),
       variants: formData.variants.map(v => {
         const price = v.price && v.price !== '' ? (isNaN(parseInt(v.price)) ? null : parseInt(v.price)) : null;
-        const stockOnline = v.stock_online && v.stock_online !== '' ? (isNaN(parseInt(v.stock_online)) ? null : parseInt(v.stock_online)) : null;
-        const stockOffline = v.stock_offline && v.stock_offline !== '' ? (isNaN(parseInt(v.stock_offline)) ? null : parseInt(v.stock_offline)) : null;
-        
+        const stockValue = v.stock && v.stock !== '' ? (isNaN(parseInt(v.stock)) ? null : parseInt(v.stock)) : null;
+
         return {
           priceType: v.priceType,
           price,
-          stock_online: stockOnline,
-          stock_offline: stockOffline,
+          stock: stockValue,
         };
       }),
     };
@@ -143,7 +138,7 @@ export default function ManajemenProdukPage() {
           });
           return;
         }
-        
+
         console.log('Updating product with ID:', editingProduct.id);
         const res = await fetch(`/api/produk/${editingProduct.id}`, {
           method: 'PUT',
@@ -209,8 +204,7 @@ export default function ManajemenProdukPage() {
       variants: product.variants.map(v => ({
         priceType: v.priceType,
         price: v.price ? v.price.toString() : '',
-        stock_online: v.stock_online !== null && v.stock_online !== undefined ? v.stock_online.toString() : '',
-        stock_offline: v.stock_offline !== null && v.stock_offline !== undefined ? v.stock_offline.toString() : '',
+        stock: v.stock !== null && v.stock !== undefined ? v.stock.toString() : '',
       })),
     });
     setShowForm(true);
@@ -330,7 +324,7 @@ export default function ManajemenProdukPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-gray-700 capitalize">{variant.priceType}</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
                             <Label htmlFor={`price-${index}`}>Harga (Opsional)</Label>
                             <Input
@@ -343,24 +337,13 @@ export default function ManajemenProdukPage() {
                             />
                           </div>
                           <div>
-                            <Label htmlFor={`stock_online-${index}`}>Stok Online (Opsional)</Label>
+                            <Label htmlFor={`stock-${index}`}>Stok (Opsional)</Label>
                             <Input
-                              id={`stock_online-${index}`}
+                              id={`stock-${index}`}
                               type="number"
                               min="0"
-                              value={variant.stock_online}
-                              onChange={(e) => updateVariant(index, 'stock_online', e.target.value)}
-                              placeholder="Kosongkan jika belum ada stok"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`stock_offline-${index}`}>Stok Offline (Opsional)</Label>
-                            <Input
-                              id={`stock_offline-${index}`}
-                              type="number"
-                              min="0"
-                              value={variant.stock_offline}
-                              onChange={(e) => updateVariant(index, 'stock_offline', e.target.value)}
+                              value={variant.stock}
+                              onChange={(e) => updateVariant(index, 'stock', e.target.value)}
                               placeholder="Kosongkan jika belum ada stok"
                             />
                           </div>
@@ -433,9 +416,8 @@ export default function ManajemenProdukPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => {
             const totalVariants = product.variants.length;
-            const totalStockOnline = product.variants.reduce((sum, v) => sum + (v.stock_online ?? 0), 0);
-            const totalStockOffline = product.variants.reduce((sum, v) => sum + (v.stock_offline ?? 0), 0);
-            
+            const totalStock = product.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
+
             return (
               <Card key={product.id} className="border-gray-200 shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-[#ffd700]/10 to-[#ffd700]/5 pb-3">
@@ -456,21 +438,15 @@ export default function ManajemenProdukPage() {
                 </CardHeader>
                 <CardContent className="pt-4">
                   {/* Summary Stats */}
-                  <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="grid grid-cols-2 gap-2 mb-4 p-3 bg-gray-50 rounded-lg">
                     <div className="text-center">
                       <p className="text-xs text-gray-500 mb-1">Varian</p>
                       <p className="text-sm font-bold text-gray-900">{totalVariants}</p>
                     </div>
-                    <div className="text-center border-x border-gray-200">
-                      <p className="text-xs text-gray-500 mb-1">Stok Online</p>
-                      <p className={`text-sm font-bold ${totalStockOnline > 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                        {totalStockOnline}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-500 mb-1">Stok Offline</p>
-                      <p className={`text-sm font-bold ${totalStockOffline > 0 ? 'text-gray-700' : 'text-red-600'}`}>
-                        {totalStockOffline}
+                    <div className="text-center border-l border-gray-200">
+                      <p className="text-xs text-gray-500 mb-1">Total Stok</p>
+                      <p className={`text-sm font-bold ${totalStock > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                        {totalStock}
                       </p>
                     </div>
                   </div>
@@ -478,9 +454,8 @@ export default function ManajemenProdukPage() {
                   {/* Variants List */}
                   <div className="space-y-2.5 mb-4 max-h-64 overflow-y-auto pr-1">
                     {product.variants.map((variant) => {
-                      const hasStockOnline = (variant.stock_online ?? 0) > 0;
-                      const hasStockOffline = (variant.stock_offline ?? 0) > 0;
-                      
+                      const hasStock = (variant.stock ?? 0) > 0;
+
                       return (
                         <div key={variant.id} className="border border-gray-200 rounded-lg p-3 bg-white hover:border-[#ffd700]/50 transition-colors">
                           <div className="flex justify-between items-center mb-2">
@@ -503,16 +478,10 @@ export default function ManajemenProdukPage() {
                             )}
                           </div>
                           <div className="flex gap-2 text-xs">
-                            <div className={`flex items-center gap-1 px-2 py-1 rounded ${hasStockOnline ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
-                              <TrendingUp className={`h-3 w-3 ${hasStockOnline ? 'text-blue-600' : 'text-red-500'}`} />
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded ${hasStock ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
+                              <Package className={`h-3 w-3 ${hasStock ? 'text-blue-600' : 'text-red-500'}`} />
                               <span className="font-medium">
-                                Online: {variant.stock_online !== null && variant.stock_online !== undefined ? variant.stock_online : '-'}
-                              </span>
-                            </div>
-                            <div className={`flex items-center gap-1 px-2 py-1 rounded ${hasStockOffline ? 'bg-gray-100 text-gray-700' : 'bg-red-50 text-red-600'}`}>
-                              <TrendingDown className={`h-3 w-3 ${hasStockOffline ? 'text-gray-600' : 'text-red-500'}`} />
-                              <span className="font-medium">
-                                Offline: {variant.stock_offline !== null && variant.stock_offline !== undefined ? variant.stock_offline : '-'}
+                                Stok: {variant.stock !== null && variant.stock !== undefined ? variant.stock : '-'}
                               </span>
                             </div>
                           </div>

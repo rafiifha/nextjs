@@ -72,20 +72,27 @@ export async function sendOrderNotification(phone: string, orderData: {
   orderId: number;
   customerName: string;
   totalHarga: number;
+  shippingFee?: number | null;
   items: Array<{ name: string; quantity: number; price: number }>;
 }) {
   const itemsText = orderData.items
     .map(item => `- ${item.name} (${item.quantity}x) = Rp ${item.price.toLocaleString('id-ID')}`)
     .join('\n');
 
+  const subtotal = orderData.items.reduce((sum, item) => sum + item.price, 0);
+  const ongkirLine = orderData.shippingFee
+    ? `\nOngkir: Rp ${orderData.shippingFee.toLocaleString('id-ID')}`
+    : '';
+
   const message = `📦 *Pesanan Baru - Toko Naning*
 
 ID Pesanan: #${orderData.orderId}
 Nama: ${orderData.customerName}
-Total: Rp ${orderData.totalHarga.toLocaleString('id-ID')}
 
 *Detail Pesanan:*
 ${itemsText}
+${orderData.shippingFee ? `\nSubtotal: Rp ${subtotal.toLocaleString('id-ID')}${ongkirLine}` : ''}
+*Total: Rp ${orderData.totalHarga.toLocaleString('id-ID')}*
 
 Terima kasih atas pesanan Anda!`;
 
@@ -96,6 +103,7 @@ export async function sendReceipt(phone: string, orderData: {
   orderId: number;
   customerName: string;
   totalHarga: number;
+  shippingFee?: number | null;
   status: string;
   items: Array<{ name: string; quantity: number; price: number }>;
   createdAt: string;
@@ -111,6 +119,11 @@ export async function sendReceipt(phone: string, orderData: {
     delivered: '🚚 Sudah Dikirim',
   }[orderData.status] || orderData.status;
 
+  const subtotal = orderData.items.reduce((sum, item) => sum + item.price, 0);
+  const ongkirLine = orderData.shippingFee
+    ? `\nOngkir: Rp ${orderData.shippingFee.toLocaleString('id-ID')}`
+    : '';
+
   const message = `🧾 *Bukti Transaksi - Toko Naning*
 
 ID Pesanan: #${orderData.orderId}
@@ -120,7 +133,7 @@ Tanggal: ${new Date(orderData.createdAt).toLocaleString('id-ID')}
 
 *Detail Pesanan:*
 ${itemsText}
-
+${orderData.shippingFee ? `\nSubtotal: Rp ${subtotal.toLocaleString('id-ID')}${ongkirLine}` : ''}
 *Total: Rp ${orderData.totalHarga.toLocaleString('id-ID')}*
 
 Terima kasih telah berbelanja di Toko Naning! 🛒`;

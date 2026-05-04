@@ -23,12 +23,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     if (isOpen) {
       loadCart();
     }
-    
+
     // Listen for cart updates
     const handleCartUpdate = () => {
       loadCart();
     };
-    
+
     window.addEventListener('cartUpdated', handleCartUpdate);
     return () => window.removeEventListener('cartUpdated', handleCartUpdate);
   }, [isOpen]);
@@ -63,7 +63,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     const newCart = cartService.updateQuantity(productId, priceType, quantity, userId);
     setCart(newCart);
     window.dispatchEvent(new Event('cartUpdated'));
-    
+
     if (quantity === 0) {
       toast({
         variant: "info",
@@ -93,7 +93,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     const newCart = cartService.removeFromCart(productId, priceType, userId);
     setCart(newCart);
     window.dispatchEvent(new Event('cartUpdated'));
-    
+
     toast({
       variant: "info",
       title: "🗑️ Produk Dihapus",
@@ -138,9 +138,8 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 h-[100dvh] w-full max-w-md bg-white shadow-xl z-[70] transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className={`fixed top-0 right-0 h-[100dvh] w-full max-w-md bg-white shadow-xl z-[70] transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
       >
         <div className="flex flex-col h-full max-h-[100dvh]">
           {/* Header */}
@@ -195,7 +194,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       </p>
                       {item.product.variants && item.variantId && (
                         <p className="text-xs text-gray-500">
-                          Stok: {item.product.variants.find(v => v.id === item.variantId)?.stock_online || 0}
+                          Stok: {item.product.variants.find(v => v.id === item.variantId)?.stock || 0}
                         </p>
                       )}
                     </div>
@@ -216,7 +215,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           onClick={() => updateQuantity(item.productId, item.priceType, item.quantity + 1)}
                           disabled={
                             item.product.variants && item.variantId
-                              ? item.quantity >= (item.product.variants.find(v => v.id === item.variantId)?.stock_online || 0)
+                              ? item.quantity >= (item.product.variants.find(v => v.id === item.variantId)?.stock || 0)
                               : false
                           }
                           className="h-8 w-8 p-0"

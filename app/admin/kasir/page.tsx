@@ -13,8 +13,7 @@ interface ProductVariant {
   id: number;
   priceType: string;
   price: number | null;
-  stock_online: number | null;
-  stock_offline: number | null;
+  stock: number | null;
 }
 
 interface Category {
@@ -79,7 +78,7 @@ export default function KasirPage() {
           for (const product of productsData) {
             if (next[product.id]) continue;
             const firstAvailable = product.variants.find(
-              (v: ProductVariant) => (v.stock_offline ?? 0) > 0 && v.price !== null && v.price !== undefined
+              (v: ProductVariant) => (v.stock ?? 0) > 0 && v.price !== null && v.price !== undefined
             );
             if (firstAvailable) next[product.id] = firstAvailable.id;
           }
@@ -140,11 +139,11 @@ export default function KasirPage() {
       return;
     }
 
-    const stockOffline = variant.stock_offline ?? 0;
-    if (stockOffline <= 0) {
+    const stockAvailable = variant.stock ?? 0;
+    if (stockAvailable <= 0) {
       toast({
         title: '❌ Error',
-        description: 'Stok offline tidak tersedia',
+        description: 'Stok tidak tersedia',
         variant: 'error',
       });
       return;
@@ -154,14 +153,14 @@ export default function KasirPage() {
       const existing = prev.find(
         (item) => item.productId === product.id && item.priceType === variant.priceType
       );
-      
+
       if (existing) {
         const newQuantity = existing.quantity + quantity;
         // Check if new quantity exceeds available stock
-        if (newQuantity > stockOffline) {
+        if (newQuantity > stockAvailable) {
           toast({
             title: '❌ Error',
-            description: `Stok offline tersedia hanya ${stockOffline} unit`,
+            description: `Stok tersedia hanya ${stockAvailable} unit`,
             variant: 'error',
           });
           return prev;
@@ -172,24 +171,24 @@ export default function KasirPage() {
             : item
         );
       }
-      
+
       // Check if quantity exceeds available stock
-      if (quantity > stockOffline) {
+      if (quantity > stockAvailable) {
         toast({
           title: '❌ Error',
-          description: `Stok offline tersedia hanya ${stockOffline} unit`,
+          description: `Stok tersedia hanya ${stockAvailable} unit`,
           variant: 'error',
         });
         return prev;
       }
-      
-      return [...prev, { 
-        productId: product.id, 
+
+      return [...prev, {
+        productId: product.id,
         variantId: variant.id,
-        product, 
-        priceType: variant.priceType, 
-        quantity, 
-        price: variant.price! 
+        product,
+        priceType: variant.priceType,
+        quantity,
+        price: variant.price!
       }];
     });
   };
@@ -199,31 +198,31 @@ export default function KasirPage() {
       removeFromCart(productId, priceType);
       return;
     }
-    
+
     setCart((prev) => {
       const item = prev.find(
         (i) => i.productId === productId && i.priceType === priceType
       );
-      
+
       if (!item) return prev;
-      
+
       // Find the variant to check stock
       const product = products.find(p => p.id === productId);
       if (product) {
         const variant = product.variants.find(v => v.priceType === priceType);
         if (variant) {
-          const stockOffline = variant.stock_offline ?? 0;
-          if (quantity > stockOffline) {
+          const stockAvailable = variant.stock ?? 0;
+          if (quantity > stockAvailable) {
             toast({
               title: '❌ Error',
-              description: `Stok offline tersedia hanya ${stockOffline} unit`,
+              description: `Stok tersedia hanya ${stockAvailable} unit`,
               variant: 'error',
             });
             return prev;
           }
         }
       }
-      
+
       return prev.map((item) =>
         item.productId === productId && item.priceType === priceType
           ? { ...item, quantity }
@@ -359,7 +358,7 @@ export default function KasirPage() {
       // If payment method is tunai, order is already paid
       if (paymentMethod === 'tunai') {
         const changeAmount = getChange();
-        
+
         // Set receipt data
         // Note: API returns order directly, not wrapped in { order: ... }
         setReceiptData({
@@ -375,17 +374,17 @@ export default function KasirPage() {
           paymentMethod: 'Tunai',
           date: new Date().toLocaleString('id-ID'),
         });
-        
+
         toast({
           title: '✅ Berhasil',
-          description: changeAmount > 0 
+          description: changeAmount > 0
             ? `Pesanan berhasil dibuat! Kembalian: ${formatRupiah(changeAmount)}`
             : 'Pesanan berhasil dibuat!',
         });
-        
+
         // Show receipt
         setShowReceipt(true);
-        
+
         // Reset form
         setCart([]);
         setCustomerName('');
@@ -393,7 +392,7 @@ export default function KasirPage() {
         setCashReceived('');
         setDiscount('');
         setSearchQuery('');
-        
+
         // Refresh products
         fetchProducts();
         setSubmitting(false);
@@ -406,7 +405,7 @@ export default function KasirPage() {
           title: '✅ Berhasil',
           description: 'Pesanan berhasil dibuat! Mengarahkan ke halaman pembayaran...',
         });
-        
+
         setTimeout(() => {
           window.location.href = `/payment/instruction/${data.id}`;
         }, 1000);
@@ -480,10 +479,10 @@ export default function KasirPage() {
               ) : filteredProducts.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {filteredProducts.map((product) => {
-                    const availableVariants = product.variants.filter(v => (v.stock_offline ?? 0) > 0 && v.price !== null && v.price !== undefined);
+                    const availableVariants = product.variants.filter(v => (v.stock ?? 0) > 0 && v.price !== null && v.price !== undefined);
                     const selectedVariantId = selectedVariantByProduct[product.id];
                     const selectedVariant = availableVariants.find(v => v.id === selectedVariantId) || availableVariants[0] || null;
-                    
+
                     return (
                       <Card
                         key={product.id}
@@ -523,7 +522,7 @@ export default function KasirPage() {
                               ) : (
                                 availableVariants.map((variant) => (
                                   <option key={variant.id} value={variant.id}>
-                                    {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stock_offline ?? 0})
+                                    {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stock ?? 0})
                                   </option>
                                 ))
                               )}
@@ -652,7 +651,7 @@ export default function KasirPage() {
               {cart.length > 0 && (
                 <div className="border-t border-gray-200 pt-4">
                   <Label className="text-sm font-semibold text-gray-900 mb-3 block">Metode Pembayaran</Label>
-                  <select 
+                  <select
                     className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                     value={paymentMethod}
                     onChange={(e) => {
@@ -690,7 +689,7 @@ export default function KasirPage() {
                 {/* Ringkasan Pembayaran */}
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                   <h4 className="text-sm font-semibold text-gray-900 mb-3">Ringkasan Pembayaran</h4>
-                  
+
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Subtotal:</span>
                     <span className="text-sm font-semibold text-gray-900">{formatRupiah(getSubtotal())}</span>
@@ -715,7 +714,7 @@ export default function KasirPage() {
                 {paymentMethod === 'tunai' && (
                   <div className="bg-blue-50 rounded-lg p-4 space-y-3">
                     <h4 className="text-sm font-semibold text-gray-900 mb-2">Pembayaran Tunai</h4>
-                    
+
                     {/* Uang Diterima - Prominent */}
                     <div className="space-y-2">
                       <Label htmlFor="cashReceived" className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -777,8 +776,8 @@ export default function KasirPage() {
                   onClick={handleCheckout}
                   className="w-full"
                   disabled={
-                    submitting || 
-                    cart.length === 0 || 
+                    submitting ||
+                    cart.length === 0 ||
                     !paymentMethod ||
                     (paymentMethod === 'tunai' && (getChange() < 0 || !cashReceived || parseFloat(cashReceived) <= 0))
                   }

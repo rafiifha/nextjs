@@ -73,8 +73,7 @@ export async function GET() {
               productId: item.variant.productId,
               priceType: item.variant.priceType,
               price: item.variant.price,
-              stock_online: item.variant.stock_online,
-              stock_offline: item.variant.stock_offline,
+              stock: item.variant.stock,
             } : null,
           })),
         };
@@ -163,7 +162,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate stock_online availability per variant (stok tidak dikurangi, hanya divalidasi)
+    // Validate stock availability per variant (stok tidak dikurangi, hanya divalidasi)
     const stockErrors: string[] = [];
     for (const item of items) {
       const product = products.find(p => p.id === item.productId);
@@ -194,9 +193,9 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const availableStock = variant.stock_online ?? 0;
+      const availableStock = variant.stock ?? 0;
       if (availableStock < item.quantity) {
-        stockErrors.push(`${product.name} (${variant.priceType}): stok online tersedia ${availableStock}, diminta ${item.quantity}`);
+        stockErrors.push(`${product.name} (${variant.priceType}): stok tersedia ${availableStock}, diminta ${item.quantity}`);
       }
     }
 
@@ -319,6 +318,7 @@ export async function POST(request: NextRequest) {
         orderId: order.id,
         customerName,
         totalHarga,
+        shippingFee: shippingFee || null,
         items: order.items.map(item => ({
           name: item.product.name,
           quantity: item.quantity,

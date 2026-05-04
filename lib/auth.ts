@@ -18,6 +18,6 @@ export function verifyToken(token: string): JWTPayload | null {
 }
 
 export function generateToken(payload: JWTPayload): string {
-  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: '1h' });
 }
 
