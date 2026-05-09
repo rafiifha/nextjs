@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { formatRupiah } from '@/lib/utils';
 import { cartService, CartItem } from '@/lib/cart';
 import { ShoppingCart, Plus, Minus, Trash2, X, Package, ArrowRight } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -15,7 +15,7 @@ interface CartDrawerProps {
 
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const router = useRouter();
-  const { toast } = useToast();
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -65,17 +65,9 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     window.dispatchEvent(new Event('cartUpdated'));
 
     if (quantity === 0) {
-      toast({
-        variant: "info",
-        title: "🗑️ Produk Dihapus",
-        description: "Produk telah dihapus dari keranjang",
-      });
+      toast.info('🗑️ Produk Dihapus', { description: 'Produk telah dihapus dari keranjang' });
     } else {
-      toast({
-        variant: "success",
-        title: "✅ Jumlah Diperbarui",
-        description: `Jumlah produk telah diubah menjadi ${quantity}`,
-      });
+      toast.success('✅ Jumlah Diperbarui', { description: `Jumlah produk telah diubah menjadi ${quantity}` });
     }
   };
 
@@ -94,11 +86,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     setCart(newCart);
     window.dispatchEvent(new Event('cartUpdated'));
 
-    toast({
-      variant: "info",
-      title: "🗑️ Produk Dihapus",
-      description: "Produk telah dihapus dari keranjang",
-    });
+    toast.info('🗑️ Produk Dihapus', { description: 'Produk telah dihapus dari keranjang' });
   };
 
   const getTotalPrice = () => {
@@ -107,7 +95,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
   const handleCheckout = () => {
     if (cart.length === 0) {
-      alert('Keranjang masih kosong');
+      toast.warning('Keranjang masih kosong');
       return;
     }
     onClose();

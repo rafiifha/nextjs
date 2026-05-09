@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Loader2, User, Mail, Phone, Lock } from 'lucide-react';
 
 export default function ProfilPage() {
   const router = useRouter();
-  const { toast } = useToast();
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -57,12 +57,12 @@ export default function ProfilPage() {
     e.preventDefault();
     
     if (!formData.name) {
-      toast({ variant: 'error', title: 'Error', description: 'Nama tidak boleh kosong' });
+      toast.error('Error', { description: 'Nama tidak boleh kosong' });
       return;
     }
 
     if (formData.password && formData.password !== formData.confirmPassword) {
-      toast({ variant: 'error', title: 'Error', description: 'Password dan Konfirmasi Password tidak cocok' });
+      toast.error('Error', { description: 'Password dan Konfirmasi Password tidak cocok' });
       return;
     }
 
@@ -97,20 +97,12 @@ export default function ProfilPage() {
       localStorage.setItem('user', JSON.stringify(data));
       window.dispatchEvent(new Event('userLogin')); // To update navbar
 
-      toast({
-        variant: 'success',
-        title: 'Berhasil',
-        description: 'Profil berhasil diperbarui'
-      });
+      toast.success('Berhasil', { description: 'Profil berhasil diperbarui' });
       
       setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
 
     } catch (error: any) {
-      toast({
-        variant: 'error',
-        title: 'Gagal',
-        description: error.message
-      });
+      toast.error('Gagal', { description: error.message });
     } finally {
       setSubmitting(false);
     }

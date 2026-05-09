@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Package, Loader2, ShoppingCart, Calendar, MapPin, Truck, CheckCircle, Clock, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 
@@ -41,7 +41,7 @@ interface Order {
 
 export default function PesananPage() {
   const router = useRouter();
-  const { toast } = useToast();
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -76,11 +76,7 @@ export default function PesananPage() {
             if (paymentStatus === 'success' && !hasShownPaymentNotification) {
               setHasShownPaymentNotification(true);
               setExpandedOrders(prev => new Set(prev).add(orderId));
-              toast({
-                variant: "success",
-                title: "✅ Pembayaran Berhasil!",
-                description: `Pesanan #${orderId} Anda berhasil dibayar dan sedang diproses.`,
-              });
+              toast.success('✅ Pembayaran Berhasil!', { description: `Pesanan #${orderId} Anda berhasil dibayar dan sedang diproses.` });
             }
             
             const scrollToOrder = () => {
@@ -148,11 +144,11 @@ export default function PesananPage() {
           return ordersData;
         }
       } else {
-        toast({ variant: "error", title: "Gagal Memuat Pesanan", description: "Terjadi kesalahan saat memuat data." });
+        toast.error('Gagal Memuat Pesanan', { description: 'Terjadi kesalahan saat memuat data.' });
         return [];
       }
     } catch (error: any) {
-      toast({ variant: "error", title: "Gagal Memuat Pesanan", description: error.message });
+      toast.error('Gagal Memuat Pesanan', { description: error.message });
       return [];
     } finally {
       setLoading(false);

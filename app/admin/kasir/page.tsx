@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
 import { ShoppingCart, Plus, Minus, Trash2, Search, X, Loader2, Filter, Package, Box, TrendingDown, CheckCircle, CreditCard, Wallet, Printer } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface ProductVariant {
   id: number;
@@ -40,7 +40,7 @@ interface CartItem {
 }
 
 export default function KasirPage() {
-  const { toast } = useToast();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -113,39 +113,23 @@ export default function KasirPage() {
   const addToCart = (product: Product, variant: ProductVariant, quantity: number = 1) => {
     // Validate data before adding to cart
     if (!product || !product.id) {
-      toast({
-        title: '❌ Error',
-        description: 'Data produk tidak valid',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: 'Data produk tidak valid' });
       return;
     }
 
     if (!variant || !variant.id) {
-      toast({
-        title: '❌ Error',
-        description: 'Data varian tidak valid',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: 'Data varian tidak valid' });
       return;
     }
 
     if (!variant.price || variant.price <= 0) {
-      toast({
-        title: '❌ Error',
-        description: 'Harga produk tidak valid',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: 'Harga produk tidak valid' });
       return;
     }
 
     const stockAvailable = variant.stock ?? 0;
     if (stockAvailable <= 0) {
-      toast({
-        title: '❌ Error',
-        description: 'Stok tidak tersedia',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: 'Stok tidak tersedia' });
       return;
     }
 
@@ -158,11 +142,7 @@ export default function KasirPage() {
         const newQuantity = existing.quantity + quantity;
         // Check if new quantity exceeds available stock
         if (newQuantity > stockAvailable) {
-          toast({
-            title: '❌ Error',
-            description: `Stok tersedia hanya ${stockAvailable} unit`,
-            variant: 'error',
-          });
+          toast.error('❌ Error', { description: `Stok tersedia hanya ${stockAvailable} unit` });
           return prev;
         }
         return prev.map((item) =>
@@ -174,11 +154,7 @@ export default function KasirPage() {
 
       // Check if quantity exceeds available stock
       if (quantity > stockAvailable) {
-        toast({
-          title: '❌ Error',
-          description: `Stok tersedia hanya ${stockAvailable} unit`,
-          variant: 'error',
-        });
+        toast.error('❌ Error', { description: `Stok tersedia hanya ${stockAvailable} unit` });
         return prev;
       }
 
@@ -213,11 +189,7 @@ export default function KasirPage() {
         if (variant) {
           const stockAvailable = variant.stock ?? 0;
           if (quantity > stockAvailable) {
-            toast({
-              title: '❌ Error',
-              description: `Stok tersedia hanya ${stockAvailable} unit`,
-              variant: 'error',
-            });
+            toast.error('❌ Error', { description: `Stok tersedia hanya ${stockAvailable} unit` });
             return prev;
           }
         }
@@ -262,29 +234,17 @@ export default function KasirPage() {
 
   const handleCheckout = async () => {
     if (!customerName || !customerPhone) {
-      toast({
-        title: '❌ Error',
-        description: 'Nama dan nomor whatsapp harus diisi',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: 'Nama dan nomor whatsapp harus diisi' });
       return;
     }
 
     if (cart.length === 0) {
-      toast({
-        title: '❌ Error',
-        description: 'Keranjang masih kosong',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: 'Keranjang masih kosong' });
       return;
     }
 
     if (!paymentMethod) {
-      toast({
-        title: '❌ Error',
-        description: 'Pilih metode pembayaran terlebih dahulu',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: 'Pilih metode pembayaran terlebih dahulu' });
       return;
     }
 
@@ -292,20 +252,12 @@ export default function KasirPage() {
     if (paymentMethod === 'tunai') {
       const cashValue = cashReceived && cashReceived !== '' ? parseFloat(cashReceived) : 0;
       if (isNaN(cashValue) || cashValue <= 0) {
-        toast({
-          title: '❌ Error',
-          description: 'Uang yang diterima harus diisi',
-          variant: 'error',
-        });
+        toast.error('❌ Error', { description: 'Uang yang diterima harus diisi' });
         return;
       }
 
       if (getChange() < 0) {
-        toast({
-          title: '❌ Error',
-          description: `Uang tidak mencukupi! Kurang: ${formatRupiah(Math.abs(getChange()))}`,
-          variant: 'error',
-        });
+        toast.error('❌ Error', { description: `Uang tidak mencukupi! Kurang: ${formatRupiah(Math.abs(getChange()))}` });
         return;
       }
     }
@@ -346,11 +298,7 @@ export default function KasirPage() {
         if (data.details && Array.isArray(data.details)) {
           errorMessage += ': ' + data.details.join(', ');
         }
-        toast({
-          title: '❌ Error',
-          description: errorMessage,
-          variant: 'error',
-        });
+        toast.error('❌ Error', { description: errorMessage });
         setSubmitting(false);
         return;
       }
@@ -375,12 +323,7 @@ export default function KasirPage() {
           date: new Date().toLocaleString('id-ID'),
         });
 
-        toast({
-          title: '✅ Berhasil',
-          description: changeAmount > 0
-            ? `Pesanan berhasil dibuat! Kembalian: ${formatRupiah(changeAmount)}`
-            : 'Pesanan berhasil dibuat!',
-        });
+        toast.success('✅ Berhasil', { description: changeAmount > 0 ? `Pesanan berhasil dibuat! Kembalian: ${formatRupiah(changeAmount)}` : 'Pesanan berhasil dibuat!' });
 
         // Show receipt
         setShowReceipt(true);
@@ -401,10 +344,7 @@ export default function KasirPage() {
 
       // If payment method is not tunai, redirect to instruction page
       if (paymentMethod !== 'tunai') {
-        toast({
-          title: '✅ Berhasil',
-          description: 'Pesanan berhasil dibuat! Mengarahkan ke halaman pembayaran...',
-        });
+        toast.success('✅ Berhasil', { description: 'Pesanan berhasil dibuat! Mengarahkan ke halaman pembayaran...' });
 
         setTimeout(() => {
           window.location.href = `/payment/instruction/${data.id}`;
@@ -412,11 +352,7 @@ export default function KasirPage() {
       }
     } catch (error: any) {
       console.error('Checkout error:', error);
-      toast({
-        title: '❌ Error',
-        description: error?.message || 'Terjadi kesalahan saat checkout',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: error?.message || 'Terjadi kesalahan saat checkout' });
       setSubmitting(false);
     }
   };

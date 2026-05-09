@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatRupiah } from '@/lib/utils';
 import { Search, Filter, Package, Loader2, XCircle, Printer, Phone, User, Calendar, Wallet, Truck, CreditCard, FileText } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface OrderItem {
   id: number;
@@ -53,7 +53,7 @@ interface Courier {
 }
 
 export default function ManajemenPesananPage() {
-  const { toast } = useToast();
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,11 +131,7 @@ export default function ManajemenPesananPage() {
         throw new Error(errorData.error || 'Gagal mengupdate status');
       }
     } catch (error: any) {
-      toast({
-        variant: 'error',
-        title: 'Gagal update status',
-        description: error.message || 'Gagal mengupdate status pesanan',
-      });
+      toast.error('Gagal update status', { description: error.message || 'Gagal mengupdate status pesanan' });
     }
   };
 
@@ -544,7 +540,7 @@ export default function ManajemenPesananPage() {
                         onClick={() => {
                           const courierId = Number(selectedCourierId || selectedOrder.courierId || 0);
                           if (!courierId) {
-                            toast({ variant: 'warning', title: 'Kurir belum dipilih', description: 'Pilih kurir sebelum ubah status pengiriman.' });
+                            toast.warning('Kurir belum dipilih', { description: 'Pilih kurir sebelum ubah status pengiriman.' });
                             return;
                           }
                           updateOrderStatus(selectedOrder.id, 'shipped', courierId);

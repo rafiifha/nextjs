@@ -34,10 +34,6 @@ model ProductVariant {
   priceType   String   // "dus", "pak", "item", "bal", "kg", etc.
   price       Int?     // Harga untuk jenis ini (bisa kosong)
   stock       Int?     // Stok untuk varian ini (bisa kosong)
-  length      Int?     // Panjang dalam cm (untuk pengiriman)
-  width       Int?     // Lebar dalam cm (untuk pengiriman)
-  height      Int?     // Tinggi dalam cm (untuk pengiriman)
-  weight      Int?     // Berat dalam gram (untuk pengiriman)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   items       OrderItem[] @relation("VariantOrderItems")
@@ -70,7 +66,7 @@ model Order {
   shippingLng      Float?     // Longitude tujuan
   shippingDistance  Float?    // Jarak dalam km
   shippingZone     Int?      // Zona (1, 2, 3)
-  trackingNumber   String?   // Nomor resi internal (TN-{id}-{timestamp})
+
   shippingNotes    String?   // Catatan untuk kurir
   courierId        Int?      // FK ke Courier
   courier          Courier?  @relation("CourierOrders", fields: [courierId], references: [id])

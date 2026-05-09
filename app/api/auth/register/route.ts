@@ -1,80 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
-import { prisma } from '@/lib/db';
-import { generateToken } from '@/lib/auth';
+import { NextRequest } from 'next/server';
+import { AuthController } from '@/app/controllers/AuthController';
+
+const authController = new AuthController();
 
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { name, email, phone, password } = body;
-
-    if (!name || !password || (!email && !phone)) {
-      return NextResponse.json(
-        { error: 'Nama, email/phone, dan password harus diisi' },
-        { status: 400 }
-      );
-    }
-
-    // Check if user already exists
-    const whereClause: any = {
-      OR: [],
-    };
-    
-    if (email) {
-      whereClause.OR.push({ email });
-    }
-    if (phone) {
-      whereClause.OR.push({ phone });
-    }
-    
-    const existingUser = whereClause.OR.length > 0 
-      ? await prisma.user.findFirst({
-          where: whereClause,
-        })
-      : null;
-
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'Email atau nomor whatsapp sudah terdaftar' },
-        { status: 400 }
-      );
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email: email || null,
-        phone: phone || null,
-        password: hashedPassword,
-        role: 'customer',
-      },
-    });
-
-    const token = generateToken({
-      userId: user.id,
-      email: user.email || undefined,
-      phone: user.phone || undefined,
-      role: user.role,
-    });
-
-    const { password: _, ...userWithoutPassword } = user;
-
-    return NextResponse.json({
-      message: 'Registrasi berhasil',
-      token,
-      user: userWithoutPassword,
-    });
-  } catch (error: any) {
-    console.error('Register error:', error);
-    return NextResponse.json(
-      { 
-        error: error.message || 'Terjadi kesalahan saat registrasi',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      },
-      { status: 500 }
-    );
-  }
+  return authController.register(request);
 }
-

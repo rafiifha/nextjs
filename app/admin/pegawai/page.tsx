@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, Truck, KeyRound, Phone, User } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { ShieldCheck, Truck, KeyRound, Phone, User, Trash2, RotateCcw, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Employee {
   id: number;
@@ -18,6 +18,7 @@ interface Courier {
   id: number;
   name: string;
   phone: string;
+  isActive: boolean;
 }
 
 export default function PegawaiPage() {
@@ -32,7 +33,8 @@ export default function PegawaiPage() {
   const [resetTarget, setResetTarget] = useState<Employee | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
-  const { toast } = useToast();
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [courierTab, setCourierTab] = useState<'aktif' | 'nonaktif'>('aktif');
 
   const getToken = () => localStorage.getItem('token');
 
@@ -43,7 +45,7 @@ export default function PegawaiPage() {
     try {
       const [cashierRes, courierRes] = await Promise.all([
         fetch('/api/auth/employees', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/delivery/couriers'),
+        fetch('/api/delivery/couriers?all=true'),
       ]);
 
       if (cashierRes.ok) setCashiers(await cashierRes.json());
@@ -70,11 +72,30 @@ export default function PegawaiPage() {
       if (!res.ok) throw new Error((await res.json()).error || 'Gagal tambah kasir');
       setCashierForm({ name: '', phone: '', password: '' });
       await fetchData();
-      toast({ variant: 'success', title: 'Kasir ditambahkan', description: 'Akun kasir baru berhasil dibuat.' });
+      toast.success('Kasir ditambahkan', { description: 'Akun kasir baru berhasil dibuat.' });
     } catch (error: any) {
-      toast({ variant: 'error', title: 'Gagal tambah kasir', description: error.message });
+      toast.error('Gagal tambah kasir', { description: error.message });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteCashier = async (id: number) => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/auth/employees/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        toast.error('Gagal hapus kasir', { description: (await res.json()).error || 'Terjadi kesalahan' });
+        return;
+      }
+      await fetchData();
+      toast.success('Kasir dihapus', { description: 'Akun kasir berhasil dihapus.' });
+    } finally {
+      setDeleteConfirmId(null);
     }
   };
 
@@ -88,7 +109,7 @@ export default function PegawaiPage() {
     const token = getToken();
     if (!token || !resetTarget) return;
     if (!newPassword.trim()) {
-      toast({ variant: 'warning', title: 'Password kosong', description: 'Isi password baru dulu.' });
+      toast.warning('Password kosong', { description: 'Isi password baru dulu.' });
       return;
     }
 
@@ -101,13 +122,13 @@ export default function PegawaiPage() {
       });
 
       if (!res.ok) {
-        toast({ variant: 'error', title: 'Gagal reset password', description: (await res.json()).error || 'Terjadi kesalahan' });
+        toast.error('Gagal reset password', { description: (await res.json()).error || 'Terjadi kesalahan' });
         return;
       }
       setResetModalOpen(false);
       setResetTarget(null);
       setNewPassword('');
-      toast({ variant: 'success', title: 'Password direset', description: 'Password kasir berhasil diperbarui.' });
+      toast.success('Password direset', { description: 'Password kasir berhasil diperbarui.' });
     } finally {
       setResetLoading(false);
     }
@@ -124,29 +145,53 @@ export default function PegawaiPage() {
       if (!res.ok) throw new Error((await res.json()).error || 'Gagal tambah kurir');
       setCourierForm({ name: '', phone: '' });
       await fetchData();
-      toast({ variant: 'success', title: 'Kurir ditambahkan', description: 'Kurir baru berhasil masuk daftar.' });
+      toast.success('Kurir ditambahkan', { description: 'Kurir baru berhasil masuk daftar.' });
     } catch (error: any) {
-      toast({ variant: 'error', title: 'Gagal tambah kurir', description: error.message });
+      toast.error('Gagal tambah kurir', { description: error.message });
     } finally {
       setLoading(false);
     }
   };
 
-  const deactivateCourier = async (id: number) => {
-    const res = await fetch(`/api/delivery/couriers/${id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      toast({ variant: 'error', title: 'Gagal nonaktifkan kurir', description: (await res.json()).error || 'Terjadi kesalahan' });
-      return;
+  const toggleCourierStatus = async (id: number, activate: boolean) => {
+    try {
+      const res = await fetch(`/api/delivery/couriers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: activate }),
+      });
+      if (!res.ok) {
+        toast.error(activate ? 'Gagal aktifkan kurir' : 'Gagal nonaktifkan kurir', {
+          description: (await res.json()).error || 'Terjadi kesalahan',
+        });
+        return;
+      }
+      await fetchData();
+      toast.success(activate ? 'Kurir diaktifkan' : 'Kurir dinonaktifkan', {
+        description: activate
+          ? 'Kurir berhasil diaktifkan kembali.'
+          : 'Kurir berhasil dipindah dari daftar aktif.',
+      });
+    } catch {
+      toast.error('Terjadi kesalahan');
     }
-    await fetchData();
-    toast({ variant: 'success', title: 'Kurir dinonaktifkan', description: 'Kurir berhasil dipindah dari daftar aktif.' });
   };
+
+  const activeCouriers = couriers.filter((c) => c.isActive);
+  const inactiveCouriers = couriers.filter((c) => !c.isActive);
 
   const tabStyle = (key: 'kasir' | 'kurir') =>
     `rounded-full px-4 py-2 text-sm font-medium transition ${
       activeTab === key
         ? 'bg-[#ffd700] text-gray-900 shadow-sm'
         : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+    }`;
+
+  const courierTabStyle = (key: 'aktif' | 'nonaktif') =>
+    `rounded-md px-3 py-1.5 text-xs font-medium transition ${
+      courierTab === key
+        ? 'bg-gray-900 text-white'
+        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
     }`;
 
   return (
@@ -202,10 +247,27 @@ export default function PegawaiPage() {
                         {cashier.phone || '-'}
                       </p>
                     </div>
-                    <Button variant="outline" onClick={() => openResetPasswordModal(cashier)}>
-                      <KeyRound className="mr-2 h-4 w-4" />
-                      Reset Password
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openResetPasswordModal(cashier)}>
+                        <KeyRound className="mr-1 h-4 w-4" />
+                        Reset Password
+                      </Button>
+                      {deleteConfirmId === cashier.id ? (
+                        <div className="flex items-center gap-1">
+                          <Button variant="destructive" size="sm" onClick={() => deleteCashier(cashier.id)}>
+                            Ya, Hapus
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setDeleteConfirmId(null)}>
+                            Batal
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button variant="outline" size="sm" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setDeleteConfirmId(cashier.id)}>
+                          <Trash2 className="mr-1 h-4 w-4" />
+                          Hapus
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {cashiers.length === 0 && <p className="text-sm text-gray-500">Belum ada akun kasir.</p>}
@@ -234,11 +296,21 @@ export default function PegawaiPage() {
             </div>
             <Button disabled={loading} onClick={createCourier}>Tambah Kurir</Button>
 
+            {/* Sub-tabs: Aktif / Nonaktif */}
+            <div className="flex gap-2 border-b border-gray-200 pb-2">
+              <button onClick={() => setCourierTab('aktif')} className={courierTabStyle('aktif')}>
+                Aktif ({activeCouriers.length})
+              </button>
+              <button onClick={() => setCourierTab('nonaktif')} className={courierTabStyle('nonaktif')}>
+                Nonaktif ({inactiveCouriers.length})
+              </button>
+            </div>
+
             {loadingData ? (
               <p className="text-sm text-gray-500">Memuat data kurir...</p>
-            ) : (
+            ) : courierTab === 'aktif' ? (
               <div className="space-y-2">
-                {couriers.map((courier) => (
+                {activeCouriers.map((courier) => (
                   <div key={courier.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-200 p-3">
                     <div>
                       <p className="flex items-center gap-2 font-medium text-gray-900">
@@ -250,16 +322,53 @@ export default function PegawaiPage() {
                         {courier.phone}
                       </p>
                     </div>
-                    <Button variant="outline" onClick={() => deactivateCourier(courier.id)}>Nonaktifkan</Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => toggleCourierStatus(courier.id, false)}
+                    >
+                      <XCircle className="mr-1 h-4 w-4" />
+                      Nonaktifkan
+                    </Button>
                   </div>
                 ))}
-                {couriers.length === 0 && <p className="text-sm text-gray-500">Belum ada kurir aktif.</p>}
+                {activeCouriers.length === 0 && <p className="text-sm text-gray-500">Belum ada kurir aktif.</p>}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {inactiveCouriers.map((courier) => (
+                  <div key={courier.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-opacity-50 border-gray-300 bg-gray-50 p-3">
+                    <div>
+                      <p className="flex items-center gap-2 font-medium text-gray-500">
+                        <User className="h-4 w-4 text-gray-400" />
+                        {courier.name}
+                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-600">Nonaktif</span>
+                      </p>
+                      <p className="mt-1 flex items-center gap-2 text-sm text-gray-400">
+                        <Phone className="h-4 w-4 text-gray-400" />
+                        {courier.phone}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-green-600 hover:bg-green-50 hover:text-green-700"
+                      onClick={() => toggleCourierStatus(courier.id, true)}
+                    >
+                      <RotateCcw className="mr-1 h-4 w-4" />
+                      Aktifkan Kembali
+                    </Button>
+                  </div>
+                ))}
+                {inactiveCouriers.length === 0 && <p className="text-sm text-gray-500">Tidak ada kurir nonaktif.</p>}
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
+      {/* Reset Password Modal */}
       {resetModalOpen && resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-lg">

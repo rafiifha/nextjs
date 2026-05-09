@@ -9,7 +9,7 @@ import { formatRupiah } from '@/lib/utils';
 import { Package, ShoppingCart, Search, Loader2, Check } from 'lucide-react';
 import Link from 'next/link';
 import { cartService } from '@/lib/cart';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface ProductVariant {
   id: number;
@@ -38,7 +38,7 @@ interface Product {
 
 export default function ProdukPage() {
   const router = useRouter();
-  const { toast } = useToast();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,11 +75,7 @@ export default function ProdukPage() {
 
   const handleAddToCart = async (product: Product, variant: ProductVariant) => {
     if (!variant.price) {
-      toast({
-        title: "⚠️ Harga Belum Tersedia",
-        description: "Produk ini belum memiliki harga. Silakan hubungi admin.",
-        variant: 'error',
-      });
+      toast.error('⚠️ Harga Belum Tersedia', { description: 'Produk ini belum memiliki harga. Silakan hubungi admin.' });
       return;
     }
 
@@ -111,10 +107,7 @@ export default function ProdukPage() {
 
       // Show success notification
       const priceTypeLabel = variant.priceType.charAt(0).toUpperCase() + variant.priceType.slice(1);
-      toast({
-        title: "✅ Produk Ditambahkan",
-        description: `${product.name} (${priceTypeLabel}) berhasil ditambahkan ke keranjang`,
-      });
+      toast.success('✅ Produk Ditambahkan', { description: `${product.name} (${priceTypeLabel}) berhasil ditambahkan ke keranjang` });
 
       // Show success feedback
       setTimeout(() => {
@@ -122,11 +115,7 @@ export default function ProdukPage() {
       }, 1000);
     } catch (error) {
       console.error('Error adding to cart:', error);
-      toast({
-        title: "❌ Gagal Menambahkan",
-        description: "Gagal menambahkan produk ke keranjang. Silakan coba lagi",
-        variant: 'error',
-      });
+      toast.error('❌ Gagal Menambahkan', { description: 'Gagal menambahkan produk ke keranjang. Silakan coba lagi' });
       setAddingToCart({ ...addingToCart, [key]: false });
     }
   };

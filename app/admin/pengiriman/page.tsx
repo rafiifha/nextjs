@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Truck, User, Phone, MapPin, PackageCheck, CheckCircle2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface Courier {
   id: number;
@@ -30,7 +30,7 @@ export default function PengirimanPage() {
   const [tab, setTab] = useState<'siap' | 'jalan' | 'selesai'>('siap');
   const [selectedCourier, setSelectedCourier] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+
 
   const fetchData = async () => {
     try {
@@ -54,7 +54,7 @@ export default function PengirimanPage() {
     const body: Record<string, any> = { status };
     if (status === 'shipped') {
       if (!courierId) {
-        toast({ variant: 'warning', title: 'Kurir belum dipilih', description: 'Pilih kurir dulu sebelum kirim.' });
+        toast.warning('Kurir belum dipilih', { description: 'Pilih kurir dulu sebelum kirim.' });
         return;
       }
       body.courierId = Number(courierId);
@@ -67,15 +67,11 @@ export default function PengirimanPage() {
     });
 
     if (!res.ok) {
-      toast({ variant: 'error', title: 'Gagal update status', description: (await res.json()).error || 'Terjadi kesalahan' });
+      toast.error('Gagal update status', { description: (await res.json()).error || 'Terjadi kesalahan' });
       return;
     }
     await fetchData();
-    toast({
-      variant: 'success',
-      title: 'Status diperbarui',
-      description: status === 'shipped' ? 'Pesanan masuk dalam pengiriman.' : 'Pesanan ditandai selesai.',
-    });
+    toast.success('Status diperbarui', { description: status === 'shipped' ? 'Pesanan masuk dalam pengiriman.' : 'Pesanan ditandai selesai.' });
   };
 
   const filteredOrders = orders.filter((order) => {

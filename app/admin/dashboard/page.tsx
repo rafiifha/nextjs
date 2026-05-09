@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { 
   Package, 
   CheckCircle, 
@@ -56,7 +56,7 @@ interface Order {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { toast } = useToast();
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -91,22 +91,14 @@ export default function AdminDashboard() {
     const handleOrderCreated = (data: any) => {
       console.log('New order created:', data);
       // Show notification for new order
-      toast({
-        variant: "success",
-        title: "🆕 Pesanan Baru!",
-        description: `Pesanan #${data.order.id} dari ${data.order.customerName} - Total: ${formatRupiah(data.order.totalHarga)}`,
-      });
+      toast.success('🆕 Pesanan Baru!', { description: `Pesanan #${data.order.id} dari ${data.order.customerName} - Total: ${formatRupiah(data.order.totalHarga)}` });
       fetchOrders();
     };
 
     const handleOrderUpdated = (data: any) => {
       console.log('Order updated:', data);
       // Show notification for order update
-      toast({
-        variant: "info",
-        title: "🔄 Pesanan Diperbarui",
-        description: `Status pesanan #${data.order.id} berubah menjadi ${getStatusIndonesian(data.order.status)}`,
-      });
+      toast.info('🔄 Pesanan Diperbarui', { description: `Status pesanan #${data.order.id} berubah menjadi ${getStatusIndonesian(data.order.status)}` });
       fetchOrders();
       if (selectedOrder && selectedOrder.id === data.order.id) {
         setSelectedOrder(data.order);
@@ -174,21 +166,13 @@ export default function AdminDashboard() {
         if (selectedOrder && selectedOrder.id === orderId) {
           setSelectedOrder(orderData);
         }
-        toast({
-          variant: "success",
-          title: "✅ Status Diperbarui",
-          description: `Status pesanan #${orderId} berhasil diubah menjadi ${getStatusIndonesian(newStatus)}`,
-        });
+        toast.success('✅ Status Diperbarui', { description: `Status pesanan #${orderId} berhasil diubah menjadi ${getStatusIndonesian(newStatus)}` });
       } else {
         throw new Error('Data pesanan tidak ditemukan dalam response');
       }
     } catch (error: any) {
       console.error('Error updating order:', error);
-      toast({
-        variant: "error",
-        title: "❌ Gagal",
-        description: error.message || 'Terjadi kesalahan saat mengupdate pesanan',
-      });
+      toast.error('❌ Gagal', { description: error.message || 'Terjadi kesalahan saat mengupdate pesanan' });
     }
   };
 
@@ -412,25 +396,13 @@ export default function AdminDashboard() {
 
       const data = await res.json();
       if (data.success) {
-        toast({
-          variant: 'success',
-          title: 'E-receipt terkirim',
-          description: 'E-receipt berhasil dikirim ke WhatsApp pelanggan.',
-        });
+        toast.success('E-receipt terkirim', { description: 'E-receipt berhasil dikirim ke WhatsApp pelanggan.' });
       } else {
-        toast({
-          variant: 'error',
-          title: 'Gagal kirim e-receipt',
-          description: data.error || 'Terjadi kesalahan',
-        });
+        toast.error('Gagal kirim e-receipt', { description: data.error || 'Terjadi kesalahan' });
       }
     } catch (error) {
       console.error('Error sending receipt:', error);
-      toast({
-        variant: 'error',
-        title: 'Gagal kirim e-receipt',
-        description: 'Terjadi kesalahan saat mengirim e-receipt',
-      });
+      toast.error('Gagal kirim e-receipt', { description: 'Terjadi kesalahan saat mengirim e-receipt' });
     }
   };
 
@@ -446,19 +418,11 @@ export default function AdminDashboard() {
         setTrackingData(prev => ({ ...prev, [orderId]: data }));
       } else {
         console.error('Failed to fetch tracking:', res.statusText);
-        toast({
-          variant: "error",
-          title: "❌ Gagal",
-          description: 'Gagal mengambil data tracking',
-        });
+        toast.error('❌ Gagal', { description: 'Gagal mengambil data tracking' });
       }
     } catch (error) {
       console.error('Error fetching tracking:', error);
-      toast({
-        variant: "error",
-        title: "❌ Error",
-        description: 'Terjadi kesalahan saat mengambil data tracking',
-      });
+      toast.error('❌ Error', { description: 'Terjadi kesalahan saat mengambil data tracking' });
     } finally {
       setLoadingTracking(prev => ({ ...prev, [orderId]: false }));
     }

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
 import { Plus, Edit, Trash2, Package, Loader2, Search, X, ShoppingBag, Box } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface Category {
   id: number;
@@ -31,7 +31,7 @@ interface Product {
 }
 
 export default function ManajemenProdukPage() {
-  const { toast } = useToast();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,11 +103,7 @@ export default function ManajemenProdukPage() {
     e.preventDefault();
 
     if (!formData.name || !formData.categoryId || formData.variants.length === 0) {
-      toast({
-        title: '❌ Error',
-        description: 'Semua field harus diisi',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: 'Semua field harus diisi' });
       return;
     }
 
@@ -131,11 +127,7 @@ export default function ManajemenProdukPage() {
     try {
       if (editingProduct) {
         if (!editingProduct.id) {
-          toast({
-            title: '❌ Error',
-            description: 'ID produk tidak ditemukan',
-            variant: 'error',
-          });
+          toast.error('❌ Error', { description: 'ID produk tidak ditemukan' });
           return;
         }
 
@@ -147,20 +139,13 @@ export default function ManajemenProdukPage() {
         });
 
         if (res.ok) {
-          toast({
-            title: '✅ Berhasil',
-            description: 'Produk berhasil diupdate',
-          });
+          toast.success('✅ Berhasil', { description: 'Produk berhasil diupdate' });
           resetForm();
           fetchProducts();
         } else {
           const error = await res.json();
           console.error('Update error response:', error);
-          toast({
-            title: '❌ Error',
-            description: error.error || error.details || 'Gagal mengupdate produk',
-            variant: 'error',
-          });
+          toast.error('❌ Error', { description: error.error || error.details || 'Gagal mengupdate produk' });
         }
       } else {
         const res = await fetch('/api/produk', {
@@ -170,29 +155,18 @@ export default function ManajemenProdukPage() {
         });
 
         if (res.ok) {
-          toast({
-            title: '✅ Berhasil',
-            description: 'Produk berhasil ditambahkan',
-          });
+          toast.success('✅ Berhasil', { description: 'Produk berhasil ditambahkan' });
           resetForm();
           fetchProducts();
         } else {
           const error = await res.json();
           console.error('Create error response:', error);
-          toast({
-            title: '❌ Error',
-            description: error.error || error.details || 'Gagal menambahkan produk',
-            variant: 'error',
-          });
+          toast.error('❌ Error', { description: error.error || error.details || 'Gagal menambahkan produk' });
         }
       }
     } catch (error: any) {
       console.error('Error saving product:', error);
-      toast({
-        title: '❌ Error',
-        description: error?.message || 'Terjadi kesalahan',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: error?.message || 'Terjadi kesalahan' });
     }
   };
 
@@ -219,27 +193,16 @@ export default function ManajemenProdukPage() {
       });
 
       if (res.ok) {
-        toast({
-          title: '✅ Berhasil',
-          description: 'Produk berhasil dihapus',
-        });
+        toast.success('✅ Berhasil', { description: 'Produk berhasil dihapus' });
         fetchProducts();
       } else {
         const error = await res.json();
         console.error('Delete error response:', error);
-        toast({
-          title: '❌ Error',
-          description: error.error || error.details || 'Gagal menghapus produk',
-          variant: 'error',
-        });
+        toast.error('❌ Error', { description: error.error || error.details || 'Gagal menghapus produk' });
       }
     } catch (error: any) {
       console.error('Error deleting product:', error);
-      toast({
-        title: '❌ Error',
-        description: error?.message || 'Terjadi kesalahan',
-        variant: 'error',
-      });
+      toast.error('❌ Error', { description: error?.message || 'Terjadi kesalahan' });
     }
   };
 

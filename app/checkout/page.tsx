@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
 import { ShoppingCart, Plus, Minus, Trash2, Loader2, Package, MapPin, Truck } from 'lucide-react';
 import { cartService } from '@/lib/cart';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 const MapPicker = dynamic(() => import('@/components/map-picker'), { ssr: false });
 
@@ -38,7 +38,7 @@ interface CartItem {
 export default function CheckoutPage() {
   const router = useRouter();
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
-  const { toast } = useToast();
+
   const [user, setUser] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -159,27 +159,27 @@ export default function CheckoutPage() {
 
   const handleCheckout = async () => {
     if (!customerName || !customerPhone) {
-      toast({ variant: "warning", title: "Data Belum Lengkap", description: "Nama dan nomor whatsapp harus diisi" });
+      toast.warning('Data Belum Lengkap', { description: 'Nama dan nomor whatsapp harus diisi' });
       return;
     }
     if (cart.length === 0) {
-      toast({ variant: "warning", title: "Keranjang Kosong", description: "Tambahkan produk terlebih dahulu" });
+      toast.warning('Keranjang Kosong', { description: 'Tambahkan produk terlebih dahulu' });
       return;
     }
     if (deliveryMethod === 'delivery' && !destinationAddress) {
-      toast({ variant: "warning", title: "Alamat Kosong", description: "Lengkapi alamat pengiriman" });
+      toast.warning('Alamat Kosong', { description: 'Lengkapi alamat pengiriman' });
       return;
     }
     if (deliveryMethod === 'delivery' && (!shippingLat || !shippingLng)) {
-      toast({ variant: "warning", title: "Lokasi Belum Dipilih", description: "Pilih titik pengiriman di peta" });
+      toast.warning('Lokasi Belum Dipilih', { description: 'Pilih titik pengiriman di peta' });
       return;
     }
     if (deliveryMethod === 'delivery' && deliveryOutOfRange) {
-      toast({ variant: "warning", title: "Di Luar Jangkauan", description: "Lokasi di luar radius 10km" });
+      toast.warning('Di Luar Jangkauan', { description: 'Lokasi di luar radius 10km' });
       return;
     }
     if (deliveryMethod === 'delivery' && paymentMethod === 'tunai') {
-      toast({ variant: "warning", title: "Metode Tidak Valid", description: "Pesanan antar wajib pembayaran non-tunai." });
+      toast.warning('Metode Tidak Valid', { description: 'Pesanan antar wajib pembayaran non-tunai.' });
       return;
     }
 
@@ -216,7 +216,7 @@ export default function CheckoutPage() {
       const orderData = await orderResponse.json();
 
       if (!orderResponse.ok) {
-        toast({ variant: "error", title: "Gagal Membuat Pesanan", description: orderData.error || 'Terjadi kesalahan' });
+        toast.error('Gagal Membuat Pesanan', { description: orderData.error || 'Terjadi kesalahan' });
         setSubmitting(false);
         return;
       }
@@ -224,14 +224,14 @@ export default function CheckoutPage() {
       cartService.clearCart();
 
       if (paymentMethod === 'tunai') {
-        toast({ variant: "success", title: "Pesanan Berhasil", description: "Silakan lakukan pembayaran tunai saat ambil pesanan." });
+        toast.success('Pesanan Berhasil', { description: 'Silakan lakukan pembayaran tunai saat ambil pesanan.' });
         router.push('/pesanan');
       } else {
         // Redirect to Pakasir instruction page
         router.push(`/payment/instruction/${orderData.id}`);
       }
     } catch (error: any) {
-      toast({ variant: "error", title: "Terjadi Kesalahan", description: error.message });
+      toast.error('Terjadi Kesalahan', { description: error.message });
       setSubmitting(false);
     }
   };
@@ -337,7 +337,7 @@ export default function CheckoutPage() {
                               setShippingDistance(null);
                               setShippingZone(null);
                               setShippingFee(0);
-                              toast({ variant: "error", title: "Lokasi Di Luar Jangkauan", description: data.error || 'Maksimal 10km' });
+                              toast.error('Lokasi Di Luar Jangkauan', { description: data.error || 'Maksimal 10km' });
                               return;
                             }
                             setDeliveryOutOfRange(false);
@@ -345,7 +345,7 @@ export default function CheckoutPage() {
                             setShippingZone(data.zone);
                             setShippingFee(data.shippingFee);
                           } catch (error) {
-                            toast({ variant: "error", title: "Gagal", description: 'Coba pilih lokasi lagi.' });
+                            toast.error('Gagal', { description: 'Coba pilih lokasi lagi.' });
                           }
                         }}
                         initialPosition={shippingLat && shippingLng ? [shippingLat, shippingLng] : undefined}
