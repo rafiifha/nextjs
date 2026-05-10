@@ -12,7 +12,6 @@ import { cartService } from '@/lib/cart';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [registerType, setRegisterType] = useState<'email' | 'phone'>('email');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -24,6 +23,11 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!email && !phone) {
+      setError('Email atau nomor WhatsApp harus diisi (minimal salah satu)');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Password dan konfirmasi password tidak cocok');
@@ -43,7 +47,8 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
-          [registerType]: registerType === 'email' ? email : phone,
+          ...(email && { email }),
+          ...(phone && { phone }),
           password,
         }),
       });
@@ -98,31 +103,6 @@ export default function RegisterPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-lg">
-              <button
-                type="button"
-                onClick={() => setRegisterType('email')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  registerType === 'email'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Email
-              </button>
-              <button
-                type="button"
-                onClick={() => setRegisterType('phone')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  registerType === 'phone'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                WhatsApp
-              </button>
-            </div>
-
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="name">Nama Lengkap</Label>
@@ -136,31 +116,29 @@ export default function RegisterPage() {
                 />
               </div>
 
-              {registerType === 'email' ? (
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="nama@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-              ) : (
-                <div>
-                  <Label htmlFor="phone">Nomor WhatsApp</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="081234567890"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                  />
-                </div>
-              )}
+              <div>
+                <Label htmlFor="email">Email <span className="text-gray-400 font-normal text-xs">(opsional)</span></Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="nama@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="phone">Nomor WhatsApp <span className="text-gray-400 font-normal text-xs">(opsional)</span></Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="081234567890"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+
+              <p className="text-xs text-gray-500">* Isi minimal salah satu: email atau nomor WhatsApp</p>
 
               <div>
                 <Label htmlFor="password">Password</Label>
@@ -216,4 +194,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-

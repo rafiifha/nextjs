@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Loader2, User, Mail, Phone, Lock } from 'lucide-react';
+import { isTokenValid } from '@/lib/utils';
 
 export default function ProfilPage() {
   const router = useRouter();
@@ -28,7 +29,11 @@ export default function ProfilPage() {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
 
-    if (!token || !userStr) {
+    if (!token || !userStr || !isTokenValid(token)) {
+      if (token && !isTokenValid(token)) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
       router.push('/login?redirect=/profil');
       return;
     }

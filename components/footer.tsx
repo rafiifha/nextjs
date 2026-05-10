@@ -22,11 +22,11 @@ export default function Footer() {
               <ShoppingBag className="h-6 w-6 text-[#ffd700]" />
               <div>
                 <div className="font-bold text-white text-lg">Toko Naning</div>
-                <div className="text-xs text-gray-400">Grosir Sembako Terpercaya</div>
+                <div className="text-xs text-gray-400">Toko Sembako Terpercaya</div>
               </div>
             </Link>
             <p className="text-sm text-gray-400">
-              Supplier sembako terpercaya dengan harga grosir terbaik untuk kebutuhan usaha Anda.
+              Toko sembako terpercaya dengan harga terjangkau untuk kebutuhan usaha Anda.
             </p>
           </div>
 

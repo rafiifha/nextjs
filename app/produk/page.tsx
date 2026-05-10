@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatRupiah } from '@/lib/utils';
-import { Package, ShoppingCart, Search, Loader2, Check } from 'lucide-react';
+import { Package, Search, Loader2, Check } from 'lucide-react';
 import Link from 'next/link';
 import { cartService } from '@/lib/cart';
 import { toast } from 'sonner';
@@ -75,7 +75,7 @@ export default function ProdukPage() {
 
   const handleAddToCart = async (product: Product, variant: ProductVariant) => {
     if (!variant.price) {
-      toast.error('⚠️ Harga Belum Tersedia', { description: 'Produk ini belum memiliki harga. Silakan hubungi admin.' });
+      toast.error('Harga Belum Tersedia', { description: 'Produk ini belum memiliki harga. Silakan hubungi admin.' });
       return;
     }
 
@@ -107,7 +107,7 @@ export default function ProdukPage() {
 
       // Show success notification
       const priceTypeLabel = variant.priceType.charAt(0).toUpperCase() + variant.priceType.slice(1);
-      toast.success('✅ Produk Ditambahkan', { description: `${product.name} (${priceTypeLabel}) berhasil ditambahkan ke keranjang` });
+      toast.success('Produk Ditambahkan', { description: `${product.name} (${priceTypeLabel}) berhasil ditambahkan ke keranjang` });
 
       // Show success feedback
       setTimeout(() => {
@@ -115,7 +115,7 @@ export default function ProdukPage() {
       }, 1000);
     } catch (error) {
       console.error('Error adding to cart:', error);
-      toast.error('❌ Gagal Menambahkan', { description: 'Gagal menambahkan produk ke keranjang. Silakan coba lagi' });
+      toast.error('Gagal Menambahkan', { description: 'Gagal menambahkan produk ke keranjang. Silakan coba lagi' });
       setAddingToCart({ ...addingToCart, [key]: false });
     }
   };
@@ -274,26 +274,14 @@ export default function ProdukPage() {
                     );
                   })()}
 
-                  <div className="flex gap-2">
-                    <Link href="/keranjang" className="flex-1">
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        disabled={cart.length === 0}
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        Keranjang ({cart.reduce((sum, item) => sum + item.quantity, 0)})
-                      </Button>
-                    </Link>
-                    <Link href="/checkout" className="flex-1">
-                      <Button
-                        className="w-full bg-[#ffd700] hover:bg-[#e6c200] text-gray-900"
-                        disabled={cart.length === 0}
-                      >
-                        Checkout
-                      </Button>
-                    </Link>
-                  </div>
+                  <Link href="/checkout">
+                    <Button
+                      className="w-full bg-[#ffd700] hover:bg-[#e6c200] text-gray-900"
+                      disabled={cart.length === 0}
+                    >
+                      Checkout
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             ))}

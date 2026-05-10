@@ -7,6 +7,7 @@ import { ShoppingBag, LogIn, LogOut, User, ShoppingCart } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cartService } from '@/lib/cart';
 import CartDrawer from '@/components/cart-drawer';
+import { isTokenValid } from '@/lib/utils';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -34,15 +35,21 @@ export default function Navbar() {
 
     const loadUser = () => {
       const userStr = localStorage.getItem('user');
-      if (userStr) {
+      const token = localStorage.getItem('token');
+      
+      if (userStr && isTokenValid(token)) {
         try {
           const userData = JSON.parse(userStr);
           setUser(userData);
         } catch (e) {
-          // ignore
           setUser(null);
         }
       } else {
+        if (token && !isTokenValid(token)) {
+          // Clear expired token
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
         setUser(null);
       }
       // Always update cart count after loading user
@@ -124,7 +131,7 @@ export default function Navbar() {
             <ShoppingBag className="h-6 w-6 text-[#ffd700]" />
             <div>
               <div className="font-bold text-gray-900 text-base sm:text-lg">Toko Naning</div>
-              <div className="text-[11px] text-gray-500">Grosir Sembako</div>
+              <div className="text-[11px] text-gray-500">Toko Sembako</div>
             </div>
           </Link>
 

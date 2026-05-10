@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatRupiah } from '@/lib/utils';
+import { formatRupiah, isTokenValid } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Package, Loader2, ShoppingCart, Calendar, MapPin, Truck, CheckCircle, Clock, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
@@ -54,7 +54,11 @@ export default function PesananPage() {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
     
-    if (!token || !userStr) {
+    if (!token || !userStr || !isTokenValid(token)) {
+      if (token && !isTokenValid(token)) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
       router.push('/login?redirect=/pesanan');
       return;
     }
@@ -76,7 +80,7 @@ export default function PesananPage() {
             if (paymentStatus === 'success' && !hasShownPaymentNotification) {
               setHasShownPaymentNotification(true);
               setExpandedOrders(prev => new Set(prev).add(orderId));
-              toast.success('✅ Pembayaran Berhasil!', { description: `Pesanan #${orderId} Anda berhasil dibayar dan sedang diproses.` });
+              toast.success('Pembayaran Berhasil!', { description: `Pesanan #${orderId} Anda berhasil dibayar dan sedang diproses.` });
             }
             
             const scrollToOrder = () => {

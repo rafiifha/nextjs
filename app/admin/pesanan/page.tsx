@@ -556,7 +556,6 @@ export default function ManajemenPesananPage() {
                     </Button>
                   )}
                   {selectedOrder.status === 'shipped' && <Button className="flex-1 bg-purple-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}>Set Terkirim</Button>}
-                  {(selectedOrder.status === 'pending' || selectedOrder.status === 'paid') && <Button className="flex-1 bg-red-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'cancelled')}>Batalkan</Button>}
                 </div>
               </div>
             </div>

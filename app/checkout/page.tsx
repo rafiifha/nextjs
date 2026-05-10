@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
 import { ShoppingCart, Plus, Minus, Trash2, Loader2, Package, MapPin, Truck } from 'lucide-react';
 import { cartService } from '@/lib/cart';
+import { isTokenValid } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const MapPicker = dynamic(() => import('@/components/map-picker'), { ssr: false });
@@ -84,7 +85,11 @@ export default function CheckoutPage() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
-    if (!token || !userStr) {
+    if (!token || !userStr || !isTokenValid(token)) {
+      if (token && !isTokenValid(token)) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
       router.push('/login?redirect=/checkout');
       return;
     }

@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Toko Naning - Grosir Sembako Terpercaya",
-  description: "Supplier sembako terpercaya dengan harga grosir terbaik",
+  title: "Toko Naning - Toko Sembako Terpercaya",
+  description: "Toko sembako terpercaya dengan harga terjangkau",
 };
 
 export default function RootLayout({

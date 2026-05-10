@@ -13,3 +13,16 @@ export function formatRupiah(amount: number): string {
   }).format(amount);
 }
 
+export function isTokenValid(token: string | null): boolean {
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+

@@ -65,9 +65,9 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     window.dispatchEvent(new Event('cartUpdated'));
 
     if (quantity === 0) {
-      toast.info('🗑️ Produk Dihapus', { description: 'Produk telah dihapus dari keranjang' });
+      toast.info('Produk Dihapus', { description: 'Produk telah dihapus dari keranjang' });
     } else {
-      toast.success('✅ Jumlah Diperbarui', { description: `Jumlah produk telah diubah menjadi ${quantity}` });
+      toast.success('Jumlah Diperbarui', { description: `Jumlah produk telah diubah menjadi ${quantity}` });
     }
   };
 
@@ -86,7 +86,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     setCart(newCart);
     window.dispatchEvent(new Event('cartUpdated'));
 
-    toast.info('🗑️ Produk Dihapus', { description: 'Produk telah dihapus dari keranjang' });
+    toast.info('Produk Dihapus', { description: 'Produk telah dihapus dari keranjang' });
   };
 
   const getTotalPrice = () => {

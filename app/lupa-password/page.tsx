@@ -59,7 +59,7 @@ export default function LupaPasswordPage() {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-gray-900">Lupa Password</CardTitle>
             <CardDescription className="text-gray-600">
-              Masukkan Email atau Nomor WhatsApp Anda untuk mereset password.
+              Masukkan Nomor WhatsApp Anda untuk mereset password.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -68,8 +68,7 @@ export default function LupaPasswordPage() {
                 <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
                 <h3 className="text-xl font-bold text-gray-900">Berhasil!</h3>
                 <p className="text-gray-600 text-sm">
-                  Password baru Anda telah dikirim. Silakan cek WhatsApp Anda. 
-                  Jika Anda hanya mendaftarkan email, hubungi Admin.
+                  Password baru Anda telah dikirim. Silakan cek WhatsApp Anda.
                 </p>
                 <Link href="/login">
                   <Button className="w-full mt-4 bg-[#ffd700] text-black hover:bg-[#e6c200]">
@@ -80,7 +79,7 @@ export default function LupaPasswordPage() {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="identifier">Email / Nomor WhatsApp</Label>
+                  <Label htmlFor="identifier">Nomor WhatsApp</Label>
                   <Input
                     id="identifier"
                     type="text"

@@ -17,6 +17,7 @@ import {
   Users
 } from 'lucide-react';
 import { cartService } from '@/lib/cart';
+import { isTokenValid } from '@/lib/utils';
 
 export default function AdminLayout({
   children,
@@ -32,7 +33,11 @@ export default function AdminLayout({
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
 
-    if (!token || !userStr) {
+    if (!token || !userStr || !isTokenValid(token)) {
+      if (token && !isTokenValid(token)) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
       router.push('/login');
       return;
     }
@@ -65,7 +70,7 @@ export default function AdminLayout({
   };
 
   const adminMenuItems = [
-    { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/dashboard', label: 'Laporan', icon: BarChart3 },
     { href: '/admin/produk', label: 'Manajemen Produk', icon: Package },
     { href: '/admin/pegawai', label: 'Kelola Pegawai', icon: Users },
   ];
