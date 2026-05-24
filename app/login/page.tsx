@@ -16,6 +16,11 @@ export default function LoginPage() {
     if (typeof window === 'undefined') return '/';
     return new URLSearchParams(window.location.search).get('redirect') || '/';
   });
+  const [successMessage] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('registered') === 'true' ? 'Registrasi berhasil! Silakan login dengan akun baru Anda.' : '';
+  });
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -108,6 +113,12 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {successMessage && (
+              <div className="p-3 mb-2 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">
+                {successMessage}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="identifier">Email / Nomor WhatsApp</Label>

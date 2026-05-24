@@ -158,7 +158,7 @@ export async function sendCourierDeliveryNotification(phone: string, orderData: 
 Pelanggan: ${orderData.customerName} (${orderData.customerPhone})
 Alamat: ${orderData.shippingAddress}
 
-📦 Barang:
+📦 Produk:
 ${itemsText}
 
 📝 Catatan: ${orderData.shippingNotes || '-'}`;

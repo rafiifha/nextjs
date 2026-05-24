@@ -820,7 +820,7 @@ export default function KasirPage() {
 
               {/* Footer */}
               <div className="text-center text-xs text-gray-500 border-t pt-4 mt-4">
-                <p>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
+                <p>Produk yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
                 <p className="mt-2">Terima Kasih</p>
               </div>
 

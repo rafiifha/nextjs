@@ -48,7 +48,7 @@ export default function Home() {
                     <div className="mt-0.5 rounded-md bg-yellow-100 p-2"><Package className="h-4 w-4 text-yellow-700" /></div>
                     <div>
                       <p className="font-medium text-gray-900">Pilih produk</p>
-                      <p className="text-sm text-gray-600">Cari barang yang dibutuhkan di katalog.</p>
+                      <p className="text-sm text-gray-600">Cari produk yang dibutuhkan di katalog.</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
