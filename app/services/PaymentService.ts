@@ -80,24 +80,22 @@ export class PaymentService {
       console.error('Pusher error:', pusherErr);
     }
 
-    try {
-      await sendReceipt(order.customerPhone, {
-        orderId: order.id,
-        customerName: order.customerName,
-        totalHarga: order.totalHarga,
-        shippingFee: order.shippingFee,
-        status: 'paid',
-        items: order.items.map(item => ({
-          name: item.product.name,
-          quantity: item.quantity,
-          price: item.price * item.quantity,
-        })),
-        createdAt: order.createdAt.toISOString(),
-      });
-      console.log(`📱 Invoice WhatsApp berhasil dikirim ke ${order.customerPhone}`);
-    } catch (waErr) {
-      console.error('❌ Gagal kirim WhatsApp invoice:', waErr);
-    }
+    // Kirim WhatsApp secara async agar tidak menghambat response webhook
+    sendReceipt(order.customerPhone, {
+      orderId: order.id,
+      customerName: order.customerName,
+      totalHarga: order.totalHarga,
+      shippingFee: order.shippingFee,
+      status: 'paid',
+      items: order.items.map(item => ({
+        name: item.product.name,
+        quantity: item.quantity,
+        price: item.price * item.quantity,
+      })),
+      createdAt: order.createdAt.toISOString(),
+    })
+      .then(() => console.log(`📱 Invoice WhatsApp berhasil dikirim ke ${order.customerPhone}`))
+      .catch((waErr) => console.error('❌ Gagal kirim WhatsApp invoice:', waErr));
 
     return { success: true, message: 'Pesanan berhasil diupdate dan invoice dikirim' };
   }

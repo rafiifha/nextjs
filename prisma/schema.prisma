@@ -53,6 +53,8 @@ model Order {
   id            Int         @id @default(autoincrement())
   customerName  String
   customerPhone String
+  userId        Int?        // FK ke User yang membuat pesanan
+  user          User?       @relation(fields: [userId], references: [id])
   status        String      @default("pending") // pending, paid, processing, shipped, delivered, cancelled, expired
   totalHarga    Int
   discount      Int?        @default(0) // Diskon dalam rupiah
@@ -102,6 +104,7 @@ model User {
   password  String
   role      String   @default("admin")
   createdAt DateTime @default(now())
+  orders    Order[]
 }
 
 

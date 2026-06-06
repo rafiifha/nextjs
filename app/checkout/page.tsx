@@ -8,12 +8,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
-import { ShoppingCart, Plus, Minus, Trash2, Loader2, Package, MapPin, Truck } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Loader2, Package, MapPin, Truck, Search } from 'lucide-react';
 import { cartService } from '@/lib/cart';
 import { isTokenValid } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const MapPicker = dynamic(() => import('@/components/map-picker'), { ssr: false });
+
+// Debounce helper
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 interface Product {
   id: number;
@@ -62,6 +72,74 @@ export default function CheckoutPage() {
   const [shippingDistance, setShippingDistance] = useState<number | null>(null);
   const [shippingZone, setShippingZone] = useState<number | null>(null);
   const [deliveryOutOfRange, setDeliveryOutOfRange] = useState(false);
+
+  // Address search
+  const [addressQuery, setAddressQuery] = useState('');
+  const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  const [searchingAddress, setSearchingAddress] = useState(false);
+  const [flyToPosition, setFlyToPosition] = useState<[number, number] | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const debouncedQuery = useDebounce(addressQuery, 500);
+
+  // Auto-search when typing address
+  useEffect(() => {
+    if (debouncedQuery.length < 3 || deliveryMethod !== 'delivery') {
+      setAddressSuggestions([]);
+      return;
+    }
+    const searchAddress = async () => {
+      setSearchingAddress(true);
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(debouncedQuery)}&countrycodes=id&limit=5`);
+        if (res.ok) {
+          const data = await res.json();
+          setAddressSuggestions(data);
+          setShowSuggestions(data.length > 0);
+        }
+      } catch {
+        // silent fail
+      } finally {
+        setSearchingAddress(false);
+      }
+    };
+    searchAddress();
+  }, [debouncedQuery, deliveryMethod]);
+
+  const selectAddressSuggestion = async (suggestion: { display_name: string; lat: string; lon: string }) => {
+    const lat = parseFloat(suggestion.lat);
+    const lng = parseFloat(suggestion.lon);
+    setAddressQuery(suggestion.display_name);
+    setDestinationAddress(suggestion.display_name);
+    setShippingLat(lat);
+    setShippingLng(lng);
+    setFlyToPosition([lat, lng]);
+    setShowSuggestions(false);
+    setAddressSuggestions([]);
+
+    // Calculate delivery fee
+    try {
+      const res = await fetch('/api/delivery/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lng }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDeliveryOutOfRange(true);
+        setShippingDistance(null);
+        setShippingZone(null);
+        setShippingFee(0);
+        toast.error('Lokasi Di Luar Jangkauan', { description: data.error || 'Maksimal 10km' });
+        return;
+      }
+      setDeliveryOutOfRange(false);
+      setShippingDistance(data.distanceKm);
+      setShippingZone(data.zone);
+      setShippingFee(data.shippingFee);
+    } catch {
+      toast.error('Gagal', { description: 'Coba pilih lokasi lagi.' });
+    }
+  };
 
   // Payment info
   const [paymentMethod, setPaymentMethod] = useState<string>('tunai');
@@ -214,7 +292,10 @@ export default function CheckoutPage() {
 
       const orderResponse = await fetch('/api/pesanan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
         body: JSON.stringify(orderPayload),
       });
 
@@ -318,17 +399,57 @@ export default function CheckoutPage() {
                       <strong>Informasi:</strong> Pengiriman pesanan hanya akan dilakukan pada pukul <strong>11:00 - 15:00</strong> dan maksimal jarak pengiriman <strong>10 KM</strong> dari lokasi toko.
                     </div>
                     <div>
+                      <Label>Cari Alamat</Label>
+                      <div className="relative mt-1">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            value={addressQuery}
+                            onChange={(e) => {
+                              setAddressQuery(e.target.value);
+                              setShowSuggestions(true);
+                            }}
+                            onFocus={() => { if (addressSuggestions.length > 0) setShowSuggestions(true); }}
+                            placeholder="Ketik alamat, contoh: Jl. Merdeka No 1..."
+                            className="pl-10 pr-8"
+                          />
+                          {searchingAddress && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                          )}
+                        </div>
+                        {showSuggestions && addressSuggestions.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                            {addressSuggestions.map((item, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-amber-50 border-b border-gray-100 last:border-0 transition-colors"
+                                onClick={() => selectAddressSuggestion(item)}
+                              >
+                                <MapPin className="inline h-3 w-3 mr-1 text-amber-600" />
+                                {item.display_name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Ketik minimal 3 huruf, pilih dari saran, peta otomatis pindah ke lokasi</p>
+                    </div>
+                    <div>
                       <Label>Pilih Lokasi di Peta</Label>
                       <MapPicker
                         onLocationSelect={async (lat, lng) => {
                           setShippingLat(lat);
                           setShippingLng(lng);
+                          setShowSuggestions(false);
+                          setAddressSuggestions([]);
                           try {
                             const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
                             if (geoRes.ok) {
                               const geoData = await geoRes.json();
                               if (geoData && geoData.display_name) {
                                 setDestinationAddress(geoData.display_name);
+                                setAddressQuery(geoData.display_name);
                               }
                             }
                             const res = await fetch('/api/delivery/calculate', {
@@ -354,17 +475,18 @@ export default function CheckoutPage() {
                           }
                         }}
                         initialPosition={shippingLat && shippingLng ? [shippingLat, shippingLng] : undefined}
+                        flyToPosition={flyToPosition}
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         {deliveryOutOfRange
                           ? 'Lokasi di luar jangkauan 10km'
                           : shippingZone
                             ? `Zona ${shippingZone} • Jarak ${shippingDistance}km • Ongkir ${formatRupiah(shippingFee)}`
-                            : 'Klik peta untuk hitung ongkir zona'}
+                            : 'Cari alamat di atas atau klik peta langsung'}
                       </p>
                     </div>
                     <div>
-                      <Label>Alamat Lengkap </Label>
+                      <Label>Alamat Lengkap</Label>
                       <Input value={destinationAddress} onChange={(e) => setDestinationAddress(e.target.value)} placeholder="Jl. Raya No 1..." className="mt-1" required />
                     </div>
                     <div>

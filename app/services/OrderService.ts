@@ -4,8 +4,9 @@ import { sendOrderNotification, sendCourierDeliveryNotification, sendCustomerShi
 import { pakasirService } from '@/services/pakasirService';
 
 export class OrderService {
-  async getAllOrders() {
+  async getOrdersByCustomer(userId: number) {
     const orders = await prisma.order.findMany({
+      where: { userId },
       include: {
         items: {
           include: {
@@ -20,7 +21,7 @@ export class OrderService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    
+
     return orders.map(order => {
       try {
         return {
@@ -82,6 +83,200 @@ export class OrderService {
     }).filter(order => order !== null);
   }
 
+  async getOrdersByCustomerPaginated(userId: number, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where: { userId },
+        include: {
+          items: {
+            include: {
+              product: {
+                include: {
+                  category: true,
+                },
+              },
+              variant: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.order.count({ where: { userId } }),
+    ]);
+
+    const data = orders.map(order => {
+      try {
+        return {
+          id: order.id,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          status: order.status,
+          totalHarga: order.totalHarga,
+          discount: order.discount ?? null,
+          cashReceived: order.cashReceived ?? null,
+          change: order.change ?? null,
+          deliveryMethod: order.deliveryMethod ?? null,
+          shippingFee: order.shippingFee ?? null,
+          shippingAddress: order.shippingAddress ?? null,
+          shippingLat: order.shippingLat ?? null,
+          shippingLng: order.shippingLng ?? null,
+          shippingDistance: order.shippingDistance ?? null,
+          shippingZone: order.shippingZone ?? null,
+          shippingNotes: order.shippingNotes ?? null,
+          courierId: order.courierId ?? null,
+          shippedAt: order.shippedAt ? order.shippedAt.toISOString() : null,
+          deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
+          paymentMethod: order.paymentMethod ?? null,
+          paymentNumber: order.paymentNumber ?? null,
+          paymentFee: order.paymentFee ?? null,
+          expiredAt: order.expiredAt ? order.expiredAt.toISOString() : null,
+          createdAt: order.createdAt.toISOString(),
+          updatedAt: order.updatedAt.toISOString(),
+          items: order.items.map(item => ({
+            id: item.id,
+            orderId: item.orderId,
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            priceType: item.priceType ?? 'dus',
+            quantity: item.quantity,
+            price: item.price,
+            product: {
+              id: item.product.id,
+              name: item.product.name,
+              categoryId: item.product.categoryId,
+              category: item.product.category ? {
+                id: item.product.category.id,
+                name: item.product.category.name,
+              } : null,
+            },
+            variant: item.variant ? {
+              id: item.variant.id,
+              productId: item.variant.productId,
+              priceType: item.variant.priceType,
+              price: item.variant.price,
+              stock: item.variant.stock,
+            } : null,
+          })),
+        };
+      } catch (itemError) {
+        console.error('Error normalizing order:', order.id, itemError);
+        return null;
+      }
+    }).filter(order => order !== null);
+
+    return { data, total };
+  }
+
+  async getAllOrders(options?: { page?: number; limit?: number; search?: string; status?: string }) {
+    const page = options?.page || 1;
+    const limit = options?.limit || 10;
+    const skip = (page - 1) * limit;
+    const search = options?.search || '';
+    const status = options?.status || '';
+
+    const where: any = {};
+
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+
+    if (search) {
+      where.OR = [
+        { customerName: { contains: search, mode: 'insensitive' } },
+        { customerPhone: { contains: search } },
+        ...(isNaN(Number(search)) ? [] : [{ id: Number(search) }]),
+      ];
+    }
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          items: {
+            include: {
+              product: {
+                include: {
+                  category: true,
+                },
+              },
+              variant: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.order.count({ where }),
+    ]);
+    
+    const data = orders.map(order => {
+      try {
+        return {
+          id: order.id,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          status: order.status,
+          totalHarga: order.totalHarga,
+          discount: order.discount ?? null,
+          cashReceived: order.cashReceived ?? null,
+          change: order.change ?? null,
+          deliveryMethod: order.deliveryMethod ?? null,
+          shippingFee: order.shippingFee ?? null,
+          shippingAddress: order.shippingAddress ?? null,
+          shippingLat: order.shippingLat ?? null,
+          shippingLng: order.shippingLng ?? null,
+          shippingDistance: order.shippingDistance ?? null,
+          shippingZone: order.shippingZone ?? null,
+          shippingNotes: order.shippingNotes ?? null,
+          courierId: order.courierId ?? null,
+          shippedAt: order.shippedAt ? order.shippedAt.toISOString() : null,
+          deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
+          paymentMethod: order.paymentMethod ?? null,
+          paymentNumber: order.paymentNumber ?? null,
+          paymentFee: order.paymentFee ?? null,
+          expiredAt: order.expiredAt ? order.expiredAt.toISOString() : null,
+          createdAt: order.createdAt.toISOString(),
+          updatedAt: order.updatedAt.toISOString(),
+          items: order.items.map(item => ({
+            id: item.id,
+            orderId: item.orderId,
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            priceType: item.priceType ?? 'dus',
+            quantity: item.quantity,
+            price: item.price,
+            product: {
+              id: item.product.id,
+              name: item.product.name,
+              categoryId: item.product.categoryId,
+              category: item.product.category ? {
+                id: item.product.category.id,
+                name: item.product.category.name,
+              } : null,
+            },
+            variant: item.variant ? {
+              id: item.variant.id,
+              productId: item.variant.productId,
+              priceType: item.variant.priceType,
+              price: item.variant.price,
+              stock: item.variant.stock,
+            } : null,
+          })),
+        };
+      } catch (itemError) {
+        console.error('Error normalizing order:', order.id, itemError);
+        return null;
+      }
+    }).filter(order => order !== null);
+
+    return { orders: data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
   async getOrderById(id: number) {
     const order = await prisma.order.findUnique({
       where: { id },
@@ -105,6 +300,7 @@ export class OrderService {
     const {
       customerName,
       customerPhone,
+      userId,
       items,
       deliveryMethod,
       shippingFee,
@@ -175,6 +371,7 @@ export class OrderService {
       data: {
         customerName,
         customerPhone,
+        userId: userId || null,
         totalHarga,
         deliveryMethod: deliveryMethod || null,
         shippingFee: shippingFee || null,
@@ -248,21 +445,20 @@ export class OrderService {
       console.error('Pusher error:', error);
     }
 
-    try {
-      await sendOrderNotification(customerPhone, {
-        orderId: order.id,
-        customerName,
-        totalHarga,
-        shippingFee: shippingFee || null,
-        items: order.items.map(item => ({
-          name: item.product.name,
-          quantity: item.quantity,
-          price: item.price * item.quantity,
-        })),
-      });
-    } catch (error) {
+    // Kirim WhatsApp secara async agar tidak menghambat response API
+    sendOrderNotification(customerPhone, {
+      orderId: order.id,
+      customerName,
+      totalHarga,
+      shippingFee: shippingFee || null,
+      items: order.items.map(item => ({
+        name: item.product.name,
+        quantity: item.quantity,
+        price: item.price * item.quantity,
+      })),
+    }).catch((error) => {
       console.error('WhatsApp error:', error);
-    }
+    });
 
     return updatedOrder;
   }
@@ -344,33 +540,30 @@ export class OrderService {
     }
 
     if (status === 'shipped' && order.courier) {
-      try {
-        await sendCourierDeliveryNotification(order.courier.phone, {
-          orderId: order.id,
-          customerName: order.customerName,
-          customerPhone: order.customerPhone,
-          shippingAddress: order.shippingAddress || '-',
-          shippingNotes: order.shippingNotes || '-',
-          items: order.items.map((item) => ({
-            name: item.product.name,
-            quantity: item.quantity,
-          })),
-        });
-      } catch (waError) {
+      // Kirim WhatsApp secara async
+      sendCourierDeliveryNotification(order.courier.phone, {
+        orderId: order.id,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        shippingAddress: order.shippingAddress || '-',
+        shippingNotes: order.shippingNotes || '-',
+        items: order.items.map((item) => ({
+          name: item.product.name,
+          quantity: item.quantity,
+        })),
+      }).catch((waError) => {
         console.error('Courier WhatsApp error:', waError);
-      }
+      });
 
-      try {
-        await sendCustomerShippingNotification(order.customerPhone, {
-          orderId: order.id,
-          customerName: order.customerName,
-          shippingAddress: order.shippingAddress || '-',
-          courierName: order.courier.name,
-          courierPhone: order.courier.phone,
-        });
-      } catch (waError) {
+      sendCustomerShippingNotification(order.customerPhone, {
+        orderId: order.id,
+        customerName: order.customerName,
+        shippingAddress: order.shippingAddress || '-',
+        courierName: order.courier.name,
+        courierPhone: order.courier.phone,
+      }).catch((waError) => {
         console.error('Customer WhatsApp shipped error:', waError);
-      }
+      });
     }
 
     return order;

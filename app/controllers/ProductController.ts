@@ -8,8 +8,28 @@ export class ProductController {
     this.productService = new ProductService();
   }
 
-  async getProducts() {
+  async getProducts(request: NextRequest) {
     try {
+      const { searchParams } = new URL(request.url);
+      const page = searchParams.get('page');
+      const limit = parseInt(searchParams.get('limit') || '10');
+
+      // If page param present, return paginated response
+      if (page) {
+        const pageNum = parseInt(page);
+        if (isNaN(pageNum) || pageNum < 1) {
+          return NextResponse.json({ error: 'Parameter page tidak valid' }, { status: 400 });
+        }
+        const result = await this.productService.getProductsPaginated(pageNum, limit);
+        return NextResponse.json({
+          data: result.data,
+          total: result.total,
+          page: pageNum,
+          totalPages: Math.ceil(result.total / limit),
+        });
+      }
+
+      // No page param - return all products (backward compat for kasir/checkout)
       const products = await this.productService.getAllProducts();
       return NextResponse.json(products);
     } catch (error) {

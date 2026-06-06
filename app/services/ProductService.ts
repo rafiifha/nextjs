@@ -13,6 +13,36 @@ export class ProductService {
     });
   }
 
+  async getProductsPaginated(page: number, limit: number, search?: string) {
+    const where: any = {};
+    if (search) {
+      where.name = { contains: search, mode: 'insensitive' };
+    }
+
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        include: {
+          category: true,
+          variants: {
+            orderBy: { priceType: 'asc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.product.count({ where }),
+    ]);
+
+    return {
+      data: products,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async getProductById(id: number) {
     return await prisma.product.findUnique({
       where: { id },

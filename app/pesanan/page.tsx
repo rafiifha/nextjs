@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah, isTokenValid } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Package, Loader2, ShoppingCart, Calendar, MapPin, Truck, CheckCircle, Clock, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, Loader2, ShoppingCart, Calendar, MapPin, Truck, CheckCircle, Clock, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 interface OrderItem {
@@ -49,6 +49,10 @@ export default function PesananPage() {
   const [highlightOrderId, setHighlightOrderId] = useState<number | null>(null);
   const [hasShownPaymentNotification, setHasShownPaymentNotification] = useState(false);
   const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -114,39 +118,53 @@ export default function PesananPage() {
     return () => clearInterval(interval);
   }, [orders, isAuthenticated]);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (page?: number) => {
     try {
-      const userStr = localStorage.getItem('user');
-      const currentUser = userStr ? JSON.parse(userStr) : user;
       const token = localStorage.getItem('token');
+      const p = page ?? currentPage;
       
-      const res = await fetch('/api/pesanan', {
+      const res = await fetch(`/api/pesanan?page=${p}&limit=${ITEMS_PER_PAGE}&t=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` },
+        cache: 'no-store'
       });
       
       if (res.ok) {
         const data = await res.json();
-        if (currentUser?.role !== 'admin') {
-          const normalize = (str: string | null | undefined) => {
-            if (!str) return '';
-            return str.toString().trim().toLowerCase().replace(/\s+/g, '');
-          };
-          const userPhone = normalize(currentUser?.phone);
-          const userEmail = normalize(currentUser?.email);
-          
-          const filtered = Array.isArray(data) ? data.filter((order: Order) => {
-            const orderPhone = normalize(order.customerPhone);
-            return orderPhone === userPhone || orderPhone === userEmail || 
-                   (userPhone && orderPhone.includes(userPhone)) ||
-                   (userEmail && orderPhone.includes(userEmail));
-          }) : [];
-          setOrders(filtered);
-          return filtered;
-        } else {
-          const ordersData = Array.isArray(data) ? data : [];
-          setOrders(ordersData);
-          return ordersData;
+        if (data && !Array.isArray(data) && data.data) {
+          const newOrders = data.data;
+          setOrders(prevOrders => {
+            if (prevOrders && prevOrders.length > 0) {
+              newOrders.forEach((newOrder: Order) => {
+                const prevOrder = prevOrders.find(o => o.id === newOrder.id);
+                if (prevOrder && prevOrder.status === 'pending' && (newOrder.status === 'paid' || newOrder.status === 'processing')) {
+                  toast.success('Pembayaran Berhasil!', {
+                    description: `Pesanan #${newOrder.id} Anda berhasil dibayar dan sedang diproses.`
+                  });
+                }
+              });
+            }
+            return newOrders;
+          });
+          setTotalPages(data.totalPages || 1);
+          setTotalOrders(data.total || 0);
+          setCurrentPage(data.page || 1);
+          return data.data;
         }
+        const ordersData = Array.isArray(data) ? data : [];
+        setOrders(prevOrders => {
+          if (prevOrders && prevOrders.length > 0) {
+            ordersData.forEach((newOrder: Order) => {
+              const prevOrder = prevOrders.find(o => o.id === newOrder.id);
+              if (prevOrder && prevOrder.status === 'pending' && (newOrder.status === 'paid' || newOrder.status === 'processing')) {
+                toast.success('Pembayaran Berhasil!', {
+                  description: `Pesanan #${newOrder.id} Anda berhasil dibayar dan sedang diproses.`
+                });
+              }
+            });
+          }
+          return ordersData;
+        });
+        return ordersData;
       } else {
         toast.error('Gagal Memuat Pesanan', { description: 'Terjadi kesalahan saat memuat data.' });
         return [];
@@ -157,6 +175,29 @@ export default function PesananPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    fetchOrders(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('...');
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (currentPage < totalPages - 2) pages.push('...');
+      pages.push(totalPages);
+    }
+    return pages;
   };
 
   const getStatusBadge = (status: string) => {
@@ -209,6 +250,7 @@ export default function PesananPage() {
         </div>
 
         {orders.length > 0 ? (
+          <>
           <div className="space-y-3">
             {orders.map((order) => {
               const isExpanded = expandedOrders.has(order.id);
@@ -323,6 +365,47 @@ export default function PesananPage() {
               );
             })}
           </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage <= 1}
+                  className="border-gray-300"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Sebelumnya
+                </Button>
+                <div className="flex items-center gap-1">
+                  {getPageNumbers().map((p, idx) =>
+                    typeof p === 'string' ? (
+                      <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">...</span>
+                    ) : (
+                      <Button
+                        key={p}
+                        variant={currentPage === p ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => handlePageChange(p)}
+                        className={currentPage === p ? 'bg-[#ffd700] text-gray-900 hover:bg-[#e6c200] border-[#ffd700]' : 'border-gray-300'}
+                      >
+                        {p}
+                      </Button>
+                    )
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage >= totalPages}
+                  className="border-gray-300"
+                >
+                  Selanjutnya <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           <Card className="border-gray-200 shadow-md">
             <CardContent className="pt-12 pb-12 text-center">

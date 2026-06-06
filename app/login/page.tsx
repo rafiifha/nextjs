@@ -79,7 +79,7 @@ export default function LoginPage() {
       } else if (data.user.role === 'kasir') {
         router.push('/admin/kasir');
       } else {
-        router.push(redirectUrl);
+        router.push(redirectUrl !== '/' ? redirectUrl : '/produk');
       }
     } catch (err: any) {
       console.error('Login error:', err);

@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, CheckCircle } from 'lucide-react';
+import { Loader2, Copy, CheckCircle, XCircle } from 'lucide-react';
 import { formatRupiah } from '@/lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
+import { toast } from 'sonner';
 
 export default function PaymentInstructionPage() {
   const params = useParams();
@@ -14,25 +15,102 @@ export default function PaymentInstructionPage() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [paymentExpired, setPaymentExpired] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(4);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        const res = await fetch(`/api/pesanan/${params.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setOrder(data);
+  const fetchOrder = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/pesanan/${params.id}?t=${Date.now()}`, {
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOrder(data);
+
+        // Check if payment confirmed
+        if (data.status === 'paid' || data.status === 'processing') {
+          setPaymentConfirmed(true);
+          // Stop polling
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+          toast.success('Pembayaran Berhasil!', {
+            description: `Pesanan #${params.id} telah dikonfirmasi.`,
+          });
         }
-      } catch (error) {
-        console.error('Error fetching order:', error);
-      } finally {
-        setLoading(false);
+
+        // Check if payment expired
+        if (data.status === 'expired' || data.status === 'cancelled') {
+          setPaymentExpired(true);
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+        }
       }
-    };
+    } catch (error) {
+      console.error('Error fetching order:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [params.id]);
+
+  // Initial fetch
+  useEffect(() => {
     if (params.id) {
       fetchOrder();
     }
-  }, [params.id]);
+  }, [params.id, fetchOrder]);
+
+  // Polling every 5s when status is pending
+  useEffect(() => {
+    if (!order || paymentConfirmed || paymentExpired) return;
+    if (order.status !== 'pending') return;
+
+    pollingRef.current = setInterval(() => {
+      fetchOrder();
+    }, 5000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [order, paymentConfirmed, paymentExpired, fetchOrder]);
+
+  // Countdown + redirect after payment confirmed
+  useEffect(() => {
+    if (!paymentConfirmed) return;
+
+    countdownRef.current = setInterval(() => {
+      setRedirectCountdown((prev) => {
+        if (prev <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    };
+  }, [paymentConfirmed]);
+
+  // Handle redirect when countdown reaches 0
+  useEffect(() => {
+    if (paymentConfirmed && redirectCountdown === 0) {
+      router.push(`/pesanan?orderId=${params.id}&payment=success`);
+    }
+  }, [paymentConfirmed, redirectCountdown, params.id, router]);
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -62,6 +140,92 @@ export default function PaymentInstructionPage() {
   const isQris = order.paymentMethod === 'qris';
   const totalPayment = order.totalHarga + (order.paymentFee || 0);
 
+  // Payment confirmed overlay
+  if (paymentConfirmed) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <Card className="max-w-md w-full shadow-2xl border-t-4 border-t-green-500 overflow-hidden">
+          <CardContent className="pt-10 pb-10 text-center space-y-6">
+            {/* Animated checkmark */}
+            <div className="relative mx-auto w-24 h-24">
+              <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-30" />
+              <div className="relative flex items-center justify-center w-24 h-24 bg-green-100 rounded-full">
+                <CheckCircle className="h-14 w-14 text-green-600" strokeWidth={1.5} />
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Pembayaran Berhasil! 🎉</h2>
+              <p className="text-gray-600">
+                Pesanan <span className="font-semibold">#{params.id}</span> telah dikonfirmasi dan sedang diproses.
+              </p>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Total Dibayar</span>
+                <span className="font-bold text-green-700">{formatRupiah(totalPayment)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Metode</span>
+                <span className="font-medium uppercase text-gray-900">{order.paymentMethod.replace('_va', ' Virtual Account')}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Status</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-200 text-green-800 rounded-full text-xs font-medium">
+                  <CheckCircle className="h-3 w-3" /> Lunas
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <p className="text-sm text-gray-500">
+                Mengarahkan ke riwayat pesanan dalam <span className="font-bold text-gray-900">{redirectCountdown}</span> detik...
+              </p>
+              <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-green-500 h-1.5 rounded-full transition-all duration-1000 ease-linear"
+                  style={{ width: `${((4 - redirectCountdown) / 4) * 100}%` }}
+                />
+              </div>
+              <Button
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+                onClick={() => router.push(`/pesanan?orderId=${params.id}&payment=success`)}
+              >
+                Lihat Pesanan Sekarang
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Payment expired overlay
+  if (paymentExpired) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <Card className="max-w-md w-full shadow-2xl border-t-4 border-t-red-500">
+          <CardContent className="pt-10 pb-10 text-center space-y-6">
+            <div className="flex items-center justify-center w-24 h-24 bg-red-100 rounded-full mx-auto">
+              <XCircle className="h-14 w-14 text-red-500" strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Pembayaran Kedaluwarsa</h2>
+              <p className="text-gray-600">Batas waktu pembayaran telah habis. Silakan buat pesanan baru.</p>
+            </div>
+            <Button
+              className="w-full bg-[#ffd700] hover:bg-[#e6c200] text-black font-semibold"
+              onClick={() => router.push('/pesanan')}
+            >
+              Kembali ke Pesanan
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-xl mx-auto">
@@ -80,6 +244,12 @@ export default function PaymentInstructionPage() {
                   {order.expiredAt ? new Date(order.expiredAt).toLocaleString('id-ID') : '-'}
                 </p>
               </div>
+            </div>
+
+            {/* Polling indicator */}
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Menunggu konfirmasi pembayaran...</span>
             </div>
 
             <div className="space-y-4">

@@ -18,6 +18,7 @@ if (typeof window !== 'undefined') {
 interface MapPickerProps {
   onLocationSelect: (lat: number, lng: number) => void;
   initialPosition?: [number, number];
+  flyToPosition?: [number, number] | null;
 }
 
 function LocationMarker({ onLocationSelect, initialPosition }: { onLocationSelect: (lat: number, lng: number) => void; initialPosition?: [number, number] }) {
@@ -64,8 +65,21 @@ function LocationMarker({ onLocationSelect, initialPosition }: { onLocationSelec
 }
 
 
+// Component to fly map to a given position
+function FlyToLocation({ position }: { position: [number, number] | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, 16, { duration: 1.2 });
+    }
+  }, [position, map]);
+
+  return null;
+}
+
 // Component to ensure map is ready before rendering children
-function MapContent({ onLocationSelect, initialPosition }: { onLocationSelect: (lat: number, lng: number) => void; initialPosition?: [number, number] }) {
+function MapContent({ onLocationSelect, initialPosition, flyToPosition }: { onLocationSelect: (lat: number, lng: number) => void; initialPosition?: [number, number]; flyToPosition?: [number, number] | null }) {
   const map = useMap();
   const [isReady, setIsReady] = useState(false);
 
@@ -105,11 +119,12 @@ function MapContent({ onLocationSelect, initialPosition }: { onLocationSelect: (
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <LocationMarker onLocationSelect={onLocationSelect} initialPosition={initialPosition} />
+      <FlyToLocation position={flyToPosition || null} />
     </>
   );
 }
 
-export default function MapPicker({ onLocationSelect, initialPosition }: MapPickerProps) {
+export default function MapPicker({ onLocationSelect, initialPosition, flyToPosition }: MapPickerProps) {
   const [isClient, setIsClient] = useState(false);
   const [mapKey, setMapKey] = useState(0);
 
@@ -139,7 +154,7 @@ export default function MapPicker({ onLocationSelect, initialPosition }: MapPick
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
       >
-        <MapContent onLocationSelect={onLocationSelect} initialPosition={initialPosition} />
+        <MapContent onLocationSelect={onLocationSelect} initialPosition={initialPosition} flyToPosition={flyToPosition} />
       </MapContainer>
       {/* Legend for destination pin only */}
       <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-md text-xs">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OrderService } from '../services/OrderService';
+import { verifyToken } from '@/lib/auth';
 
 export class OrderController {
   private orderService: OrderService;
@@ -8,10 +9,44 @@ export class OrderController {
     this.orderService = new OrderService();
   }
 
-  async getOrders() {
+  async getOrders(request: NextRequest) {
     try {
-      const orders = await this.orderService.getAllOrders();
-      return NextResponse.json(orders);
+      const authHeader = request.headers.get('Authorization');
+      const token = authHeader?.replace('Bearer ', '');
+      
+      let userPayload = null;
+      if (token) {
+        userPayload = verifyToken(token);
+      }
+
+      const { searchParams } = new URL(request.url);
+      const pageParam = searchParams.get('page');
+      const limitParam = searchParams.get('limit');
+
+      // Admin gets all orders, customer gets only their own
+      if (userPayload && userPayload.role !== 'admin') {
+        if (pageParam) {
+          const page = Math.max(1, parseInt(pageParam) || 1);
+          const limit = Math.max(1, Math.min(100, parseInt(limitParam || '10') || 10));
+          const result = await this.orderService.getOrdersByCustomerPaginated(userPayload.userId, page, limit);
+          return NextResponse.json({
+            data: result.data,
+            total: result.total,
+            page,
+            totalPages: Math.ceil(result.total / limit),
+          });
+        }
+        const orders = await this.orderService.getOrdersByCustomer(userPayload.userId);
+        return NextResponse.json(orders);
+      }
+
+      const page = parseInt(searchParams.get('page') || '1');
+      const limit = parseInt(searchParams.get('limit') || '10');
+      const search = searchParams.get('search') || '';
+      const status = searchParams.get('status') || '';
+
+      const result = await this.orderService.getAllOrders({ page, limit, search, status });
+      return NextResponse.json(result);
     } catch (error: any) {
       console.error('Get orders error:', error);
       return NextResponse.json(
@@ -47,6 +82,17 @@ export class OrderController {
   async createOrder(request: NextRequest) {
     try {
       const body = await request.json();
+      
+      // Extract userId from JWT token
+      const authHeader = request.headers.get('Authorization');
+      const token = authHeader?.replace('Bearer ', '');
+      if (token) {
+        const userPayload = verifyToken(token);
+        if (userPayload) {
+          body.userId = userPayload.userId;
+        }
+      }
+      
       const order = await this.orderService.createOrder(body);
       return NextResponse.json(order, { status: 201 });
     } catch (error: any) {

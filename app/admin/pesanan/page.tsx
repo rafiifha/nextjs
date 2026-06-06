@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -62,40 +62,64 @@ export default function ManajemenPesananPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const ITEMS_PER_PAGE = 10;
 
-  useEffect(() => {
-    fetchOrders();
-    fetchCouriers();
-  }, []);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async (page?: number, search?: string, status?: string) => {
     try {
-      const res = await fetch('/api/pesanan');
+      setLoading(true);
+      const p = page ?? currentPage;
+      const s = search ?? searchQuery;
+      const st = status ?? statusFilter;
+      const params = new URLSearchParams({
+        page: String(p),
+        limit: String(ITEMS_PER_PAGE),
+        search: s,
+        status: st,
+      });
+      const res = await fetch(`/api/pesanan?${params}`);
       if (res.ok) {
         const data = await res.json();
-        const ordersData = Array.isArray(data) ? data : [];
-        const normalizedOrders = ordersData.map((order: any) => ({
-          ...order,
-          discount: order.discount || null,
-          cashReceived: order.cashReceived || null,
-          change: order.change || null,
-          paymentMethod: order.paymentMethod || null,
-          paymentNumber: order.paymentNumber || null,
-          expiredAt: order.expiredAt || null,
-          items: order.items?.map((item: any) => ({
-            ...item,
-            priceType: item.priceType || 'dus',
-            variant: item.variant || null,
-          })) || [],
-        }));
-        setOrders(normalizedOrders);
+        if (data.orders) {
+          const normalizedOrders = data.orders.map((order: any) => ({
+            ...order,
+            discount: order.discount || null,
+            cashReceived: order.cashReceived || null,
+            change: order.change || null,
+            paymentMethod: order.paymentMethod || null,
+            paymentNumber: order.paymentNumber || null,
+            expiredAt: order.expiredAt || null,
+            items: order.items?.map((item: any) => ({
+              ...item,
+              priceType: item.priceType || 'dus',
+              variant: item.variant || null,
+            })) || [],
+          }));
+          setOrders(normalizedOrders);
+          setTotalPages(data.totalPages || 1);
+          setTotalOrders(data.total || 0);
+          setCurrentPage(data.page || 1);
+        } else {
+          // Fallback for non-paginated response (e.g. customer endpoint)
+          const ordersData = Array.isArray(data) ? data : [];
+          setOrders(ordersData);
+          setTotalPages(1);
+        }
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, searchQuery, statusFilter]);
+
+  useEffect(() => {
+    fetchOrders();
+    fetchCouriers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchCouriers = async () => {
     try {
@@ -121,7 +145,15 @@ export default function ManajemenPesananPage() {
 
       if (res.ok) {
         await fetchOrders();
-        const updatedOrders = await fetch('/api/pesanan').then(r => r.json());
+        const params = new URLSearchParams({
+          page: String(currentPage),
+          limit: String(ITEMS_PER_PAGE),
+          search: searchQuery,
+          status: statusFilter,
+        });
+        const updatedRes = await fetch(`/api/pesanan?${params}`);
+        const updatedData = await updatedRes.json();
+        const updatedOrders = updatedData.orders || updatedData;
         const updatedOrder = updatedOrders.find((o: Order) => o.id === orderId);
         if (updatedOrder && selectedOrder && selectedOrder.id === orderId) {
           setSelectedOrder(updatedOrder);
@@ -186,7 +218,15 @@ export default function ManajemenPesananPage() {
 
         if (res.ok) {
           await fetchOrders();
-          const updatedOrders = await fetch('/api/pesanan').then(r => r.json());
+          const params = new URLSearchParams({
+            page: String(currentPage),
+            limit: String(ITEMS_PER_PAGE),
+            search: searchQuery,
+            status: statusFilter,
+          });
+          const updatedRes = await fetch(`/api/pesanan?${params}`);
+          const updatedData = await updatedRes.json();
+          const updatedOrders = updatedData.orders || updatedData;
           const updatedOrder = updatedOrders.find((o: Order) => o.id === order.id);
           if (updatedOrder) {
             setSelectedOrder(updatedOrder);
@@ -295,14 +335,39 @@ export default function ManajemenPesananPage() {
     setTimeout(() => { printWindow.print(); }, 250);
   };
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerPhone.includes(searchQuery) ||
-      order.id.toString().includes(searchQuery);
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+    fetchOrders(1, value, statusFilter);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
+    setCurrentPage(1);
+    fetchOrders(1, searchQuery, value);
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    fetchOrders(page, searchQuery, statusFilter);
+  };
+
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('...');
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (currentPage < totalPages - 2) pages.push('...');
+      pages.push(totalPages);
+    }
+    return pages;
+  };
 
   return (
     <div className="p-6">
@@ -319,11 +384,11 @@ export default function ManajemenPesananPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <Input placeholder="Cari nama, telepon, atau ID pesanan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+                  <Input placeholder="Cari nama, telepon, atau ID pesanan..." value={searchQuery} onChange={(e) => handleSearchChange(e.target.value)} className="pl-10" />
                 </div>
                 <div className="relative">
                   <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full h-10 pl-10 pr-4 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ffd700]">
+                  <select value={statusFilter} onChange={(e) => handleStatusChange(e.target.value)} className="w-full h-10 pl-10 pr-4 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#ffd700]">
                     <option value="all">Semua Status</option>
                     <option value="pending">Menunggu Pembayaran</option>
                     <option value="paid">Sudah Dibayar</option>
@@ -341,9 +406,9 @@ export default function ManajemenPesananPage() {
                   <Loader2 className="h-8 w-8 animate-spin text-[#ffd700] mx-auto mb-4" />
                   <p className="text-sm text-gray-500">Memuat data pesanan...</p>
                 </div>
-              ) : filteredOrders.length > 0 ? (
+              ) : orders.length > 0 ? (
                 <div className="space-y-4">
-                  {filteredOrders.map((order) => (
+                  {orders.map((order) => (
                     <Card
                       key={order.id}
                       className={`cursor-pointer transition-all duration-200 hover:shadow-md border ${
@@ -389,6 +454,48 @@ export default function ManajemenPesananPage() {
                       </CardContent>
                     </Card>
                   ))}
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                      <p className="text-sm text-gray-600">
+                        Halaman {currentPage} dari {totalPages} ({totalOrders} pesanan)
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          className="px-3 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Previous
+                        </button>
+                        {getPageNumbers().map((pageNum, idx) =>
+                          pageNum === '...' ? (
+                            <span key={`ellipsis-${idx}`} className="px-2 py-2 text-sm text-gray-500">...</span>
+                          ) : (
+                            <button
+                              key={pageNum}
+                              onClick={() => handlePageChange(pageNum as number)}
+                              className={`px-3 py-2 text-sm font-medium rounded-md border transition-colors ${
+                                currentPage === pageNum
+                                  ? 'bg-[#ffd700] border-[#ffd700] text-gray-900 font-bold'
+                                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          )
+                        )}
+                        <button
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500">Tidak ada pesanan ditemukan</div>

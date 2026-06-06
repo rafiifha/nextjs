@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatRupiah } from '@/lib/utils';
-import { Package, Search, Loader2, Check } from 'lucide-react';
+import { Package, Search, Loader2, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { cartService } from '@/lib/cart';
 import { toast } from 'sonner';
@@ -46,6 +46,10 @@ export default function ProdukPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [addingToCart, setAddingToCart] = useState<{ [key: string]: boolean }>({});
   const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<number, number>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -57,7 +61,6 @@ export default function ProdukPage() {
       }
     }
     loadCart();
-    fetchProducts();
 
     // Listen for cart updates
     const handleCartUpdate = () => {
@@ -67,6 +70,15 @@ export default function ProdukPage() {
     window.addEventListener('cartUpdated', handleCartUpdate);
     return () => window.removeEventListener('cartUpdated', handleCartUpdate);
   }, []);
+
+  useEffect(() => {
+    fetchProducts(currentPage, searchQuery);
+  }, [currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchProducts(1, searchQuery);
+  }, [searchQuery]);
 
   const loadCart = () => {
     const cartData = cartService.getCart();
@@ -124,13 +136,18 @@ export default function ProdukPage() {
     return cart.some(item => item.productId === productId && item.priceType === priceType);
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (page: number, search: string) => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/produk');
+      const params = new URLSearchParams({ page: String(page), limit: String(ITEMS_PER_PAGE) });
+      if (search) params.set('search', search);
+      const res = await fetch(`/api/produk?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        const productsData = Array.isArray(data) ? data : [];
+        const productsData = Array.isArray(data.data) ? data.data : [];
         setProducts(productsData);
+        setTotalPages(data.totalPages || 1);
+        setTotalProducts(data.total || 0);
         setSelectedVariantByProduct((prev) => {
           const next = { ...prev };
           for (const product of productsData) {
@@ -152,9 +169,21 @@ export default function ProdukPage() {
     }
   };
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('...');
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (currentPage < totalPages - 2) pages.push('...');
+      pages.push(totalPages);
+    }
+    return pages;
+  };
 
   const isAdmin = user?.role === 'admin';
 
@@ -191,9 +220,10 @@ export default function ProdukPage() {
             <Loader2 className="h-8 w-8 animate-spin text-[#ffd700] mb-4" />
             <p className="text-gray-600">Memuat produk...</p>
           </div>
-        ) : filteredProducts.length > 0 ? (
+        ) : products.length > 0 ? (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredProducts.map((product) => (
+            {products.map((product) => (
               <Card
                 key={product.id}
                 className="border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
@@ -286,6 +316,54 @@ export default function ProdukPage() {
               </Card>
             ))}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-8">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 px-3 py-2 text-sm font-medium border border-gray-200 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </button>
+
+              {getPageNumbers().map((pageNum, idx) =>
+                pageNum === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 py-2 text-sm text-gray-500">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum as number)}
+                    className={`px-3 py-2 text-sm font-medium rounded-md border transition-colors ${
+                      currentPage === pageNum
+                        ? 'bg-[#ffd700] border-[#ffd700] text-gray-900'
+                        : 'border-gray-200 hover:bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                )
+              )}
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 px-3 py-2 text-sm font-medium border border-gray-200 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          <p className="text-center text-sm text-gray-500 mt-3">
+            Menampilkan {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} dari {totalProducts} produk
+          </p>
+          </>
         ) : (
           <Card className="border-gray-200">
             <CardContent className="pt-16 pb-16 text-center">
