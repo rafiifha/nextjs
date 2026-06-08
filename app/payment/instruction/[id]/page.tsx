@@ -20,7 +20,7 @@ export default function PaymentInstructionPage() {
   const [redirectCountdown, setRedirectCountdown] = useState(4);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
-  const [retrying, setRetrying] = useState(false);
+
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -202,36 +202,7 @@ export default function PaymentInstructionPage() {
     );
   }
 
-  const handleRetryPayment = async () => {
-    setRetrying(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/pesanan/${params.id}/retry-payment`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success('Transaksi pembayaran baru berhasil dibuat!');
-        setPaymentExpired(false);
-        setLoading(true);
-        await fetchOrder();
-      } else {
-        toast.error('Gagal membuat ulang pembayaran', {
-          description: data.error || 'Terjadi kesalahan.',
-        });
-      }
-    } catch (error: any) {
-      toast.error('Gagal membuat ulang pembayaran', {
-        description: error.message || 'Terjadi kesalahan jaringan.',
-      });
-    } finally {
-      setRetrying(false);
-    }
-  };
+
 
   // Payment expired overlay
   if (paymentExpired) {
@@ -244,26 +215,21 @@ export default function PaymentInstructionPage() {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Pembayaran Kedaluwarsa</h2>
-              <p className="text-gray-600">Batas waktu pembayaran telah habis. Anda dapat membuat transaksi pembayaran baru untuk pesanan ini.</p>
+              <p className="text-gray-600">Batas waktu pembayaran telah habis. Silakan lakukan checkout ulang dengan membuat pesanan baru.</p>
             </div>
             <div className="space-y-3">
               <Button
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold"
-                disabled={retrying}
-                onClick={handleRetryPayment}
+                className="w-full bg-[#ffd700] hover:bg-[#e6c200] text-black font-semibold"
+                onClick={() => router.push('/')}
               >
-                {retrying ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Memproses...</>
-                ) : (
-                  <><RefreshCw className="h-4 w-4 mr-2" /> Bayar Ulang</>
-                )}
+                Buat Pesanan Baru
               </Button>
               <Button
                 variant="outline"
                 className="w-full font-semibold"
                 onClick={() => router.push('/pesanan')}
               >
-                Kembali ke Pesanan
+                Kembali ke Riwayat Pesanan
               </Button>
             </div>
           </CardContent>

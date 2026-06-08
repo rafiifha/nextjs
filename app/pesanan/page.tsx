@@ -53,7 +53,7 @@ export default function PesananPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
   const ITEMS_PER_PAGE = 10;
-  const [retryingOrderId, setRetryingOrderId] = useState<number | null>(null);
+
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -227,38 +227,6 @@ export default function PesananPage() {
     });
   };
 
-  const handleRetryPayment = async (e: React.MouseEvent, orderId: number) => {
-    e.stopPropagation();
-    setRetryingOrderId(orderId);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/pesanan/${orderId}/retry-payment`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success('Transaksi pembayaran baru berhasil dibuat!', {
-          description: 'Anda akan diarahkan ke halaman pembayaran.',
-        });
-        await fetchOrders();
-        router.push(`/payment/instruction/${orderId}`);
-      } else {
-        toast.error('Gagal membuat ulang pembayaran', {
-          description: data.error || 'Terjadi kesalahan.',
-        });
-      }
-    } catch (error: any) {
-      toast.error('Gagal membuat ulang pembayaran', {
-        description: error.message || 'Terjadi kesalahan jaringan.',
-      });
-    } finally {
-      setRetryingOrderId(null);
-    }
-  };
 
   if (loading) {
     return (
@@ -341,19 +309,10 @@ export default function PesananPage() {
                           Bayar Sekarang
                         </Button>
                       )}
-                      {order.status === 'expired' && order.paymentMethod && order.paymentMethod !== 'tunai' && (
-                        <Button 
-                          size="sm" 
-                          className="bg-orange-500 text-white hover:bg-orange-600"
-                          disabled={retryingOrderId === order.id}
-                          onClick={(e) => handleRetryPayment(e, order.id)}
-                        >
-                          {retryingOrderId === order.id ? (
-                            <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Memproses...</>
-                          ) : (
-                            <><RefreshCw className="h-3.5 w-3.5 mr-1" /> Bayar Ulang</>
-                          )}
-                        </Button>
+                      {order.status === 'expired' && (
+                        <span className="text-xs text-red-500 font-medium bg-red-50 px-2.5 py-1 rounded-md border border-red-200">
+                          ⚠️ Kedaluwarsa (Silakan Checkout Ulang)
+                        </span>
                       )}
                     </div>
 
@@ -399,22 +358,6 @@ export default function PesananPage() {
                             <p className="text-xs text-gray-600 mb-1">Total Pembayaran</p>
                             <p className="text-lg font-bold text-[#ffd700]">{formatRupiah(order.totalHarga)}</p>
                           </div>
-                          {order.status === 'expired' && order.paymentMethod && order.paymentMethod !== 'tunai' && (
-                            <div className="flex items-end justify-end">
-                              <Button
-                                size="sm"
-                                className="bg-orange-500 text-white hover:bg-orange-600"
-                                disabled={retryingOrderId === order.id}
-                                onClick={(e) => handleRetryPayment(e, order.id)}
-                              >
-                                {retryingOrderId === order.id ? (
-                                  <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Memproses...</>
-                                ) : (
-                                  <><RefreshCw className="h-3.5 w-3.5 mr-1" /> Bayar Ulang</>
-                                )}
-                              </Button>
-                            </div>
-                          )}
                         </div>
 
                         {order.deliveryMethod === 'delivery' && (

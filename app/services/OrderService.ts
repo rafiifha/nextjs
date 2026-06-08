@@ -517,6 +517,19 @@ export class OrderService {
           console.log(`↩️ Cancel: stok variant ${item.variantId} dikembalikan ${item.quantity}`);
         }
       }
+
+      // Cancel Pakasir transaction on manual cancel
+      if (existingOrder.paymentMethod && existingOrder.paymentMethod !== 'tunai') {
+        try {
+          await pakasirService.cancelTransaction({
+            order_id: `INV-${existingOrder.id}`,
+            amount: existingOrder.totalHarga,
+          });
+          console.log(`❌ Pakasir transaction INV-${existingOrder.id} cancelled manually.`);
+        } catch (err: any) {
+          console.error(`Failed to cancel Pakasir transaction INV-${existingOrder.id} on manual cancel:`, err.message);
+        }
+      }
     }
 
     const isOfflineOrder = existingOrder.deliveryMethod === 'pickup' && (!existingOrder.shippingFee || existingOrder.shippingFee === 0);
@@ -635,6 +648,19 @@ export class OrderService {
         where: { id: order.id },
         data: { status: 'expired' },
       });
+
+      // Cancel Pakasir transaction on expiry
+      if (order.paymentMethod && order.paymentMethod !== 'tunai') {
+        try {
+          await pakasirService.cancelTransaction({
+            order_id: `INV-${order.id}`,
+            amount: order.totalHarga,
+          });
+          console.log(`❌ Pakasir transaction INV-${order.id} cancelled due to expiry.`);
+        } catch (err: any) {
+          console.error(`Failed to cancel Pakasir transaction INV-${order.id} on expiry:`, err.message);
+        }
+      }
       
       try {
         await triggerOrderEvent('order-updated', {

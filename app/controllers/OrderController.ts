@@ -11,6 +11,7 @@ export class OrderController {
 
   async getOrders(request: NextRequest) {
     try {
+      await this.orderService.checkExpiredOrders();
       const authHeader = request.headers.get('Authorization');
       const token = authHeader?.replace('Bearer ', '');
       
@@ -61,6 +62,7 @@ export class OrderController {
 
   async getOrderById(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
     try {
+      await this.orderService.checkExpiredOrders();
       const resolvedParams = params instanceof Promise ? await params : params;
       const id = parseInt(resolvedParams.id);
       
