@@ -125,6 +125,20 @@ export class CashierService {
 
     let updatedOrder = order;
 
+    // Reserve stock immediately for ALL orders (tunai maupun digital)
+    for (const item of order.items) {
+      if (!item.variantId) continue;
+      try {
+        await prisma.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { decrement: item.quantity } },
+        });
+        console.log(`📦 Kasir stok reserved: variant ${item.variantId} dikurangi ${item.quantity}`);
+      } catch (error: any) {
+        console.error(`Failed to reduce stock for variant ${item.variantId}:`, error);
+      }
+    }
+
     if (!isTunai) {
       try {
         const pakasirRes = await pakasirService.createTransaction(paymentMethod, {
@@ -136,12 +150,15 @@ export class CashierService {
           throw new Error('Pakasir tidak mengembalikan payment number');
         }
 
+        const expiredAt = new Date();
+        expiredAt.setMinutes(expiredAt.getMinutes() + 15);
+
         updatedOrder = await prisma.order.update({
           where: { id: order.id },
           data: {
             paymentNumber: pakasirRes.payment.payment_number,
             paymentFee: pakasirRes.payment.fee,
-            expiredAt: pakasirRes.payment.expired_at ? new Date(pakasirRes.payment.expired_at) : null,
+            expiredAt: expiredAt,
           },
           include: {
             items: {
@@ -158,24 +175,17 @@ export class CashierService {
           },
         });
       } catch (pakasirErr: any) {
-        await prisma.order.delete({ where: { id: order.id } });
-        throw new Error(pakasirErr?.message || 'Gagal membuat transaksi Pakasir');
-      }
-    }
-
-    if (isTunai) {
-      for (const item of updatedOrder.items) {
-        if (!item.variantId) continue;
-        try {
+        // Restore stock before deleting order
+        for (const item of order.items) {
+          if (!item.variantId) continue;
           await prisma.productVariant.update({
             where: { id: item.variantId },
-            data: {
-              stock: { decrement: item.quantity },
-            },
+            data: { stock: { increment: item.quantity } },
           });
-        } catch (error: any) {
-          console.error(`Failed to reduce stock for variant ${item.variantId}:`, error);
+          console.log(`↩️ Kasir stok restored: variant ${item.variantId} dikembalikan ${item.quantity}`);
         }
+        await prisma.order.delete({ where: { id: order.id } });
+        throw new Error(pakasirErr?.message || 'Gagal membuat transaksi Pakasir');
       }
     }
 

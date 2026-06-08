@@ -365,7 +365,7 @@ export class OrderService {
     const totalHarga = items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) + (shippingFee || 0);
 
     const expiredAt = new Date();
-    expiredAt.setHours(expiredAt.getHours() + 24);
+    expiredAt.setMinutes(expiredAt.getMinutes() + 15); // 15 menit timeout
 
     const order = await prisma.order.create({
       data: {
@@ -409,6 +409,17 @@ export class OrderService {
 
     let updatedOrder = order;
 
+    // Reserve stock immediately on order creation
+    for (const item of order.items) {
+      if (item.variantId) {
+        await prisma.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { decrement: item.quantity } },
+        });
+        console.log(`📦 Stok reserved: variant ${item.variantId} dikurangi ${item.quantity}`);
+      }
+    }
+
     if (paymentMethod && paymentMethod !== 'tunai') {
       try {
         const pakasirRes = await pakasirService.createTransaction(paymentMethod, {
@@ -427,13 +438,23 @@ export class OrderService {
           data: {
             paymentNumber: payment_number,
             paymentFee: fee,
-            expiredAt: expired_at ? new Date(expired_at) : expiredAt,
+            expiredAt: expiredAt,
           },
           include: {
             items: { include: { product: true } },
           },
         });
       } catch (pakasirErr) {
+        // Restore stock before deleting order
+        for (const item of order.items) {
+          if (item.variantId) {
+            await prisma.productVariant.update({
+              where: { id: item.variantId },
+              data: { stock: { increment: item.quantity } },
+            });
+            console.log(`↩️ Stok restored: variant ${item.variantId} dikembalikan ${item.quantity}`);
+          }
+        }
         await prisma.order.delete({ where: { id: order.id } });
         throw new Error('Gagal membuat transaksi pembayaran');
       }
@@ -478,10 +499,24 @@ export class OrderService {
 
     const existingOrder = await prisma.order.findUnique({
       where: { id },
+      include: { items: true },
     });
 
     if (!existingOrder) {
       throw new Error('Pesanan tidak ditemukan');
+    }
+
+    // Restore reserved stock when cancelling a pending order
+    if (status === 'cancelled' && existingOrder.status === 'pending') {
+      for (const item of existingOrder.items) {
+        if (item.variantId) {
+          await prisma.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: { increment: item.quantity } },
+          });
+          console.log(`↩️ Cancel: stok variant ${item.variantId} dikembalikan ${item.quantity}`);
+        }
+      }
     }
 
     const isOfflineOrder = existingOrder.deliveryMethod === 'pickup' && (!existingOrder.shippingFee || existingOrder.shippingFee === 0);
@@ -585,6 +620,17 @@ export class OrderService {
     });
 
     for (const order of expiredOrders) {
+      // Restore reserved stock before marking as expired
+      for (const item of order.items) {
+        if (item.variantId) {
+          await prisma.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: { increment: item.quantity } },
+          });
+          console.log(`↩️ Expired: stok variant ${item.variantId} dikembalikan ${item.quantity}`);
+        }
+      }
+
       await prisma.order.update({
         where: { id: order.id },
         data: { status: 'expired' },

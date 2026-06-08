@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { triggerOrderEvent } from '@/services/pusherService';
 import { sendReceipt } from '@/services/whatsappService';
 
-// Endpoint to manually mark order as paid and reduce stock
+// Endpoint to manually mark order as paid (stock already reserved at order creation)
 // Used as fallback when Pakasir callback is not received
 export async function POST(
   request: NextRequest,
@@ -20,16 +20,13 @@ export async function POST(
       );
     }
 
-    // Get order with items
+    // Get order
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
         items: {
           include: {
-            product: {
-              include: { variants: true }
-            },
-            variant: true,
+            product: true,
           },
         },
       },
@@ -66,58 +63,7 @@ export async function POST(
       );
     }
 
-    // Validate stock availability per variant before reducing
-    const stockErrors: string[] = [];
-    for (const item of order.items) {
-      let variant = item.variant;
-      
-      // If variant is null, find by priceType
-      if (!variant) {
-        variant = item.product.variants.find(v => v.priceType === item.priceType) || null;
-        if (!variant) {
-          stockErrors.push(`${item.product.name}: varian "${item.priceType}" tidak ditemukan`);
-          continue;
-        }
-      }
-
-      const availableStock = variant.stock ?? 0;
-      if (availableStock < item.quantity) {
-        stockErrors.push(`${item.product.name} (${variant.priceType}): stok tersedia ${availableStock}, diminta ${item.quantity}`);
-      }
-    }
-
-    if (stockErrors.length > 0) {
-      return NextResponse.json(
-        { error: 'Stok tidak mencukupi', details: stockErrors },
-        { status: 400 }
-      );
-    }
-
-    // Reduce stock for each variant
-    for (const item of order.items) {
-      let variantId = item.variantId;
-      
-      if (!variantId) {
-        const variant = item.product.variants.find(v => v.priceType === item.priceType);
-        if (!variant) {
-          console.error(`❌ Variant not found for product ${item.productId} with priceType ${item.priceType}`);
-          continue;
-        }
-        variantId = variant.id;
-      }
-
-      await prisma.productVariant.update({
-        where: { id: variantId },
-        data: {
-          stock: {
-            decrement: item.quantity,
-          },
-        },
-      });
-      console.log(`✅ Reduced stock for variant ${variantId} by ${item.quantity}`);
-    }
-
-    // Update order status to paid
+    // Stok sudah di-reserve saat order dibuat, langsung update status ke paid
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
       data: { status: 'paid' },

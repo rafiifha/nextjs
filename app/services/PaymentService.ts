@@ -61,18 +61,7 @@ export class PaymentService {
     });
 
     console.log(`✅ Pesanan ${numericId} berhasil diupdate menjadi paid via Pakasir.`);
-
-    for (const item of updatedOrder.items) {
-      if (item.variantId) {
-        await prisma.productVariant.update({
-          where: { id: item.variantId },
-          data: {
-            stock: { decrement: item.quantity },
-          },
-        });
-        console.log(`📦 Stok online variant ${item.variantId} dikurangi ${item.quantity}`);
-      }
-    }
+    // Stok sudah di-reserve saat order dibuat, tidak perlu decrement lagi
 
     try {
       await triggerOrderEvent('order-updated', updatedOrder);

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, Copy, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { formatRupiah } from '@/lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ export default function PaymentInstructionPage() {
   const [redirectCountdown, setRedirectCountdown] = useState(4);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -201,6 +202,37 @@ export default function PaymentInstructionPage() {
     );
   }
 
+  const handleRetryPayment = async () => {
+    setRetrying(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/pesanan/${params.id}/retry-payment`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Transaksi pembayaran baru berhasil dibuat!');
+        setPaymentExpired(false);
+        setLoading(true);
+        await fetchOrder();
+      } else {
+        toast.error('Gagal membuat ulang pembayaran', {
+          description: data.error || 'Terjadi kesalahan.',
+        });
+      }
+    } catch (error: any) {
+      toast.error('Gagal membuat ulang pembayaran', {
+        description: error.message || 'Terjadi kesalahan jaringan.',
+      });
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   // Payment expired overlay
   if (paymentExpired) {
     return (
@@ -212,14 +244,28 @@ export default function PaymentInstructionPage() {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Pembayaran Kedaluwarsa</h2>
-              <p className="text-gray-600">Batas waktu pembayaran telah habis. Silakan buat pesanan baru.</p>
+              <p className="text-gray-600">Batas waktu pembayaran telah habis. Anda dapat membuat transaksi pembayaran baru untuk pesanan ini.</p>
             </div>
-            <Button
-              className="w-full bg-[#ffd700] hover:bg-[#e6c200] text-black font-semibold"
-              onClick={() => router.push('/pesanan')}
-            >
-              Kembali ke Pesanan
-            </Button>
+            <div className="space-y-3">
+              <Button
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold"
+                disabled={retrying}
+                onClick={handleRetryPayment}
+              >
+                {retrying ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Memproses...</>
+                ) : (
+                  <><RefreshCw className="h-4 w-4 mr-2" /> Bayar Ulang</>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full font-semibold"
+                onClick={() => router.push('/pesanan')}
+              >
+                Kembali ke Pesanan
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

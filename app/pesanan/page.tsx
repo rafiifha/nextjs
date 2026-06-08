@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah, isTokenValid } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Package, Loader2, ShoppingCart, Calendar, MapPin, Truck, CheckCircle, Clock, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, Loader2, ShoppingCart, Calendar, MapPin, Truck, CheckCircle, Clock, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, CreditCard, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 interface OrderItem {
@@ -53,6 +53,7 @@ export default function PesananPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
   const ITEMS_PER_PAGE = 10;
+  const [retryingOrderId, setRetryingOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -226,6 +227,39 @@ export default function PesananPage() {
     });
   };
 
+  const handleRetryPayment = async (e: React.MouseEvent, orderId: number) => {
+    e.stopPropagation();
+    setRetryingOrderId(orderId);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/pesanan/${orderId}/retry-payment`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Transaksi pembayaran baru berhasil dibuat!', {
+          description: 'Anda akan diarahkan ke halaman pembayaran.',
+        });
+        await fetchOrders();
+        router.push(`/payment/instruction/${orderId}`);
+      } else {
+        toast.error('Gagal membuat ulang pembayaran', {
+          description: data.error || 'Terjadi kesalahan.',
+        });
+      }
+    } catch (error: any) {
+      toast.error('Gagal membuat ulang pembayaran', {
+        description: error.message || 'Terjadi kesalahan jaringan.',
+      });
+    } finally {
+      setRetryingOrderId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -303,7 +337,22 @@ export default function PesananPage() {
                           className="bg-[#ffd700] text-black hover:bg-[#e6c200]"
                           onClick={(e) => { e.stopPropagation(); router.push(`/payment/instruction/${order.id}`); }}
                         >
+                          <CreditCard className="h-3.5 w-3.5 mr-1" />
                           Bayar Sekarang
+                        </Button>
+                      )}
+                      {order.status === 'expired' && order.paymentMethod && order.paymentMethod !== 'tunai' && (
+                        <Button 
+                          size="sm" 
+                          className="bg-orange-500 text-white hover:bg-orange-600"
+                          disabled={retryingOrderId === order.id}
+                          onClick={(e) => handleRetryPayment(e, order.id)}
+                        >
+                          {retryingOrderId === order.id ? (
+                            <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Memproses...</>
+                          ) : (
+                            <><RefreshCw className="h-3.5 w-3.5 mr-1" /> Bayar Ulang</>
+                          )}
                         </Button>
                       )}
                     </div>
@@ -335,9 +384,37 @@ export default function PesananPage() {
                             )}
                           </div>
                           <div>
+                            <p className="text-xs text-gray-600 mb-1">Metode Pembayaran</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {order.paymentMethod === 'tunai' ? 'Tunai' 
+                                : order.paymentMethod === 'qris' ? 'QRIS'
+                                : order.paymentMethod ? order.paymentMethod.replace('_va', ' VA').toUpperCase()
+                                : '-'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                          <div>
                             <p className="text-xs text-gray-600 mb-1">Total Pembayaran</p>
                             <p className="text-lg font-bold text-[#ffd700]">{formatRupiah(order.totalHarga)}</p>
                           </div>
+                          {order.status === 'expired' && order.paymentMethod && order.paymentMethod !== 'tunai' && (
+                            <div className="flex items-end justify-end">
+                              <Button
+                                size="sm"
+                                className="bg-orange-500 text-white hover:bg-orange-600"
+                                disabled={retryingOrderId === order.id}
+                                onClick={(e) => handleRetryPayment(e, order.id)}
+                              >
+                                {retryingOrderId === order.id ? (
+                                  <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Memproses...</>
+                                ) : (
+                                  <><RefreshCw className="h-3.5 w-3.5 mr-1" /> Bayar Ulang</>
+                                )}
+                              </Button>
+                            </div>
+                          )}
                         </div>
 
                         {order.deliveryMethod === 'delivery' && (
