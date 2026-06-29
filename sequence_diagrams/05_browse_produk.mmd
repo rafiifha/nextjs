@@ -1,0 +1,23 @@
+sequenceDiagram
+    actor Pelanggan
+    participant View as <<View>><br/>ProdukPage
+    participant Controller as <<Controller>><br/>ProductController
+    participant Service as <<Service>><br/>ProductService
+    participant Entity as <<Entity>><br/>Product
+
+    Pelanggan->>View: bukaHalamanProduk()
+    activate View
+    View->>Controller: getProducts(request)
+    activate Controller
+    Controller->>Service: getProductsPaginated(page, limit)
+    activate Service
+    Service->>Entity: findMany(skip, take, include variants & category)
+    activate Entity
+    Entity-->>Service: daftar produk beserta varian
+    deactivate Entity
+    Service-->>Controller: { data, total }
+    deactivate Service
+    Controller-->>View: 200 OK (JSON data, total, page, totalPages)
+    deactivate Controller
+    View-->>Pelanggan: Tampilkan Katalog Produk Beserta Harga Varian
+    deactivate View

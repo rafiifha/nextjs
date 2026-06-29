@@ -2,15 +2,27 @@ import { prisma } from '@/lib/db';
 
 export class ProductService {
   async getAllProducts() {
-    return await prisma.product.findMany({
+    const products = await prisma.product.findMany({
       include: {
         category: true,
         variants: {
           orderBy: { priceType: 'asc' },
         },
+        items: {
+          select: {
+            quantity: true,
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' },
     });
+
+    return products
+      .map((p) => {
+        const salesCount = p.items.reduce((sum, item) => sum + item.quantity, 0);
+        const { items, ...rest } = p;
+        return { ...rest, salesCount };
+      })
+      .sort((a, b) => b.salesCount - a.salesCount);
   }
 
   async getProductsPaginated(page: number, limit: number, search?: string) {
@@ -56,7 +68,7 @@ export class ProductService {
   }
 
   async createProduct(data: any) {
-    const { name, categoryId, variants } = data;
+    const { name, categoryId, variants, image } = data;
 
     if (!name || !categoryId || !variants || !Array.isArray(variants) || variants.length === 0) {
       throw new Error('Nama, kategori, dan varian harga harus diisi');
@@ -82,6 +94,7 @@ export class ProductService {
       data: {
         name,
         categoryId,
+        image: image || null,
         variants: {
           create: this.parseVariants(variants),
         },
@@ -96,7 +109,7 @@ export class ProductService {
   }
 
   async updateProduct(id: number, data: any) {
-    const { name, categoryId, variants } = data;
+    const { name, categoryId, variants, image } = data;
 
     if (!name || !categoryId || !variants || !Array.isArray(variants) || variants.length === 0) {
       throw new Error('Nama, kategori, dan varian harga harus diisi');
@@ -135,6 +148,7 @@ export class ProductService {
       data: {
         name,
         categoryId: parseInt(categoryId),
+        image: image || null,
         variants: {
           create: this.parseVariants(variants),
         },
@@ -174,16 +188,23 @@ export class ProductService {
         price = isNaN(parsed) ? null : parsed;
       }
       
-      let stock: number | null = null;
-      if (variant.stock !== undefined && variant.stock !== null && variant.stock !== '') {
-        const parsed = typeof variant.stock === 'string' ? parseInt(variant.stock) : variant.stock;
-        stock = isNaN(parsed) ? null : parsed;
+      let stockOnline: number | null = null;
+      if (variant.stockOnline !== undefined && variant.stockOnline !== null && variant.stockOnline !== '') {
+        const parsed = typeof variant.stockOnline === 'string' ? parseInt(variant.stockOnline) : variant.stockOnline;
+        stockOnline = isNaN(parsed) ? null : parsed;
+      }
+
+      let stockOffline: number | null = null;
+      if (variant.stockOffline !== undefined && variant.stockOffline !== null && variant.stockOffline !== '') {
+        const parsed = typeof variant.stockOffline === 'string' ? parseInt(variant.stockOffline) : variant.stockOffline;
+        stockOffline = isNaN(parsed) ? null : parsed;
       }
       
       return {
         priceType: variant.priceType,
         price: price ?? null,
-        stock: stock ?? null,
+        stockOnline: stockOnline ?? null,
+        stockOffline: stockOffline ?? null,
       };
     });
   }

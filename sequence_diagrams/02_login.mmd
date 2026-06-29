@@ -1,0 +1,49 @@
+sequenceDiagram
+    actor Pelanggan
+    participant View as <<View>><br/>LoginPage
+    participant Controller as <<Controller>><br/>AuthController
+    participant Service as <<Service>><br/>AuthService
+    participant Entity as <<Entity>><br/>User
+    participant CartSvc as <<Service>><br/>CartService
+
+    Pelanggan->>View: inputKredensial(identifier, password)
+    activate View
+    View->>Controller: login(request)
+    activate Controller
+    Controller->>Service: login(email, phone, password)
+    activate Service
+    Service->>Entity: findFirst(email OR phone)
+    activate Entity
+    Entity-->>Service: data user (hashed password)
+    deactivate Entity
+
+    alt User Tidak Ditemukan / Password Salah
+        Service-->>Controller: throw Error "salah"
+        Controller-->>View: 401 Unauthorized
+        View-->>Pelanggan: Tampilkan Pesan Login Gagal
+    else Kredensial Valid
+        Service->>Service: bcrypt.compare(password, hash)
+        activate Service
+        deactivate Service
+
+        Service->>Service: generateToken(userId, role)
+        activate Service
+        deactivate Service
+
+        Service-->>Controller: { message, token, user }
+        Controller-->>View: 200 OK (JSON token & user)
+
+        View->>View: saveToLocalStorage(token, user)
+        activate View
+        deactivate View
+
+        View->>CartSvc: migrateCartToUser(userId)
+        activate CartSvc
+        CartSvc-->>View: migrasi selesai
+        deactivate CartSvc
+
+        View-->>Pelanggan: Redirect (customer→/produk, admin→/admin/dashboard, kasir→/admin/kasir)
+    end
+    deactivate Service
+    deactivate Controller
+    deactivate View

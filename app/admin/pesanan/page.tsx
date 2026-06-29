@@ -179,7 +179,7 @@ export default function ManajemenPesananPage() {
       'shipped': 'Dalam Pengiriman',
       'delivered': 'Terkirim',
       'cancelled': 'Dibatalkan',
-      'expired': 'Kedaluwarsa',
+      'expired': 'Dibatalkan (Tidak Dibayar)',
     };
     return statusMap[status] || status;
   };
@@ -192,7 +192,7 @@ export default function ManajemenPesananPage() {
       case 'shipped': return 'bg-orange-100 text-orange-700 border-orange-300';
       case 'delivered': return 'bg-purple-100 text-purple-700 border-purple-300';
       case 'cancelled': return 'bg-red-100 text-red-700 border-red-300';
-      case 'expired': return 'bg-gray-100 text-gray-700 border-gray-300';
+      case 'expired': return 'bg-red-50 text-red-750 border-red-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-300';
     }
   };
@@ -395,7 +395,7 @@ export default function ManajemenPesananPage() {
                     <option value="processing">Diproses</option>
                     <option value="shipped">Dalam Pengiriman</option>
                     <option value="delivered">Terkirim</option>
-                    <option value="expired">Kedaluwarsa</option>
+                    <option value="expired">Dibatalkan (Tidak Dibayar)</option>
                   </select>
                 </div>
               </div>

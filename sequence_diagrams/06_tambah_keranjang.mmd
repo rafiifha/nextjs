@@ -1,0 +1,42 @@
+sequenceDiagram
+    actor Pelanggan
+    participant View as <<View>><br/>ProdukPage
+    participant Service as <<Service>><br/>CartService
+    participant Entity as <<Entity>><br/>LocalStorage
+
+    Pelanggan->>View: klikTambahKeKeranjang(productId, priceType, qty)
+    activate View
+    View->>Service: addToCart(productId, product, variantId, priceType, price, qty)
+    activate Service
+    Service->>Entity: getItem("tokonaning_cart_{userId}")
+    activate Entity
+    Entity-->>Service: data keranjang saat ini (JSON)
+    deactivate Entity
+
+    Service->>Service: cekItemSudahAda(productId, priceType)
+    activate Service
+    deactivate Service
+
+    alt Item Sudah Ada di Keranjang
+        Service->>Service: incrementQuantity()
+        activate Service
+        deactivate Service
+    else Item Belum Ada
+        Service->>Service: pushNewItem()
+        activate Service
+        deactivate Service
+    end
+
+    Service->>Entity: setItem("tokonaning_cart_{userId}", updatedJSON)
+    activate Entity
+    Entity-->>Service: tersimpan
+    deactivate Entity
+
+    Service->>Service: dispatchEvent("cartUpdated")
+    activate Service
+    deactivate Service
+
+    Service-->>View: data keranjang terbaru
+    deactivate Service
+    View-->>Pelanggan: Tampilkan Badge Keranjang Terupdate
+    deactivate View

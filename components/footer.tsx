@@ -68,45 +68,13 @@ export default function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center gap-2 text-sm">
                 <Phone className="h-4 w-4 text-[#ffd700]" />
-                <span>0812-3456-7890</span>
-              </li>
-              <li className="flex items-center gap-2 text-sm">
-                <Mail className="h-4 w-4 text-[#ffd700]" />
-                <span>info@tokonaning.com</span>
+                <span>0857 3246 3329</span>
               </li>
               <li className="flex items-start gap-2 text-sm">
                 <MapPin className="h-4 w-4 text-[#ffd700] mt-0.5" />
-                <span>Jl. Raya Sembako No. 123, Jakarta</span>
+                <span>Jl. Raya Cicalengka - Majalaya KM 1, Cikuya, Cicalengka</span>
               </li>
             </ul>
-          </div>
-
-          {/* Social Media */}
-          <div>
-            <h3 className="font-semibold text-white mb-4">Ikuti Kami</h3>
-            <div className="flex gap-3">
-              <a
-                href="#"
-                className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full hover:bg-[#ffd700] hover:text-gray-900 transition-colors"
-                aria-label="Facebook"
-              >
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full hover:bg-[#ffd700] hover:text-gray-900 transition-colors"
-                aria-label="Instagram"
-              >
-                <Instagram className="h-5 w-5" />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full hover:bg-[#ffd700] hover:text-gray-900 transition-colors"
-                aria-label="Twitter"
-              >
-                <Twitter className="h-5 w-5" />
-              </a>
-            </div>
           </div>
         </div>
 

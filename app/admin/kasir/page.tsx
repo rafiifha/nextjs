@@ -13,7 +13,8 @@ interface ProductVariant {
   id: number;
   priceType: string;
   price: number | null;
-  stock: number | null;
+  stockOnline: number | null;
+  stockOffline: number | null;
 }
 
 interface Category {
@@ -46,9 +47,9 @@ export default function KasirPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('');
+  const [customerName, setCustomerName] = useState('Pelanggan Umum');
+  const [customerPhone, setCustomerPhone] = useState('081234567890');
+  const [paymentMethod, setPaymentMethod] = useState('tunai');
   const [cashReceived, setCashReceived] = useState<string>('');
   const [discount, setDiscount] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -56,6 +57,7 @@ export default function KasirPage() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<number, number>>({});
+
 
   useEffect(() => {
     fetchProducts();
@@ -78,7 +80,7 @@ export default function KasirPage() {
           for (const product of productsData) {
             if (next[product.id]) continue;
             const firstAvailable = product.variants.find(
-              (v: ProductVariant) => (v.stock ?? 0) > 0 && v.price !== null && v.price !== undefined
+              (v: ProductVariant) => (v.stockOffline ?? 0) > 0 && v.price !== null && v.price !== undefined
             );
             if (firstAvailable) next[product.id] = firstAvailable.id;
           }
@@ -127,7 +129,7 @@ export default function KasirPage() {
       return;
     }
 
-    const stockAvailable = variant.stock ?? 0;
+    const stockAvailable = variant.stockOffline ?? 0;
     if (stockAvailable <= 0) {
       toast.error('Error', { description: 'Stok tidak tersedia' });
       return;
@@ -187,7 +189,7 @@ export default function KasirPage() {
       if (product) {
         const variant = product.variants.find(v => v.priceType === priceType);
         if (variant) {
-          const stockAvailable = variant.stock ?? 0;
+          const stockAvailable = variant.stockOffline ?? 0;
           if (quantity > stockAvailable) {
             toast.error('Error', { description: `Stok tersedia hanya ${stockAvailable} unit` });
             return prev;
@@ -330,8 +332,9 @@ export default function KasirPage() {
 
         // Reset form
         setCart([]);
-        setCustomerName('');
-        setCustomerPhone('');
+        setCustomerName('Pelanggan Umum');
+        setCustomerPhone('081234567890');
+        setPaymentMethod('tunai');
         setCashReceived('');
         setDiscount('');
         setSearchQuery('');
@@ -358,17 +361,17 @@ export default function KasirPage() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Kasir</h1>
-        <p className="text-gray-600">Sistem kasir untuk transaksi langsung</p>
+    <div className="h-[calc(100vh-30px)] flex flex-col p-4 overflow-hidden">
+      <div className="mb-4 flex-shrink-0">
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Kasir</h1>
+        <p className="text-xs text-gray-600">Sistem kasir untuk transaksi langsung</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden">
         {/* Product List */}
-        <div className="lg:col-span-2">
-          <Card className="border-gray-200 shadow-md">
-            <CardHeader>
+        <div className="lg:col-span-2 h-full flex flex-col overflow-hidden">
+          <Card className="border-gray-200 shadow-md h-full flex flex-col overflow-hidden">
+            <CardHeader className="flex-shrink-0">
               <CardTitle className="text-xl font-bold">Daftar Produk</CardTitle>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 {/* Search Input */}
@@ -406,7 +409,7 @@ export default function KasirPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 min-h-0 overflow-y-auto p-4">
               {loading ? (
                 <div className="text-center py-8 text-gray-600">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
@@ -415,9 +418,7 @@ export default function KasirPage() {
               ) : filteredProducts.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {filteredProducts.map((product) => {
-                    const availableVariants = product.variants.filter(v => (v.stock ?? 0) > 0 && v.price !== null && v.price !== undefined);
-                    const selectedVariantId = selectedVariantByProduct[product.id];
-                    const selectedVariant = availableVariants.find(v => v.id === selectedVariantId) || availableVariants[0] || null;
+                    const availableVariants = product.variants.filter(v => (v.stockOffline ?? 0) > 0 && v.price !== null && v.price !== undefined);
 
                     return (
                       <Card
@@ -442,35 +443,28 @@ export default function KasirPage() {
                         </CardHeader>
                         <CardContent className="pt-3">
                           <div className="space-y-2">
-                            <select
-                              className="w-full h-9 rounded-md border border-gray-300 bg-white px-3 text-sm"
-                              value={selectedVariant?.id || ''}
-                              onChange={(e) =>
-                                setSelectedVariantByProduct((prev) => ({
-                                  ...prev,
-                                  [product.id]: Number(e.target.value),
-                                }))
-                              }
-                              disabled={availableVariants.length === 0}
-                            >
-                              {availableVariants.length === 0 ? (
-                                <option value="">Varian tidak tersedia</option>
-                              ) : (
-                                availableVariants.map((variant) => (
-                                  <option key={variant.id} value={variant.id}>
-                                    {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stock ?? 0})
-                                  </option>
-                                ))
-                              )}
-                            </select>
-                            <Button
-                              size="sm"
-                              className="w-full h-8 text-xs"
-                              disabled={!selectedVariant}
-                              onClick={() => selectedVariant && addToCart(product, selectedVariant, 1)}
-                            >
-                              + Tambah
-                            </Button>
+                            {availableVariants.length === 0 ? (
+                              <p className="text-xs text-red-500 text-center py-1">Varian tidak tersedia</p>
+                            ) : (
+                              <div className="flex flex-col gap-1.5 mt-1">
+                                {availableVariants.map((variant) => (
+                                  <Button
+                                    key={variant.id}
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addToCart(product, variant, 1)}
+                                    className="text-xs h-9 px-3 w-full bg-white hover:bg-amber-50/40 border-gray-200 hover:border-amber-300 text-gray-800 flex justify-between items-center transition-all duration-150"
+                                  >
+                                    <span className="font-bold uppercase text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">{variant.priceType}</span>
+                                    <span className="font-semibold text-gray-900">{formatRupiah(variant.price || 0)}</span>
+                                    <span className="text-[10px] text-gray-500 font-medium">
+                                      Stok: {variant.stockOffline ?? 0}
+                                    </span>
+                                  </Button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -500,33 +494,35 @@ export default function KasirPage() {
         </div>
 
         {/* Cart & Checkout */}
-        <div className="lg:col-span-1">
-          <Card className="border-gray-200 shadow-md sticky top-4">
-            <CardHeader>
+        <div className="lg:col-span-1 h-full flex flex-col overflow-hidden">
+          <Card className="border-gray-200 shadow-md h-full flex flex-col overflow-hidden">
+            <CardHeader className="flex-shrink-0">
               <CardTitle className="text-xl font-bold flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5" />
                 Keranjang
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 pb-4">
               {/* Customer Info */}
-              <div className="space-y-3">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-3">
                 <div>
-                  <Label htmlFor="customerName">Nama Pelanggan</Label>
+                  <Label htmlFor="customerName" className="text-xs font-semibold text-gray-700">Nama Pelanggan</Label>
                   <Input
                     id="customerName"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Nama pelanggan"
+                    className="h-9 text-sm mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="customerPhone">Nomor WhatsApp</Label>
+                  <Label htmlFor="customerPhone" className="text-xs font-semibold text-gray-700">Nomor WhatsApp</Label>
                   <Input
                     id="customerPhone"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     placeholder="08xxxxxxxxxx"
+                    className="h-9 text-sm mt-1"
                   />
                 </div>
               </div>
@@ -535,7 +531,7 @@ export default function KasirPage() {
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="font-semibold text-gray-900 mb-3">Item ({cart.length})</h3>
                 {cart.length > 0 ? (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                  <div className="space-y-2 max-h-36 overflow-y-auto">
                     {cart.map((item, index) => (
                       <div
                         key={index}
@@ -667,6 +663,31 @@ export default function KasirPage() {
                         className="w-full text-lg font-semibold py-3 border-2 border-[#ffd700] focus:border-[#ffd700] focus:ring-2 focus:ring-[#ffd700]/20"
                         autoFocus
                       />
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCashReceived(String(getTotalAfterDiscount()))}
+                          className="text-[11px] h-7 px-2 border-amber-300 hover:bg-amber-50 text-gray-800"
+                        >
+                          Uang Pas
+                        </Button>
+                        {[10000, 20000, 50000, 100000]
+                          .filter((val) => val > getTotalAfterDiscount())
+                          .map((val) => (
+                            <Button
+                              key={val}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCashReceived(String(val))}
+                              className="text-[11px] h-7 px-2 border-gray-200 hover:bg-gray-50 text-gray-700"
+                            >
+                              {val === 10000 ? '10rb' : val === 20000 ? '20rb' : val === 50000 ? '50rb' : '100rb'}
+                            </Button>
+                          ))}
+                      </div>
                     </div>
 
                     {/* Diskon - Optional, smaller */}
@@ -706,29 +727,31 @@ export default function KasirPage() {
                     )}
                   </div>
                 )}
-
-                {/* Checkout Button */}
-                <Button
-                  onClick={handleCheckout}
-                  className="w-full"
-                  disabled={
-                    submitting ||
-                    cart.length === 0 ||
-                    !paymentMethod ||
-                    (paymentMethod === 'tunai' && (getChange() < 0 || !cashReceived || parseFloat(cashReceived) <= 0))
-                  }
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Memproses...
-                    </>
-                  ) : (
-                    paymentMethod === 'tunai' ? 'Proses Transaksi Tunai' : 'Proses Transaksi Non-Tunai'
-                  )}
-                </Button>
               </div>
             </CardContent>
+
+            <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0">
+              {/* Checkout Button */}
+              <Button
+                onClick={handleCheckout}
+                className="w-full"
+                disabled={
+                  submitting ||
+                  cart.length === 0 ||
+                  !paymentMethod ||
+                  (paymentMethod === 'tunai' && (getChange() < 0 || !cashReceived || parseFloat(cashReceived) <= 0))
+                }
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Memproses...
+                  </>
+                ) : (
+                  paymentMethod === 'tunai' ? 'Proses Transaksi Tunai' : 'Proses Transaksi Non-Tunai'
+                )}
+              </Button>
+            </div>
           </Card>
         </div>
       </div>

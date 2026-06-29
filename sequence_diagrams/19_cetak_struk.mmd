@@ -1,0 +1,57 @@
+sequenceDiagram
+    actor Kasir
+    participant View as <<View>><br/>KasirPage
+    participant Controller as <<Controller>><br/>OrderController
+    participant Service as <<Service>><br/>OrderService
+    participant Entity as <<Entity>><br/>Order
+    participant PrintSvc as <<Service>><br/>WebPrintService
+    participant Printer as <<Device>><br/>ThermalPrinter
+
+    %% 1. Mengirim permintaan cetak struk & mengambil data transaksi
+    Kasir->>View: klikCetakStruk(orderId)
+    activate View
+    View->>Controller: getOrderReceipt(orderId)
+    activate Controller
+    Controller->>Service: getOrderReceipt(orderId)
+    activate Service
+    Service->>Entity: findUnique(orderId, include items)
+    activate Entity
+    Entity-->>Service: data order detail
+    deactivate Entity
+    Service-->>Controller: data order detail
+    deactivate Service
+    Controller-->>View: 200 OK (JSON receiptData)
+    deactivate Controller
+
+    %% 2. Menyesuaikan format nota dengan perangkat pencetak
+    View->>PrintSvc: formatReceipt(receiptData)
+    activate PrintSvc
+    PrintSvc->>PrintSvc: applyThermalFormat()
+    activate PrintSvc
+    deactivate PrintSvc
+    PrintSvc-->>View: formattedReceipt
+    deactivate PrintSvc
+
+    %% 3. Mengirim data cetak ke perangkat printer
+    View->>PrintSvc: printCommand(formattedReceipt)
+    activate PrintSvc
+    PrintSvc->>Printer: pingDevice()
+    activate Printer
+
+    %% 4. Apakah printer menyala?
+    alt Ya (Printer Menyala)
+        Printer-->>PrintSvc: status online / ready
+        PrintSvc->>Printer: sendPrintData(formattedReceipt)
+        Printer-->>PrintSvc: printing success
+        deactivate Printer
+        PrintSvc-->>View: success
+        View-->>Kasir: Tampilkan Struk Berhasil Dicetak
+    else Tidak (Printer Tidak Menyala)
+        activate Printer
+        Printer-->>PrintSvc: status offline / error
+        deactivate Printer
+        PrintSvc-->>View: error (printer inactive)
+        deactivate PrintSvc
+        View-->>Kasir: Tampilkan Notifikasi Printer Tidak Aktif (Data Transaksi Tetap)
+    end
+    deactivate View

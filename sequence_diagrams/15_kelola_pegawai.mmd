@@ -1,0 +1,122 @@
+sequenceDiagram
+    actor Admin
+    participant View as <<View>><br/>AdminPegawaiPage
+    participant Controller as <<Controller>><br/>UserController
+    participant Service as <<Service>><br/>UserService
+    participant Entity as <<Entity>><br/>User
+
+    %% Switch Tab / Load Data
+    Admin->>View: klikTabPegawai("kasir" / "kurir")
+    activate View
+    View->>Controller: getPegawai(role)
+    activate Controller
+    Controller->>Service: getPegawaiByRole(role)
+    activate Service
+    Service->>Entity: findMany(role)
+    activate Entity
+    Entity-->>Service: data daftar pegawai
+    deactivate Entity
+    Service-->>Controller: list pegawai
+    deactivate Service
+    Controller-->>View: 200 OK (JSON list)
+    deactivate Controller
+    View-->>Admin: Tampilkan Daftar Kasir / Kurir
+    deactivate View
+
+    %% Actions
+    alt Tambah Kasir
+        Admin->>View: inputDataKasir(nama, phone, password)
+        activate View
+        View->>Controller: createKasir(nama, phone, password)
+        activate Controller
+        Controller->>Service: createKasir(nama, phone, password)
+        activate Service
+        Service->>Service: bcrypt.hash(password)
+        activate Service
+        deactivate Service
+        Service->>Entity: create(nama, phone, hash, role='kasir')
+        activate Entity
+        Entity-->>Service: kasir baru
+        deactivate Entity
+        Service-->>Controller: success
+        deactivate Service
+        Controller-->>View: 201 Created
+        deactivate Controller
+        View-->>Admin: Refresh List & Tampilkan Toast Sukses
+        deactivate View
+
+    else Tambah Kurir
+        Admin->>View: inputDataKurir(nama, phone)
+        activate View
+        View->>Controller: createKurir(nama, phone)
+        activate Controller
+        Controller->>Service: createKurir(nama, phone)
+        activate Service
+        Service->>Entity: create(nama, phone, role='kurir', status='active')
+        activate Entity
+        Entity-->>Service: kurir baru
+        deactivate Entity
+        Service-->>Controller: success
+        deactivate Service
+        Controller-->>View: 201 Created
+        deactivate Controller
+        View-->>Admin: Refresh List & Tampilkan Toast Sukses
+        deactivate View
+
+    else Reset Password Kasir
+        Admin->>View: klikResetPassword(kasirId)
+        activate View
+        View->>Controller: resetPassword(kasirId, newPassword)
+        activate Controller
+        Controller->>Service: resetPassword(kasirId, newPassword)
+        activate Service
+        Service->>Service: bcrypt.hash(newPassword)
+        activate Service
+        deactivate Service
+        Service->>Entity: update(kasirId, { password: hash })
+        activate Entity
+        Entity-->>Service: password terupdate
+        deactivate Entity
+        Service-->>Controller: success
+        deactivate Service
+        Controller-->>View: 200 OK
+        deactivate Controller
+        View-->>Admin: Tampilkan Toast Sukses Reset
+        deactivate View
+
+    else Hapus Kasir
+        Admin->>View: klikHapusKasir(kasirId)
+        activate View
+        View->>Controller: deleteKasir(kasirId)
+        activate Controller
+        Controller->>Service: deleteKasir(kasirId)
+        activate Service
+        Service->>Entity: delete(kasirId)
+        activate Entity
+        Entity-->>Service: kasir terhapus
+        deactivate Entity
+        Service-->>Controller: success
+        deactivate Service
+        Controller-->>View: 200 OK
+        deactivate Controller
+        View-->>Admin: Refresh List Kasir
+        deactivate View
+
+    else Ubah Status Kurir (Aktifkan / Nonaktifkan)
+        Admin->>View: klikNonaktifkanKurir(kurirId)
+        activate View
+        View->>Controller: updateKurirStatus(kurirId, status='inactive')
+        activate Controller
+        Controller->>Service: updateKurirStatus(kurirId, status)
+        activate Service
+        Service->>Entity: update(kurirId, { status })
+        activate Entity
+        Entity-->>Service: status terupdate
+        deactivate Entity
+        Service-->>Controller: success
+        deactivate Service
+        Controller-->>View: 200 OK
+        deactivate Controller
+        View-->>Admin: Refresh List Kurir
+        deactivate View
+    end

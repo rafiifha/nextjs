@@ -33,7 +33,8 @@ interface Product {
     id: number;
     priceType: string;
     price: number | null;
-    stock: number | null;
+    stockOnline: number | null;
+    stockOffline: number | null;
   }>;
 }
 
@@ -211,7 +212,7 @@ export default function CheckoutPage() {
           const product = data.find((p: Product) => p.id === Number(productId));
           if (product && product.variants) {
             const variantDus = product.variants.find((v: any) => v.priceType === 'dus');
-            if (variantDus && (variantDus.stock ?? 0) > 0) {
+            if (variantDus && (variantDus.stockOnline ?? 0) > 0) {
               setCart(cartService.addToCart(product.id, product, variantDus.id, 'dus', variantDus.price, 1));
             }
           }
@@ -302,7 +303,10 @@ export default function CheckoutPage() {
       const orderData = await orderResponse.json();
 
       if (!orderResponse.ok) {
-        toast.error('Gagal Membuat Pesanan', { description: orderData.error || 'Terjadi kesalahan' });
+        const errorDesc = orderData.details && Array.isArray(orderData.details)
+          ? orderData.details.join(', ')
+          : (orderData.error || 'Terjadi kesalahan');
+        toast.error('Gagal Membuat Pesanan', { description: errorDesc });
         setSubmitting(false);
         return;
       }

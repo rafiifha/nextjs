@@ -1,0 +1,69 @@
+sequenceDiagram
+    actor Pelanggan
+    participant View as <<View>><br/>PaymentPage
+    participant Controller as <<Controller>><br/>PaymentController
+    participant Service as <<Service>><br/>PaymentService
+    participant Entity as <<Entity>><br/>Order
+    actor PakasirAPI as PakasirAPI
+
+    %% 1. Meninjau rincian tagihan
+    Pelanggan->>View: bukaHalamanPembayaran(orderId)
+    activate View
+    View->>Controller: checkExpiration(orderId)
+    activate Controller
+    Controller->>Service: checkExpiration(orderId)
+    activate Service
+    Service->>Entity: findUnique(orderId)
+    activate Entity
+    Entity-->>Service: data order (expiredAt)
+    deactivate Entity
+
+    %% 2. Apakah waktu kedaluwarsa habis?
+    alt Ya (Kedaluwarsa Habis)
+        Service->>Entity: update(orderId, status='cancelled')
+        activate Entity
+        Entity-->>Service: order dibatalkan
+        deactivate Entity
+        Service-->>Controller: status cancelled
+        Controller-->>View: Tampilkan Pesan Kedaluwarsa
+        View-->>Pelanggan: Pesanan Dibatalkan
+    else Tidak (Kedaluwarsa Belum Habis)
+        Service-->>Controller: status pending
+        Controller-->>View: Tampilkan Pilihan Pembayaran
+        View-->>Pelanggan: Tampilkan Tagihan
+
+        %% 3. Memilih metode & Memicu pencetakan kode bayar
+        Pelanggan->>View: pilihMetodePembayaran(method)
+        View->>Controller: generatePaymentCode(orderId, method)
+        Controller->>Service: generatePaymentCode(orderId, method)
+        Service->>PakasirAPI: POST /transactioncreate/{method}
+        activate PakasirAPI
+        PakasirAPI-->>Service: payment_number (kode bayar)
+        deactivate PakasirAPI
+        Service->>Entity: update(orderId, paymentNumber)
+        activate Entity
+        Entity-->>Service: updated
+        deactivate Entity
+        Service-->>Controller: paymentInfo
+        Controller-->>View: 200 OK (paymentInfo)
+        View-->>Pelanggan: Tampilkan Kode Pembayaran
+
+        %% 4. Melakukan pembayaran & Mendeteksi keberhasilan
+        Pelanggan->>PakasirAPI: melakukanPembayaran(kode bayar)
+        activate PakasirAPI
+        PakasirAPI->>Controller: POST /api/payment/webhook (paymentData)
+        deactivate PakasirAPI
+        Controller->>Service: handleWebhook(paymentData)
+
+        %% 5. Memperbarui status pesanan menjadi sudah lunas
+        Service->>Entity: update(orderId, status='paid')
+        activate Entity
+        Entity-->>Service: order terupdate (status paid)
+        deactivate Entity
+        Service-->>Controller: success
+        Controller-->>View: 200 OK (Lunas)
+        View-->>Pelanggan: Tampilkan Pembayaran Berhasil
+    end
+    deactivate Service
+    deactivate Controller
+    deactivate View

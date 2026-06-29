@@ -214,8 +214,8 @@ export default function PaymentInstructionPage() {
               <XCircle className="h-14 w-14 text-red-500" strokeWidth={1.5} />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Pembayaran Kedaluwarsa</h2>
-              <p className="text-gray-600">Batas waktu pembayaran telah habis. Silakan lakukan checkout ulang dengan membuat pesanan baru.</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Pemesanan Dibatalkan</h2>
+              <p className="text-gray-600">Pesanan ini telah dibatalkan secara otomatis karena pembayaran tidak diterima dalam batas waktu 15 menit. Silakan lakukan checkout ulang.</p>
             </div>
             <div className="space-y-3">
               <Button

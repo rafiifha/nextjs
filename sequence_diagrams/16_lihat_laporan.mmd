@@ -1,0 +1,33 @@
+sequenceDiagram
+    actor Admin
+    participant View as <<View>><br/>AdminDashboardPage
+    participant Controller as <<Controller>><br/>OrderController
+    participant Service as <<Service>><br/>OrderService
+    participant Entity as <<Entity>><br/>Order
+
+    Admin->>View: bukaHalamanLaporan()
+    activate View
+    View->>Controller: getOrders(request, filters)
+    activate Controller
+    Controller->>Service: getAllOrders({ page, limit, search, status })
+    activate Service
+    Service->>Entity: findMany(where status, search, skip, take)
+    activate Entity
+    Entity-->>Service: data semua pesanan
+    deactivate Entity
+
+    Service->>Service: mapAndNormalizeOrders()
+    activate Service
+    deactivate Service
+
+    Service-->>Controller: { orders, total, page, limit, totalPages }
+    deactivate Service
+    Controller-->>View: 200 OK (JSON laporan)
+    deactivate Controller
+
+    View->>View: hitungRekapPenjualan()
+    activate View
+    deactivate View
+
+    View-->>Admin: Tampilkan Grafik & Tabel Laporan Penjualan
+    deactivate View

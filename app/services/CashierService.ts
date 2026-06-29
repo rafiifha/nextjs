@@ -53,7 +53,7 @@ export class CashierService {
         continue;
       }
 
-      const availableStock = variant.stock ?? 0;
+      const availableStock = variant.stockOffline ?? 0;
       if (availableStock < item.quantity) {
         stockErrors.push(`${product.name} (${variant.priceType}): stok tersedia ${availableStock}, diminta ${item.quantity}`);
       }
@@ -131,7 +131,7 @@ export class CashierService {
       try {
         await prisma.productVariant.update({
           where: { id: item.variantId },
-          data: { stock: { decrement: item.quantity } },
+          data: { stockOffline: { decrement: item.quantity } },
         });
         console.log(`📦 Kasir stok reserved: variant ${item.variantId} dikurangi ${item.quantity}`);
       } catch (error: any) {
@@ -180,7 +180,7 @@ export class CashierService {
           if (!item.variantId) continue;
           await prisma.productVariant.update({
             where: { id: item.variantId },
-            data: { stock: { increment: item.quantity } },
+            data: { stockOffline: { increment: item.quantity } },
           });
           console.log(`↩️ Kasir stok restored: variant ${item.variantId} dikembalikan ${item.quantity}`);
         }

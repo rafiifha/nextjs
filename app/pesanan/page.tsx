@@ -209,7 +209,7 @@ export default function PesananPage() {
       shipped: { label: 'Dalam Pengiriman', icon: Truck, className: 'bg-orange-100 text-orange-800' },
       delivered: { label: 'Sudah Dikirim', icon: Truck, className: 'bg-purple-100 text-purple-800' },
       cancelled: { label: 'Dibatalkan', icon: XCircle, className: 'bg-red-100 text-red-800' },
-      expired: { label: 'Kedaluwarsa', icon: XCircle, className: 'bg-gray-100 text-gray-800' },
+      expired: { label: 'Dibatalkan (Tidak Dibayar)', icon: XCircle, className: 'bg-red-50 text-red-700 border border-red-200' },
     };
     const config = statusConfig[status] || statusConfig.pending;
     const Icon = config.icon;

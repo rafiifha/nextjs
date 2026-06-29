@@ -1,0 +1,35 @@
+sequenceDiagram
+    actor Pelanggan
+    participant View as <<View>><br/>ProfilPage
+    participant Controller as <<Controller>><br/>UserController
+    participant Service as <<Service>><br/>UserService
+    participant Entity as <<Entity>><br/>User
+
+    Pelanggan->>View: updateProfil(name, email, phone, password)
+    activate View
+    View->>Controller: updateProfile(request)
+    activate Controller
+    Controller->>Service: updateProfile(id, name, email, phone, password)
+    activate Service
+
+    opt Password Diubah
+        Service->>Service: bcrypt.hash(password)
+        activate Service
+        deactivate Service
+    end
+
+    Service->>Entity: update(id, dataToUpdate)
+    activate Entity
+    Entity-->>Service: data user terupdate
+    deactivate Entity
+    Service-->>Controller: updatedUser
+    deactivate Service
+    Controller-->>View: 200 OK (JSON user)
+    deactivate Controller
+
+    View->>View: updateLocalStorage(user)
+    activate View
+    deactivate View
+
+    View-->>Pelanggan: Tampilkan Pesan Profil Berhasil Diperbarui
+    deactivate View

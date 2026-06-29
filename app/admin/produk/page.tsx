@@ -19,12 +19,14 @@ interface ProductVariant {
   id: number;
   priceType: string;
   price: number | null;
-  stock: number | null;
+  stockOnline: number | null;
+  stockOffline: number | null;
 }
 
 interface Product {
   id: number;
   name: string;
+  image?: string | null;
   categoryId: number;
   category: Category;
   variants: ProductVariant[];
@@ -39,13 +41,16 @@ export default function ManajemenProdukPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     categoryId: '',
+    image: '',
     variants: [] as Array<{
       priceType: string;
       price: string;
-      stock: string;
+      stockOnline: string;
+      stockOffline: string;
     }>,
   });
 
@@ -87,7 +92,8 @@ export default function ManajemenProdukPage() {
       const newVariants = category.priceTypes.map(priceType => ({
         priceType,
         price: '',
-        stock: '',
+        stockOnline: '',
+        stockOffline: '',
       }));
       setFormData({ ...formData, categoryId, variants: newVariants });
     }
@@ -97,6 +103,41 @@ export default function ManajemenProdukPage() {
     const newVariants = [...formData.variants];
     newVariants[index] = { ...newVariants[index], [field]: value };
     setFormData({ ...formData, variants: newVariants });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Error', { description: 'File harus berupa gambar' });
+      return;
+    }
+
+    setUploading(true);
+    const data = new FormData();
+    data.append('file', file);
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: data,
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setFormData((prev) => ({ ...prev, image: result.url }));
+        toast.success('Berhasil', { description: 'Gambar berhasil diunggah' });
+      } else {
+        const err = await res.json();
+        toast.error('Error', { description: err.error || 'Gagal mengunggah gambar' });
+      }
+    } catch (err: any) {
+      console.error('File upload error:', err);
+      toast.error('Error', { description: 'Gagal mengunggah gambar' });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,14 +153,17 @@ export default function ManajemenProdukPage() {
     const productData = {
       name: formData.name,
       categoryId: parseInt(formData.categoryId),
+      image: formData.image || null,
       variants: formData.variants.map(v => {
         const price = v.price && v.price !== '' ? (isNaN(parseInt(v.price)) ? null : parseInt(v.price)) : null;
-        const stockValue = v.stock && v.stock !== '' ? (isNaN(parseInt(v.stock)) ? null : parseInt(v.stock)) : null;
+        const stockOnlineValue = v.stockOnline && v.stockOnline !== '' ? (isNaN(parseInt(v.stockOnline)) ? null : parseInt(v.stockOnline)) : null;
+        const stockOfflineValue = v.stockOffline && v.stockOffline !== '' ? (isNaN(parseInt(v.stockOffline)) ? null : parseInt(v.stockOffline)) : null;
 
         return {
           priceType: v.priceType,
           price,
-          stock: stockValue,
+          stockOnline: stockOnlineValue,
+          stockOffline: stockOfflineValue,
         };
       }),
     };
@@ -175,10 +219,12 @@ export default function ManajemenProdukPage() {
     setFormData({
       name: product.name,
       categoryId: product.categoryId.toString(),
+      image: product.image || '',
       variants: product.variants.map(v => ({
         priceType: v.priceType,
         price: v.price ? v.price.toString() : '',
-        stock: v.stock !== null && v.stock !== undefined ? v.stock.toString() : '',
+        stockOnline: v.stockOnline !== null && v.stockOnline !== undefined ? v.stockOnline.toString() : '',
+        stockOffline: v.stockOffline !== null && v.stockOffline !== undefined ? v.stockOffline.toString() : '',
       })),
     });
     setShowForm(true);
@@ -219,7 +265,13 @@ export default function ManajemenProdukPage() {
     setFormData({
       name: '',
       categoryId: '',
-      variants: [],
+      image: '',
+      variants: [] as Array<{
+        priceType: string;
+        price: string;
+        stockOnline: string;
+        stockOffline: string;
+      }>,
     });
     setEditingProduct(null);
     setShowForm(false);
@@ -241,7 +293,7 @@ export default function ManajemenProdukPage() {
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Manajemen Produk</h1>
-          <p className="text-gray-600">Kelola produk, kategori, dan varian harga</p>
+          <p className="text-gray-600">Kelola produk dan varian harga</p>
         </div>
         <Button onClick={() => { resetForm(); setShowForm(true); }}>
           <Plus className="h-4 w-4 mr-2" />
@@ -264,6 +316,59 @@ export default function ManajemenProdukPage() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
+              </div>
+
+              <div>
+                <Label>Gambar Produk</Label>
+                <div className="mt-2 flex items-center gap-4">
+                  {formData.image ? (
+                    <div className="relative h-20 w-20 rounded-lg overflow-hidden border border-gray-200 group">
+                      <img
+                        src={formData.image}
+                        alt="Preview"
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, image: '' }))}
+                        className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-semibold"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-20 w-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 text-gray-400 text-xs">
+                      No Image
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <input
+                      id="image-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      disabled={uploading}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById('image-upload')?.click()}
+                      disabled={uploading}
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Mengunggah...
+                        </>
+                      ) : (
+                        'Pilih File Gambar'
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500 mt-1">PNG, JPG, JPEG sampai 5MB</p>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -296,7 +401,7 @@ export default function ManajemenProdukPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-gray-700 capitalize">{variant.priceType}</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                           <div>
                             <Label htmlFor={`price-${index}`}>Harga (Opsional)</Label>
                             <Input
@@ -305,18 +410,29 @@ export default function ManajemenProdukPage() {
                               min="0"
                               value={variant.price}
                               onChange={(e) => updateVariant(index, 'price', e.target.value)}
-                              placeholder="Kosongkan jika belum ada harga"
+                              placeholder="Belum ada harga"
                             />
                           </div>
                           <div>
-                            <Label htmlFor={`stock-${index}`}>Stok (Opsional)</Label>
+                            <Label htmlFor={`stockOnline-${index}`}>Stok Online</Label>
                             <Input
-                              id={`stock-${index}`}
+                              id={`stockOnline-${index}`}
                               type="number"
                               min="0"
-                              value={variant.stock}
-                              onChange={(e) => updateVariant(index, 'stock', e.target.value)}
-                              placeholder="Kosongkan jika belum ada stok"
+                              value={variant.stockOnline}
+                              onChange={(e) => updateVariant(index, 'stockOnline', e.target.value)}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`stockOffline-${index}`}>Stok Offline</Label>
+                            <Input
+                              id={`stockOffline-${index}`}
+                              type="number"
+                              min="0"
+                              value={variant.stockOffline}
+                              onChange={(e) => updateVariant(index, 'stockOffline', e.target.value)}
+                              placeholder="0"
                             />
                           </div>
                         </div>
@@ -401,8 +517,18 @@ export default function ManajemenProdukPage() {
                         {getCategoryName(product.categoryId)}
                       </div>
                     </div>
-                    <div className="ml-2 p-2 bg-[#ffd700]/20 rounded-lg">
-                      <Package className="h-5 w-5 text-[#ffd700]" />
+                    <div className="ml-2 flex-shrink-0">
+                      {product.image ? (
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="h-12 w-12 object-cover rounded-lg border border-gray-200"
+                        />
+                      ) : (
+                        <div className="p-2 bg-[#ffd700]/20 rounded-lg">
+                          <Package className="h-5 w-5 text-[#ffd700]" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -410,7 +536,8 @@ export default function ManajemenProdukPage() {
                   {/* Variants List */}
                   <div className="space-y-2.5 mb-4 max-h-64 overflow-y-auto pr-1">
                     {product.variants.map((variant) => {
-                      const hasStock = (variant.stock ?? 0) > 0;
+                      const hasOnline = (variant.stockOnline ?? 0) > 0;
+                      const hasOffline = (variant.stockOffline ?? 0) > 0;
 
                       return (
                         <div key={variant.id} className="border border-gray-200 rounded-lg p-3 bg-white hover:border-[#ffd700]/50 transition-colors">
@@ -434,10 +561,16 @@ export default function ManajemenProdukPage() {
                             )}
                           </div>
                           <div className="flex gap-2 text-xs">
-                            <div className={`flex items-center gap-1 px-2 py-1 rounded ${hasStock ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
-                              <Package className={`h-3 w-3 ${hasStock ? 'text-blue-600' : 'text-red-500'}`} />
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded ${hasOnline ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
+                              <Package className={`h-3 w-3 ${hasOnline ? 'text-blue-600' : 'text-red-500'}`} />
                               <span className="font-medium">
-                                Stok: {variant.stock !== null && variant.stock !== undefined ? variant.stock : '-'}
+                                Online: {variant.stockOnline !== null && variant.stockOnline !== undefined ? variant.stockOnline : '-'}
+                              </span>
+                            </div>
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded ${hasOffline ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                              <ShoppingBag className={`h-3 w-3 ${hasOffline ? 'text-green-600' : 'text-red-500'}`} />
+                              <span className="font-medium">
+                                Offline: {variant.stockOffline !== null && variant.stockOffline !== undefined ? variant.stockOffline : '-'}
                               </span>
                             </div>
                           </div>

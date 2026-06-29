@@ -72,7 +72,8 @@ export class OrderService {
               productId: item.variant.productId,
               priceType: item.variant.priceType,
               price: item.variant.price,
-              stock: item.variant.stock,
+              stockOnline: item.variant.stockOnline,
+              stockOffline: item.variant.stockOffline,
             } : null,
           })),
         };
@@ -158,7 +159,8 @@ export class OrderService {
               productId: item.variant.productId,
               priceType: item.variant.priceType,
               price: item.variant.price,
-              stock: item.variant.stock,
+              stockOnline: item.variant.stockOnline,
+              stockOffline: item.variant.stockOffline,
             } : null,
           })),
         };
@@ -264,7 +266,8 @@ export class OrderService {
               productId: item.variant.productId,
               priceType: item.variant.priceType,
               price: item.variant.price,
-              stock: item.variant.stock,
+              stockOnline: item.variant.stockOnline,
+              stockOffline: item.variant.stockOffline,
             } : null,
           })),
         };
@@ -350,7 +353,7 @@ export class OrderService {
         continue;
       }
 
-      const availableStock = variant.stock ?? 0;
+      const availableStock = variant.stockOnline ?? 0;
       if (availableStock < item.quantity) {
         stockErrors.push(`${product.name} (${variant.priceType}): stok tersedia ${availableStock}, diminta ${item.quantity}`);
       }
@@ -414,7 +417,7 @@ export class OrderService {
       if (item.variantId) {
         await prisma.productVariant.update({
           where: { id: item.variantId },
-          data: { stock: { decrement: item.quantity } },
+          data: { stockOnline: { decrement: item.quantity } },
         });
         console.log(`📦 Stok reserved: variant ${item.variantId} dikurangi ${item.quantity}`);
       }
@@ -450,7 +453,7 @@ export class OrderService {
           if (item.variantId) {
             await prisma.productVariant.update({
               where: { id: item.variantId },
-              data: { stock: { increment: item.quantity } },
+              data: { stockOnline: { increment: item.quantity } },
             });
             console.log(`↩️ Stok restored: variant ${item.variantId} dikembalikan ${item.quantity}`);
           }
@@ -512,7 +515,7 @@ export class OrderService {
         if (item.variantId) {
           await prisma.productVariant.update({
             where: { id: item.variantId },
-            data: { stock: { increment: item.quantity } },
+            data: { stockOnline: { increment: item.quantity } },
           });
           console.log(`↩️ Cancel: stok variant ${item.variantId} dikembalikan ${item.quantity}`);
         }
@@ -638,7 +641,7 @@ export class OrderService {
         if (item.variantId) {
           await prisma.productVariant.update({
             where: { id: item.variantId },
-            data: { stock: { increment: item.quantity } },
+            data: { stockOnline: { increment: item.quantity } },
           });
           console.log(`↩️ Expired: stok variant ${item.variantId} dikembalikan ${item.quantity}`);
         }

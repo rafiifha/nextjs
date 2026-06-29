@@ -1,71 +1,114 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Loader2 } from 'lucide-react';
-
+import { ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [showOtp, setShowOtp] = useState(false);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [countdown, setCountdown] = useState(0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
+
+  // Submit form → kirim OTP
+  const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!email && !phone) {
-      setError('Email atau nomor WhatsApp harus diisi (minimal salah satu)');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Password dan konfirmasi password tidak cocok');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('Password minimal 6 karakter');
-      return;
-    }
+    if (!name) { setError('Nama harus diisi'); return; }
+    if (!phone) { setError('Nomor WhatsApp harus diisi'); return; }
+    if (password.length < 6) { setError('Password minimal 6 karakter'); return; }
+    if (password !== confirmPassword) { setError('Password tidak cocok'); return; }
 
     setLoading(true);
-
     try {
-      const response = await fetch('/api/auth/register', {
+      const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          ...(email && { email }),
-          ...(phone && { phone }),
-          password,
-        }),
+        body: JSON.stringify({ phone, type: 'register' }),
       });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Gagal mengirim OTP'); return; }
 
-      const data = await response.json();
+      setShowOtp(true);
+      setCountdown(60);
+      setOtpCode('');
+    } catch {
+      setError('Terjadi kesalahan. Cek koneksi internet Anda.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      if (!response.ok) {
-        setError(data.error || 'Registrasi gagal');
-        setLoading(false);
-        return;
-      }
+  // Verifikasi OTP → register
+  const handleVerifyAndRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (otpCode.length !== 6) { setError('Masukkan 6 digit kode OTP'); return; }
 
-      // Registrasi berhasil, arahkan ke halaman login
+    setLoading(true);
+    try {
+      // 1. Verify OTP
+      const verifyRes = await fetch('/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, code: otpCode, type: 'register' }),
+      });
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok) { setError(verifyData.error || 'Verifikasi gagal'); return; }
+
+      // 2. Register
+      const regRes = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone, ...(email && { email }), password }),
+      });
+      const regData = await regRes.json();
+      if (!regRes.ok) { setError(regData.error || 'Registrasi gagal'); return; }
+
       router.push('/login?registered=true');
-    } catch (err: any) {
-      console.error('Register error:', err);
-      setError(err.message || 'Terjadi kesalahan saat registrasi. Pastikan server berjalan.');
+    } catch {
+      setError('Terjadi kesalahan saat registrasi.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (countdown > 0) return;
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, type: 'register' }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Gagal mengirim ulang'); return; }
+      setCountdown(60);
+      setOtpCode('');
+    } catch {
+      setError('Terjadi kesalahan.');
     } finally {
       setLoading(false);
     }
@@ -90,90 +133,92 @@ export default function RegisterPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Nama Lengkap</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Nama lengkap"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="email">Email <span className="text-gray-400 font-normal text-xs">(opsional)</span></Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="nama@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="phone">Nomor WhatsApp <span className="text-gray-400 font-normal text-xs">(opsional)</span></Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="081234567890"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-              </div>
-
-              <p className="text-xs text-gray-500">* Isi minimal salah satu: email atau nomor WhatsApp</p>
-
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Minimal 6 karakter"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Ulangi password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
-                  {error}
+            {!showOtp ? (
+              /* Form utama */
+              <form onSubmit={handleSubmitForm} className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Nama Lengkap</Label>
+                  <Input id="name" type="text" placeholder="Nama lengkap" value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
-              )}
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Memproses...
-                  </>
-                ) : (
-                  'Daftar'
+                <div>
+                  <Label htmlFor="phone">Nomor WhatsApp</Label>
+                  <Input id="phone" type="tel" placeholder="081234567890" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+                </div>
+
+                <div>
+                  <Label htmlFor="email">Email <span className="text-gray-400 font-normal text-xs">(opsional)</span></Label>
+                  <Input id="email" type="email" placeholder="nama@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+
+                <div>
+                  <Label htmlFor="password">Password</Label>
+                  <Input id="password" type="password" placeholder="Minimal 6 karakter" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                </div>
+
+                <div>
+                  <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
+                  <Input id="confirmPassword" type="password" placeholder="Ulangi password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">{error}</div>
                 )}
-              </Button>
-            </form>
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Mengirim kode verifikasi...</> : 'Daftar'}
+                </Button>
+              </form>
+            ) : (
+              /* Verifikasi OTP */
+              <form onSubmit={handleVerifyAndRegister} className="space-y-4">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-700 text-sm text-center">
+                  Kode verifikasi telah dikirim ke WhatsApp <strong>{phone}</strong>
+                </div>
+
+                <div>
+                  <Label htmlFor="otp">Kode Verifikasi</Label>
+                  <Input
+                    id="otp"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Masukkan 6 digit kode"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="text-center text-lg tracking-[0.5em] font-mono"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">{error}</div>
+                )}
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Memverifikasi...</> : 'Verifikasi & Daftar'}
+                </Button>
+
+                <div className="flex items-center justify-between text-sm">
+                  <button type="button" onClick={() => { setShowOtp(false); setError(''); }} className="text-gray-500 hover:text-gray-700">
+                    ← Kembali
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={countdown > 0 || loading}
+                    className={`font-medium ${countdown > 0 ? 'text-gray-400' : 'text-[#ffd700] hover:underline'}`}
+                  >
+                    {countdown > 0 ? `Kirim ulang (${countdown}s)` : 'Kirim ulang'}
+                  </button>
+                </div>
+              </form>
+            )}
 
             <div className="mt-6 text-center text-sm text-gray-600">
               Sudah punya akun?{' '}
-              <Link href="/login" className="text-[#ffd700] hover:underline font-medium">
-                Masuk sekarang
-              </Link>
+              <Link href="/login" className="text-[#ffd700] hover:underline font-medium">Masuk sekarang</Link>
             </div>
           </CardContent>
         </Card>

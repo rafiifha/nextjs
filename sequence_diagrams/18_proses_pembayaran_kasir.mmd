@@ -1,0 +1,86 @@
+sequenceDiagram
+    actor Kasir
+    participant View as <<View>><br/>KasirPage
+    participant Controller as <<Controller>><br/>CashierController
+    participant Service as <<Service>><br/>CashierService
+    participant OrderEntity as <<Entity>><br/>Order
+    participant VariantEntity as <<Entity>><br/>ProductVariant
+    actor PakasirAPI as PakasirAPI
+
+    Kasir->>View: pilihMetodePembayaran(tunai / digital)
+    activate View
+
+    alt Tunai (Cash)
+        Kasir->>View: inputPembayaranTunai(cashAmount)
+        View->>Controller: prosesPembayaranTunai(orderId, cashAmount)
+        activate Controller
+        Controller->>Service: prosesPembayaranTunai(orderId, cashAmount)
+        activate Service
+        
+        Service->>OrderEntity: update(orderId, status='paid', cashAmount)
+        activate OrderEntity
+        OrderEntity-->>Service: order terupdate (paid)
+        deactivate OrderEntity
+
+        Service->>VariantEntity: decrementStock(orderItems)
+        activate VariantEntity
+        VariantEntity-->>Service: stok terpotong
+        deactivate VariantEntity
+
+        Service-->>Controller: success (change / kembalian)
+        deactivate Service
+        Controller-->>View: 200 OK (JSON kembalian)
+        deactivate Controller
+        View-->>Kasir: Tampilkan Transaksi Berhasil & Kembalian
+
+    else Digital (QRIS / VA)
+        View->>Controller: generatePaymentCode(orderId, method='digital')
+        activate Controller
+        Controller->>Service: generatePaymentCode(orderId, method)
+        activate Service
+        Service->>PakasirAPI: POST /transactioncreate
+        activate PakasirAPI
+        PakasirAPI-->>Service: data QRIS / VA (payment_number, qr_string)
+        deactivate PakasirAPI
+        Service-->>Controller: paymentDetails
+        deactivate Service
+        Controller-->>View: 200 OK (JSON details)
+        deactivate Controller
+        View-->>Kasir: Tampilkan QRIS / VA di Layar
+
+        %% Verifikasi Pembayaran
+        Kasir->>View: klikVerifikasiPembayaran()
+        View->>Controller: verifyPayment(orderId)
+        activate Controller
+        Controller->>Service: verifyPaymentStatus(orderId)
+        activate Service
+        Service->>PakasirAPI: GET /transactionstatus
+        activate PakasirAPI
+        PakasirAPI-->>Service: { status: 'PAID' / 'PENDING' }
+        deactivate PakasirAPI
+
+        alt Pembayaran Berhasil (Ya)
+            Service->>OrderEntity: update(orderId, status='paid')
+            activate OrderEntity
+            OrderEntity-->>Service: order terupdate (paid)
+            deactivate OrderEntity
+            
+            Service->>VariantEntity: decrementStock(orderItems)
+            activate VariantEntity
+            VariantEntity-->>Service: stok terpotong
+            deactivate VariantEntity
+            
+            Service-->>Controller: success
+            deactivate Service
+            Controller-->>View: 200 OK (PAID)
+            deactivate Controller
+            View-->>Kasir: Tampilkan Transaksi Berhasil (Lunas)
+        else Pembayaran Gagal (Tidak)
+            Service-->>Controller: failure (PENDING/EXPIRED)
+            deactivate Service
+            Controller-->>View: 400 Bad Request
+            deactivate Controller
+            View-->>Kasir: Tampilkan Notifikasi Pembayaran Gagal
+        end
+    end
+    deactivate View

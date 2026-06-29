@@ -175,6 +175,18 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                     key={index}
                     className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
                   >
+                    {/* Product Image Thumbnail */}
+                    <div className="h-12 w-12 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center border border-gray-200">
+                      {item.product.image ? (
+                        <img
+                          src={item.product.image}
+                          alt={item.product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Package className="h-5 w-5 text-gray-400" />
+                      )}
+                    </div>
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900 mb-1">{item.product.name}</h4>
                       <p className="text-sm text-gray-600 mb-2">
@@ -182,7 +194,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       </p>
                       {item.product.variants && item.variantId && (
                         <p className="text-xs text-gray-500">
-                          Stok: {item.product.variants.find(v => v.id === item.variantId)?.stock || 0}
+                          Stok: {item.product.variants.find(v => v.id === item.variantId)?.stockOnline || 0}
                         </p>
                       )}
                     </div>
@@ -203,7 +215,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           onClick={() => updateQuantity(item.productId, item.priceType, item.quantity + 1)}
                           disabled={
                             item.product.variants && item.variantId
-                              ? item.quantity >= (item.product.variants.find(v => v.id === item.variantId)?.stock || 0)
+                              ? item.quantity >= (item.product.variants.find(v => v.id === item.variantId)?.stockOnline || 0)
                               : false
                           }
                           className="h-8 w-8 p-0"

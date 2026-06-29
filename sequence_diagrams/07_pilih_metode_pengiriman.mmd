@@ -1,0 +1,45 @@
+sequenceDiagram
+    actor Pelanggan
+    participant View as <<View>><br/>CheckoutPage
+    participant Controller as <<Controller>><br/>DeliveryController
+    participant Service as <<Service>><br/>DeliveryService
+
+    Pelanggan->>View: pilihMetodePengiriman(method)
+    activate View
+
+    alt Metode = "pickup" (Ambil Sendiri)
+        View->>View: setShippingFee(0)
+        activate View
+        deactivate View
+
+        View->>View: hideMapComponent()
+        activate View
+        deactivate View
+
+        View-->>Pelanggan: Tampilkan Info Alamat Toko & Ongkir Rp 0
+    else Metode = "delivery" (Diantar)
+        View->>View: renderLeafletMap()
+        activate View
+        deactivate View
+
+        Pelanggan->>View: pilihTitikLokasiDiPeta(lat, lng)
+        View->>Controller: calculateShippingFee(request)
+        activate Controller
+        Controller->>Service: calculateShippingFee(lat, lng)
+        activate Service
+
+        Service->>Service: haversineDistanceKm(storeLat, storeLng, lat, lng)
+        activate Service
+        deactivate Service
+
+        Service->>Service: getZoneAndFee(distanceKm)
+        activate Service
+        deactivate Service
+
+        Service-->>Controller: { distanceKm, zone, shippingFee, store }
+        deactivate Service
+        Controller-->>View: 200 OK (JSON shippingData)
+        deactivate Controller
+        View-->>Pelanggan: Tampilkan Jarak, Zona, Ongkir & Total Harga Terupdate
+    end
+    deactivate View

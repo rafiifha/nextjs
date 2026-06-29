@@ -21,6 +21,7 @@ model Product {
   name        String
   categoryId  Int      @default(1) // Default ke kategori pertama (akan dibuat via seed)
   category    Category @relation(fields: [categoryId], references: [id])
+  image       String?  // URL gambar produk (bisa kosong)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   variants    ProductVariant[]
@@ -33,7 +34,8 @@ model ProductVariant {
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   priceType   String   // "dus", "pak", "item", "bal", "kg", etc.
   price       Int?     // Harga untuk jenis ini (bisa kosong)
-  stock       Int?     // Stok untuk varian ini (bisa kosong)
+  stockOnline  Int?    // Stok online (ditampilkan ke pelanggan)
+  stockOffline Int?    // Stok offline (ditampilkan ke kasir)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   items       OrderItem[] @relation("VariantOrderItems")
@@ -107,4 +109,14 @@ model User {
   orders    Order[]
 }
 
+model OtpVerification {
+  id        Int      @id @default(autoincrement())
+  phone     String
+  code      String
+  type      String   // "register" atau "forgot_password"
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
 
+  @@index([phone, type])
+}

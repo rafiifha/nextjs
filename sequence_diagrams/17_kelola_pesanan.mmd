@@ -1,0 +1,84 @@
+sequenceDiagram
+    actor Kasir
+    participant View as <<View>><br/>KasirPage
+    participant ProductCtrl as <<Controller>><br/>ProductController
+    participant OrderCtrl as <<Controller>><br/>OrderController
+    participant ProductSvc as <<Service>><br/>ProductService
+    participant OrderSvc as <<Service>><br/>OrderService
+    participant ProductEntity as <<Entity>><br/>Product
+    participant OrderEntity as <<Entity>><br/>Order
+
+    %% 1. Membuka Halaman Kasir
+    Kasir->>View: bukaHalamanKasir()
+    activate View
+    View->>ProductCtrl: getProducts()
+    activate ProductCtrl
+    ProductCtrl->>ProductSvc: getAllProducts()
+    activate ProductSvc
+    ProductSvc->>ProductEntity: findMany()
+    activate ProductEntity
+    ProductEntity-->>ProductSvc: daftar produk
+    deactivate ProductEntity
+    ProductSvc-->>ProductCtrl: daftar produk
+    deactivate ProductSvc
+    ProductCtrl-->>View: 200 OK (JSON produk)
+    deactivate ProductCtrl
+    View-->>Kasir: Tampilkan Halaman Kasir (POS)
+    deactivate View
+
+    %% 2. Mencari Produk
+    loop Cari Produk
+        Kasir->>View: inputKataKunci(keyword)
+        activate View
+        View->>ProductCtrl: searchProducts(keyword)
+        activate ProductCtrl
+        ProductCtrl->>ProductSvc: searchProducts(keyword)
+        activate ProductSvc
+        ProductSvc->>ProductEntity: findMany(where keyword)
+        activate ProductEntity
+        ProductEntity-->>ProductSvc: hasil pencarian
+        deactivate ProductEntity
+
+        alt Produk Tidak Ditemukan
+            ProductSvc-->>ProductCtrl: null / list kosong
+            ProductCtrl-->>View: 200 OK (data kosong)
+            View-->>Kasir: Tampilkan Notifikasi Produk Tidak Ditemukan
+        else Produk Ditemukan
+            ProductSvc-->>ProductCtrl: data produk
+            deactivate ProductSvc
+            ProductCtrl-->>View: 200 OK (data produk)
+            deactivate ProductCtrl
+            View-->>Kasir: Tampilkan Hasil Pencarian Produk
+            deactivate View
+
+            %% 3. Pilih produk & tambah ke keranjang
+            Kasir->>View: pilihProdukDanTambahKeKeranjang(productId, qty)
+            activate View
+            View->>View: tambahKeKeranjangLokal()
+            activate View
+            deactivate View
+            View-->>Kasir: Tampilkan Keranjang Terupdate
+            deactivate View
+        end
+    end
+
+    %% 4. Input data pelanggan & Membuat Pesanan
+    Kasir->>View: inputDataPelanggan(nama, noHP)
+    activate View
+    Kasir->>View: klikBuatPesanan()
+    View->>OrderCtrl: createOfflineOrder(customerData, cartItems)
+    activate OrderCtrl
+    OrderCtrl->>OrderSvc: createOrder(orderData)
+    activate OrderSvc
+    OrderSvc->>OrderEntity: create(orderData)
+    activate OrderEntity
+    OrderEntity-->>OrderSvc: order baru dibuat
+    deactivate OrderEntity
+    OrderSvc-->>OrderCtrl: data order baru (status pending)
+    deactivate OrderSvc
+    OrderCtrl-->>View: 201 Created (JSON order)
+    deactivate OrderCtrl
+
+    %% 5. Mengarahkan ke proses pembayaran
+    View-->>Kasir: Redirect ke Halaman Proses Pembayaran
+    deactivate View

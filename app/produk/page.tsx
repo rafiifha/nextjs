@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatRupiah } from '@/lib/utils';
-import { Package, Search, Loader2, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, Search, Loader2, Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import Link from 'next/link';
 import { cartService } from '@/lib/cart';
 import { toast } from 'sonner';
@@ -15,7 +15,8 @@ interface ProductVariant {
   id: number;
   priceType: string;
   price: number | null;
-  stock: number | null;
+  stockOnline: number | null;
+  stockOffline: number | null;
   length?: number | null;
   width?: number | null;
   height?: number | null;
@@ -31,6 +32,7 @@ interface Category {
 interface Product {
   id: number;
   name: string;
+  image?: string | null;
   categoryId: number;
   category: Category;
   variants: ProductVariant[];
@@ -46,6 +48,7 @@ export default function ProdukPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [addingToCart, setAddingToCart] = useState<{ [key: string]: boolean }>({});
   const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<number, number>>({});
+  const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -153,7 +156,7 @@ export default function ProdukPage() {
           for (const product of productsData) {
             if (next[product.id]) continue;
             const firstAvailable = product.variants.find(
-              (v: ProductVariant) => (v.stock ?? 0) > 0 && v.price !== null && v.price !== undefined
+              (v: ProductVariant) => (v.stockOnline ?? 0) > 0 && v.price !== null && v.price !== undefined
             );
             if (firstAvailable) {
               next[product.id] = firstAvailable.id;
@@ -226,9 +229,24 @@ export default function ProdukPage() {
             {products.map((product) => (
               <Card
                 key={product.id}
-                className="border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
+                className="border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col"
               >
-                <CardContent className="p-4">
+                {/* Product Image / Gradient Fallback */}
+                <div className="relative h-48 w-full bg-gray-100 flex-shrink-0">
+                  {product.image ? (
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      onClick={() => setSelectedFullImage(product.image || null)}
+                      className="w-full h-full object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-yellow-100 to-amber-200 flex items-center justify-center">
+                      <Package className="h-12 w-12 text-amber-500/70" />
+                    </div>
+                  )}
+                </div>
+                <CardContent className="p-4 flex-1 flex flex-col justify-between">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <h3 className="text-base font-semibold text-gray-900">{product.name}</h3>
@@ -236,7 +254,7 @@ export default function ProdukPage() {
                         <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           {product.category.name}
                         </span>
-                        {product.variants.some(v => (v.stock ?? 0) > 0) ? (
+                        {product.variants.some(v => (v.stockOnline ?? 0) > 0) ? (
                           <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
                             Tersedia
                           </span>
@@ -247,11 +265,10 @@ export default function ProdukPage() {
                         )}
                       </div>
                     </div>
-                    <Package className="h-6 w-6 text-[#ffd700]" />
                   </div>
 
                   {(() => {
-                    const availableVariants = product.variants.filter((v) => (v.stock ?? 0) > 0 && v.price !== null && v.price !== undefined);
+                    const availableVariants = product.variants.filter((v) => (v.stockOnline ?? 0) > 0 && v.price !== null && v.price !== undefined);
                     const selectedVariantId = selectedVariantByProduct[product.id];
                     const selectedVariant = availableVariants.find((v) => v.id === selectedVariantId) || availableVariants[0];
                     const key = selectedVariant ? `${product.id}-${selectedVariant.priceType}` : `${product.id}-none`;
@@ -277,7 +294,7 @@ export default function ProdukPage() {
                           ) : (
                             availableVariants.map((variant) => (
                               <option key={variant.id} value={variant.id}>
-                                {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stock ?? 0})
+                                {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stockOnline ?? 0})
                               </option>
                             ))
                           )}
@@ -382,6 +399,29 @@ export default function ProdukPage() {
           </Card>
         )}
       </div>
+
+      {/* Lightbox / Full-screen Image Modal */}
+      {selectedFullImage && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm cursor-zoom-out"
+          onClick={() => setSelectedFullImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setSelectedFullImage(null)}
+              className="absolute top-4 right-4 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors z-[10000]"
+              title="Tutup"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img
+              src={selectedFullImage}
+              alt="Full Preview"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

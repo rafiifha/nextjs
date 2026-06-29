@@ -48,7 +48,11 @@ export class AuthController {
       console.error('Register error:', error);
       
       const errorMessage = error.message;
-      if (errorMessage === 'Nama, email/phone, dan password harus diisi' || errorMessage === 'Email atau nomor whatsapp sudah terdaftar') {
+      if (
+        errorMessage === 'Nama, nomor WhatsApp, dan password harus diisi' ||
+        errorMessage === 'Email atau nomor WhatsApp sudah terdaftar' ||
+        errorMessage === 'Nomor WhatsApp belum diverifikasi. Silakan verifikasi OTP terlebih dahulu.'
+      ) {
         return NextResponse.json({ error: errorMessage }, { status: 400 });
       }
       
@@ -59,20 +63,74 @@ export class AuthController {
     }
   }
 
+  async sendOtp(request: NextRequest) {
+    try {
+      const { phone, type } = await request.json();
+      const result = await this.authService.sendOtp(phone, type);
+      return NextResponse.json(result);
+    } catch (error: any) {
+      console.error('Send OTP error:', error);
+
+      const errorMessage = error.message;
+      if (
+        errorMessage === 'Nomor WhatsApp harus diisi' ||
+        errorMessage === 'Nomor WhatsApp sudah terdaftar' ||
+        errorMessage === 'Nomor WhatsApp tidak terdaftar' ||
+        errorMessage === 'Gagal mengirim OTP. Pastikan nomor WhatsApp aktif.'
+      ) {
+        return NextResponse.json({ error: errorMessage }, { status: 400 });
+      }
+
+      return NextResponse.json(
+        { error: errorMessage || 'Terjadi kesalahan saat mengirim OTP' },
+        { status: 500 }
+      );
+    }
+  }
+
+  async verifyOtp(request: NextRequest) {
+    try {
+      const { phone, code, type } = await request.json();
+      const result = await this.authService.verifyOtp(phone, code, type);
+      return NextResponse.json(result);
+    } catch (error: any) {
+      console.error('Verify OTP error:', error);
+
+      const errorMessage = error.message;
+      if (
+        errorMessage === 'Nomor WhatsApp dan kode OTP harus diisi' ||
+        errorMessage === 'Kode OTP tidak ditemukan. Silakan minta kode baru.' ||
+        errorMessage === 'Kode OTP sudah kadaluarsa. Silakan minta kode baru.' ||
+        errorMessage === 'Kode OTP salah'
+      ) {
+        return NextResponse.json({ error: errorMessage }, { status: 400 });
+      }
+
+      return NextResponse.json(
+        { error: errorMessage || 'Terjadi kesalahan saat verifikasi OTP' },
+        { status: 500 }
+      );
+    }
+  }
+
   async forgotPassword(request: NextRequest) {
     try {
-      const { identifier } = await request.json();
-      const result = await this.authService.forgotPassword(identifier);
+      const { identifier, newPassword } = await request.json();
+      const result = await this.authService.forgotPassword(identifier, newPassword);
       return NextResponse.json(result);
     } catch (error: any) {
       console.error('Lupa password error:', error);
       
-      if (error.message === 'Email atau nomor WhatsApp harus diisi') {
+      if (error.message === 'Nomor WhatsApp harus diisi') {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
       
       if (error.message === 'Pengguna tidak ditemukan') {
         return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+
+      if (error.message === 'Nomor WhatsApp belum diverifikasi. Silakan verifikasi OTP terlebih dahulu.') {
+        return NextResponse.json({ error: error.message }, { status: 400 });
       }
       
       return NextResponse.json({ error: 'Terjadi kesalahan pada server' }, { status: 500 });

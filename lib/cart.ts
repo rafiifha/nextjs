@@ -6,6 +6,7 @@ export interface CartItem {
   product: {
     id: number;
     name: string;
+    image?: string | null;
     category?: {
       id: number;
       name: string;
@@ -15,7 +16,8 @@ export interface CartItem {
       id: number;
       priceType: string;
       price: number | null;
-      stock: number | null;
+      stockOnline: number | null;
+      stockOffline: number | null;
       length?: number | null;
       width?: number | null;
       height?: number | null;
