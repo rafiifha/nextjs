@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,6 +48,7 @@ export default function PesananPage() {
   const [user, setUser] = useState<any>(null);
   const [highlightOrderId, setHighlightOrderId] = useState<number | null>(null);
   const [hasShownPaymentNotification, setHasShownPaymentNotification] = useState(false);
+  const notifiedOrderIds = useRef<Set<number>>(new Set());
   const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -84,6 +85,7 @@ export default function PesananPage() {
             setHighlightOrderId(orderId);
             if (paymentStatus === 'success' && !hasShownPaymentNotification) {
               setHasShownPaymentNotification(true);
+              notifiedOrderIds.current.add(orderId);
               setExpandedOrders(prev => new Set(prev).add(orderId));
               toast.success('Pembayaran Berhasil!', { description: `Pesanan #${orderId} Anda berhasil dibayar dan sedang diproses.` });
             }
@@ -137,7 +139,8 @@ export default function PesananPage() {
             if (prevOrders && prevOrders.length > 0) {
               newOrders.forEach((newOrder: Order) => {
                 const prevOrder = prevOrders.find(o => o.id === newOrder.id);
-                if (prevOrder && prevOrder.status === 'pending' && (newOrder.status === 'paid' || newOrder.status === 'processing')) {
+                if (prevOrder && prevOrder.status === 'pending' && (newOrder.status === 'paid' || newOrder.status === 'processing') && !notifiedOrderIds.current.has(newOrder.id)) {
+                  notifiedOrderIds.current.add(newOrder.id);
                   toast.success('Pembayaran Berhasil!', {
                     description: `Pesanan #${newOrder.id} Anda berhasil dibayar dan sedang diproses.`
                   });
@@ -156,7 +159,8 @@ export default function PesananPage() {
           if (prevOrders && prevOrders.length > 0) {
             ordersData.forEach((newOrder: Order) => {
               const prevOrder = prevOrders.find(o => o.id === newOrder.id);
-              if (prevOrder && prevOrder.status === 'pending' && (newOrder.status === 'paid' || newOrder.status === 'processing')) {
+              if (prevOrder && prevOrder.status === 'pending' && (newOrder.status === 'paid' || newOrder.status === 'processing') && !notifiedOrderIds.current.has(newOrder.id)) {
+                notifiedOrderIds.current.add(newOrder.id);
                 toast.success('Pembayaran Berhasil!', {
                   description: `Pesanan #${newOrder.id} Anda berhasil dibayar dan sedang diproses.`
                 });

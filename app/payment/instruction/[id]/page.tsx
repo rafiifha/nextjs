@@ -39,9 +39,6 @@ export default function PaymentInstructionPage() {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
           }
-          toast.success('Pembayaran Berhasil!', {
-            description: `Pesanan #${params.id} telah dikonfirmasi.`,
-          });
         }
 
         // Check if payment expired

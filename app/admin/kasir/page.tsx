@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/utils';
-import { ShoppingCart, Plus, Minus, Trash2, Search, X, Loader2, Filter, Package, Box, TrendingDown, CheckCircle, CreditCard, Wallet, Printer } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Search, X, Loader2, Filter, Package, Box, TrendingDown, CheckCircle, CreditCard, Wallet, Printer, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ProductVariant {
@@ -57,6 +57,8 @@ export default function KasirPage() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<number, number>>({});
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showDiscountDropdown, setShowDiscountDropdown] = useState(false);
 
 
   useEffect(() => {
@@ -229,7 +231,7 @@ export default function KasirPage() {
   };
 
   const getChange = () => {
-    const cashValue = cashReceived && cashReceived !== '' ? parseFloat(cashReceived) : 0;
+    const cashValue = cashReceived && cashReceived !== '' ? parseFloat(cashReceived.replace(/\./g, '')) : 0;
     if (isNaN(cashValue) || cashValue <= 0) return 0;
     return Math.max(0, cashValue - getTotalAfterDiscount());
   };
@@ -252,7 +254,7 @@ export default function KasirPage() {
 
     // Validate cash payment
     if (paymentMethod === 'tunai') {
-      const cashValue = cashReceived && cashReceived !== '' ? parseFloat(cashReceived) : 0;
+      const cashValue = cashReceived && cashReceived !== '' ? parseFloat(cashReceived.replace(/\./g, '')) : 0;
       if (isNaN(cashValue) || cashValue <= 0) {
         toast.error('Error', { description: 'Uang yang diterima harus diisi' });
         return;
@@ -276,7 +278,7 @@ export default function KasirPage() {
           customerPhone,
           paymentMethod: paymentMethod,
           discount: paymentMethod === 'tunai' ? getDiscountAmount() : 0,
-          cashReceived: paymentMethod === 'tunai' ? (cashReceived && cashReceived !== '' ? parseFloat(cashReceived) : 0) : null,
+          cashReceived: paymentMethod === 'tunai' ? (cashReceived && cashReceived !== '' ? parseFloat(cashReceived.replace(/\./g, '')) : 0) : null,
           items: cart.map((item) => {
             // Ensure all required fields are present and valid
             if (!item.productId || !item.priceType || !item.quantity || !item.price) {
@@ -319,7 +321,7 @@ export default function KasirPage() {
           subtotal: getSubtotal(),
           discount: getDiscountAmount(),
           total: getTotalAfterDiscount(),
-          cashReceived: cashReceived && cashReceived !== '' ? parseFloat(cashReceived) : 0,
+          cashReceived: cashReceived && cashReceived !== '' ? parseFloat(cashReceived.replace(/\./g, '')) : 0,
           change: changeAmount,
           paymentMethod: 'Tunai',
           date: new Date().toLocaleString('id-ID'),
@@ -362,26 +364,34 @@ export default function KasirPage() {
 
   return (
     <div className="h-[calc(100vh-30px)] flex flex-col p-4 overflow-hidden">
-      <div className="mb-4 flex-shrink-0">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Kasir</h1>
-        <p className="text-xs text-gray-600">Sistem kasir untuk transaksi langsung</p>
+      <div className="mb-3 flex-shrink-0 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-0.5">Kasir</h1>
+          <p className="text-xs text-gray-600">Sistem kasir untuk transaksi langsung</p>
+        </div>
+        {cart.length > 0 && (
+          <div className="flex items-center gap-2 bg-[#ffd700]/15 px-3 py-1.5 rounded-full">
+            <ShoppingCart className="h-4 w-4 text-[#ffd700]" />
+            <span className="text-sm font-bold text-gray-900">{cart.length} item</span>
+            <span className="text-sm font-semibold text-[#b8960c]">{formatRupiah(getTotalAfterDiscount())}</span>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden">
-        {/* Product List */}
+        {/* === LEFT COLUMN: PRODUCT LIST === */}
         <div className="lg:col-span-2 h-full flex flex-col overflow-hidden">
-          <Card className="border-gray-200 shadow-md h-full flex flex-col overflow-hidden">
-            <CardHeader className="flex-shrink-0">
-              <CardTitle className="text-xl font-bold">Daftar Produk</CardTitle>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                {/* Search Input */}
+          <Card className="border-gray-200 shadow-md h-full flex flex-col overflow-hidden bg-white">
+            <CardHeader className="flex-shrink-0 pb-3">
+              <CardTitle className="text-lg font-bold">Daftar Produk</CardTitle>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
                   <Input
                     placeholder="Cari produk..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-10"
+                    className="pl-10 pr-10 h-9"
                   />
                   {searchQuery && (
                     <button
@@ -392,14 +402,12 @@ export default function KasirPage() {
                     </button>
                   )}
                 </div>
-
-                {/* Category Filter */}
                 <div className="relative">
                   <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
                   <select
                     value={selectedCategoryId}
                     onChange={(e) => setSelectedCategoryId(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-10 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-10 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     <option value="">Semua Kategori</option>
                     {categories.map(cat => (
@@ -409,82 +417,61 @@ export default function KasirPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 min-h-0 overflow-y-auto p-4">
+
+            <CardContent className="min-h-0 overflow-y-auto px-4 pb-3 flex-1">
               {loading ? (
-                <div className="text-center py-8 text-gray-600">
+                <div className="text-center py-6 text-gray-600">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                   Memuat produk...
                 </div>
               ) : filteredProducts.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {filteredProducts.map((product) => {
                     const availableVariants = product.variants.filter(v => (v.stockOffline ?? 0) > 0 && v.price !== null && v.price !== undefined);
-
                     return (
-                      <Card
+                      <div
                         key={product.id}
-                        className="border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+                        className="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden bg-white"
                       >
-                        <CardHeader className="bg-gradient-to-r from-[#ffd700]/10 to-[#ffd700]/5 py-3">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1 min-w-0">
-                              <CardTitle className="text-sm font-semibold text-gray-900 line-clamp-2">
-                                {product.name}
-                              </CardTitle>
-                              <div className="inline-flex items-center gap-1 px-2 py-0.5 mt-2 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                                <Box className="h-3 w-3" />
-                                {product.category.name}
-                              </div>
+                        <div className="bg-gradient-to-r from-[#ffd700]/10 to-[#ffd700]/5 px-3 py-2">
+                          <p className="text-xs font-semibold text-gray-900 line-clamp-2 leading-tight">{product.name}</p>
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 mt-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-medium">
+                            <Box className="h-2.5 w-2.5" />
+                            {product.category.name}
+                          </span>
+                        </div>
+                        <div className="px-2 py-1.5">
+                          {availableVariants.length === 0 ? (
+                            <p className="text-[10px] text-red-500 text-center py-1">Habis</p>
+                          ) : (
+                            <div className="flex flex-col gap-1">
+                              {availableVariants.map((variant) => (
+                                <Button
+                                  key={variant.id}
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => addToCart(product, variant, 1)}
+                                  className="text-[10px] h-7 px-2 w-full bg-white hover:bg-amber-50/40 border-gray-200 hover:border-amber-300 text-gray-800 flex justify-between items-center transition-all duration-150"
+                                >
+                                  <span className="font-bold uppercase bg-gray-100 text-gray-700 px-1 py-0.5 rounded text-[9px]">{variant.priceType}</span>
+                                  <span className="font-semibold text-gray-900">{formatRupiah(variant.price || 0)}</span>
+                                  <span className="text-[9px] text-gray-500">s:{variant.stockOffline ?? 0}</span>
+                                </Button>
+                              ))}
                             </div>
-                            <div className="ml-2 p-1.5 bg-[#ffd700]/20 rounded-lg">
-                              <Package className="h-3.5 w-3.5 text-[#ffd700]" />
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-3">
-                          <div className="space-y-2">
-                            {availableVariants.length === 0 ? (
-                              <p className="text-xs text-red-500 text-center py-1">Varian tidak tersedia</p>
-                            ) : (
-                              <div className="flex flex-col gap-1.5 mt-1">
-                                {availableVariants.map((variant) => (
-                                  <Button
-                                    key={variant.id}
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => addToCart(product, variant, 1)}
-                                    className="text-xs h-9 px-3 w-full bg-white hover:bg-amber-50/40 border-gray-200 hover:border-amber-300 text-gray-800 flex justify-between items-center transition-all duration-150"
-                                  >
-                                    <span className="font-bold uppercase text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">{variant.priceType}</span>
-                                    <span className="font-semibold text-gray-900">{formatRupiah(variant.price || 0)}</span>
-                                    <span className="text-[10px] text-gray-500 font-medium">
-                                      Stok: {variant.stockOffline ?? 0}
-                                    </span>
-                                  </Button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-600 mb-4">Produk tidak ditemukan</p>
+                <div className="text-center py-6">
+                  <p className="text-gray-600 mb-3 text-sm">Produk tidak ditemukan</p>
                   {(searchQuery || selectedCategoryId) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSearchQuery('');
-                        setSelectedCategoryId('');
-                      }}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Hapus Filter
+                    <Button variant="outline" size="sm" onClick={() => { setSearchQuery(''); setSelectedCategoryId(''); }}>
+                      <X className="h-4 w-4 mr-2" /> Hapus Filter
                     </Button>
                   )}
                 </div>
@@ -493,268 +480,199 @@ export default function KasirPage() {
           </Card>
         </div>
 
-        {/* Cart & Checkout */}
+        {/* === RIGHT COLUMN: SIDEBAR CART === */}
         <div className="lg:col-span-1 h-full flex flex-col overflow-hidden">
-          <Card className="border-gray-200 shadow-md h-full flex flex-col overflow-hidden">
-            <CardHeader className="flex-shrink-0">
-              <CardTitle className="text-xl font-bold flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" />
-                Keranjang
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 pb-4">
-              {/* Customer Info */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-3">
-                <div>
-                  <Label htmlFor="customerName" className="text-xs font-semibold text-gray-700">Nama Pelanggan</Label>
-                  <Input
-                    id="customerName"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Nama pelanggan"
-                    className="h-9 text-sm mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="customerPhone" className="text-xs font-semibold text-gray-700">Nomor WhatsApp</Label>
-                  <Input
-                    id="customerPhone"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="08xxxxxxxxxx"
-                    className="h-9 text-sm mt-1"
-                  />
-                </div>
-              </div>
-
-              {/* Cart Items */}
-              <div className="border-t border-gray-200 pt-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Item ({cart.length})</h3>
-                {cart.length > 0 ? (
-                  <div className="space-y-2 max-h-36 overflow-y-auto">
-                    {cart.map((item, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
-                      >
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900">{item.product.name}</p>
-                          <p className="text-xs text-gray-600 capitalize">{item.priceType}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateCartQuantity(item.productId, item.priceType, item.quantity - 1)}
-                            className="h-6 w-6 p-0"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateCartQuantity(item.productId, item.priceType, item.quantity + 1)}
-                            className="h-6 w-6 p-0"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeFromCart(item.productId, item.priceType)}
-                            className="h-6 w-6 p-0 text-red-600"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        <p className="text-sm font-semibold text-gray-900 ml-2">
-                          {formatRupiah(item.price * item.quantity)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500 text-center py-4">Keranjang kosong</p>
+          <Card className="border-gray-200 shadow-md h-full flex flex-col overflow-hidden bg-white">
+            <CardHeader className="flex-shrink-0 pb-2 border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-md font-bold flex items-center gap-1.5 bg-[#ffd700] px-2 py-0.5 rounded shadow-sm text-black">
+                  <ShoppingCart className="h-4 w-4" />
+                  Belanjaan ({cart.length})
+                </CardTitle>
+                {cart.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => setCart([])} className="text-[10px] h-6 text-red-500 hover:text-red-700 hover:bg-red-50 px-2">
+                    <Trash2 className="h-3 w-3 mr-1" /> Hapus Semua
+                  </Button>
                 )}
               </div>
+            </CardHeader>
 
-              {/* Payment Method */}
-              {cart.length > 0 && (
-                <div className="border-t border-gray-200 pt-4">
-                  <Label className="text-sm font-semibold text-gray-900 mb-3 block">Metode Pembayaran</Label>
-                  <select
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                    value={paymentMethod}
-                    onChange={(e) => {
-                      setPaymentMethod(e.target.value);
-                      if (e.target.value !== 'tunai') {
-                        setCashReceived('');
-                        setDiscount('');
-                      }
-                    }}
-                  >
-                    <option value="">Pilih metode pembayaran</option>
-                    <option value="tunai">💵 Tunai</option>
-                    <option value="qris">💳 QRIS</option>
-                    <option value="bca_va">🏦 BCA Virtual Account</option>
-                    <option value="bni_va">🏦 BNI Virtual Account</option>
-                    <option value="bri_va">🏦 BRI Virtual Account</option>
-                    <option value="cimb_niaga_va">🏦 CIMB Niaga VA</option>
-                    <option value="maybank_va">🏦 Maybank VA</option>
-                    <option value="permata_va">🏦 Permata VA</option>
-                    <option value="sampoerna_va">🏦 Sampoerna VA</option>
-                    <option value="bnc_va">🏦 BNC VA</option>
-                    <option value="atm_bersama_va">🏦 ATM Bersama VA</option>
-                    <option value="artha_graha_va">🏦 Artha Graha VA</option>
-                  </select>
-                  {paymentMethod !== 'tunai' && (
-                    <p className="mt-2 text-xs text-gray-600">
-                      Pembayaran non-tunai: setelah pesanan dibuat, kasir diarahkan ke halaman instruksi bayar.
-                    </p>
-                  )}
+            <CardContent className="flex-1 min-h-0 flex flex-col overflow-hidden p-3 bg-amber-50/10">
+              {cart.length > 0 ? (
+                <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1 mb-1">
+                  {cart.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded-md border border-amber-100 text-xs shadow-xs">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 truncate leading-tight">{item.product.name}</p>
+                        <p className="text-[10px] text-gray-500 capitalize mt-0.5">{item.priceType} • {formatRupiah(item.price)}</p>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                        <Button variant="outline" size="sm" onClick={() => updateCartQuantity(item.productId, item.priceType, item.quantity - 1)} className="h-5 w-5 p-0 bg-white">
+                          <Minus className="h-2.5 w-2.5" />
+                        </Button>
+                        <span className="w-5 text-center text-xs font-semibold">{item.quantity}</span>
+                        <Button variant="outline" size="sm" onClick={() => updateCartQuantity(item.productId, item.priceType, item.quantity + 1)} className="h-5 w-5 p-0 bg-white">
+                          <Plus className="h-2.5 w-2.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => removeFromCart(item.productId, item.priceType)} className="h-5 w-5 p-0 text-red-500">
+                          <Trash2 className="h-2.5 w-2.5" />
+                        </Button>
+                      </div>
+                      <p className="text-xs font-bold text-gray-900 ml-2 whitespace-nowrap">{formatRupiah(item.price * item.quantity)}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-xs text-gray-400">Pilih produk di kiri untuk berbelanja</p>
                 </div>
               )}
-
-              {/* Summary & Payment */}
-              <div className="border-t border-gray-200 pt-4 space-y-4">
-                {/* Ringkasan Pembayaran */}
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Ringkasan Pembayaran</h4>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Subtotal:</span>
-                    <span className="text-sm font-semibold text-gray-900">{formatRupiah(getSubtotal())}</span>
-                  </div>
-
-                  {paymentMethod === 'tunai' && getDiscountAmount() > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Diskon:</span>
-                      <span className="text-sm font-semibold text-red-600">-{formatRupiah(getDiscountAmount())}</span>
-                    </div>
-                  )}
-
-                  <div className="border-t border-gray-200 pt-2 mt-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-base font-bold text-gray-900">Total:</span>
-                      <span className="text-lg font-bold text-[#ffd700]">{formatRupiah(getTotalAfterDiscount())}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Input Pembayaran Tunai */}
-                {paymentMethod === 'tunai' && (
-                  <div className="bg-blue-50 rounded-lg p-4 space-y-3">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Pembayaran Tunai</h4>
-
-                    {/* Uang Diterima - Prominent */}
-                    <div className="space-y-2">
-                      <Label htmlFor="cashReceived" className="text-base font-bold text-gray-900 flex items-center gap-2">
-                        <Wallet className="h-4 w-4 text-[#ffd700]" />
-                        Uang Diterima (Rp) <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="cashReceived"
-                        type="number"
-                        min="0"
-                        value={cashReceived}
-                        onChange={(e) => setCashReceived(e.target.value)}
-                        placeholder="Masukkan jumlah uang"
-                        className="w-full text-lg font-semibold py-3 border-2 border-[#ffd700] focus:border-[#ffd700] focus:ring-2 focus:ring-[#ffd700]/20"
-                        autoFocus
-                      />
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCashReceived(String(getTotalAfterDiscount()))}
-                          className="text-[11px] h-7 px-2 border-amber-300 hover:bg-amber-50 text-gray-800"
-                        >
-                          Uang Pas
-                        </Button>
-                        {[10000, 20000, 50000, 100000]
-                          .filter((val) => val > getTotalAfterDiscount())
-                          .map((val) => (
-                            <Button
-                              key={val}
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setCashReceived(String(val))}
-                              className="text-[11px] h-7 px-2 border-gray-200 hover:bg-gray-50 text-gray-700"
-                            >
-                              {val === 10000 ? '10rb' : val === 20000 ? '20rb' : val === 50000 ? '50rb' : '100rb'}
-                            </Button>
-                          ))}
-                      </div>
-                    </div>
-
-                    {/* Diskon - Optional, smaller */}
-                    <div className="space-y-1.5">
-                      <Label htmlFor="discount" className="text-xs font-medium text-gray-600 flex items-center gap-1">
-                        Diskon (Rp) <span className="text-gray-400 text-[10px]">(Opsional)</span>
-                      </Label>
-                      <Input
-                        id="discount"
-                        type="number"
-                        min="0"
-                        value={discount}
-                        onChange={(e) => setDiscount(e.target.value)}
-                        placeholder="0"
-                        className="w-full text-sm"
-                      />
-                    </div>
-
-                    {/* Kembalian Display */}
-                    {cashReceived && parseFloat(cashReceived) > 0 && (
-                      <>
-                        {getChange() > 0 ? (
-                          <div className="bg-green-100 border border-green-300 rounded-lg p-3">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-semibold text-green-900">Kembalian:</span>
-                              <span className="text-base font-bold text-green-700">{formatRupiah(getChange())}</span>
-                            </div>
-                          </div>
-                        ) : getChange() < 0 && (
-                          <div className="bg-red-100 border border-red-300 rounded-lg p-3">
-                            <p className="text-sm text-red-700 font-medium">
-                              Uang tidak mencukupi! Kurang: {formatRupiah(Math.abs(getChange()))}
-                            </p>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
             </CardContent>
-
-            <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0">
-              {/* Checkout Button */}
-              <Button
-                onClick={handleCheckout}
-                className="w-full"
-                disabled={
-                  submitting ||
-                  cart.length === 0 ||
-                  !paymentMethod ||
-                  (paymentMethod === 'tunai' && (getChange() < 0 || !cashReceived || parseFloat(cashReceived) <= 0))
-                }
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Memproses...
-                  </>
-                ) : (
-                  paymentMethod === 'tunai' ? 'Proses Transaksi Tunai' : 'Proses Transaksi Non-Tunai'
-                )}
-              </Button>
-            </div>
           </Card>
         </div>
       </div>
+
+      <Card className="flex-shrink-0 border-t-4 border-[#ffd700] bg-amber-50/10 p-3 shadow-md mt-3 mb-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+          {/* Col 1: Customer Identity */}
+          <div className="border border-amber-200 rounded-md bg-white p-2.5 shadow-xs space-y-2.5">
+            <div>
+              <Label htmlFor="customerName" className="text-xs font-semibold text-gray-700">Nama</Label>
+              <Input id="customerName" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="h-8 text-xs px-2 mt-0.5 bg-white" />
+            </div>
+            <div>
+              <Label htmlFor="customerPhone" className="text-xs font-semibold text-gray-700">Nomor WhatsApp</Label>
+              <Input id="customerPhone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="h-8 text-xs px-2 mt-0.5 bg-white" />
+            </div>
+          </div>
+
+          {/* Col 2: Payment Details (Method + Cash/Discount) */}
+          <div className="space-y-2.5">
+            {/* Payment Method Select */}
+            <div className="space-y-1 bg-white p-2 border border-gray-200 rounded-md shadow-xs">
+              <Label className="text-xs font-bold text-gray-800">Metode Pembayaran</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm mt-0.5"
+                value={paymentMethod}
+                onChange={(e) => {
+                  setPaymentMethod(e.target.value);
+                  if (e.target.value !== 'tunai') { setCashReceived(''); setDiscount(''); }
+                }}
+              >
+                <option value="">Pilih metode</option>
+                <option value="tunai">💵 Tunai</option>
+                <option value="qris">💳 QRIS</option>
+                <option value="bca_va">🏦 BCA VA</option>
+                <option value="bni_va">🏦 BNI VA</option>
+                <option value="bri_va">🏦 BRI VA</option>
+                <option value="cimb_niaga_va">🏦 CIMB Niaga VA</option>
+                <option value="maybank_va">🏦 Maybank VA</option>
+                <option value="permata_va">🏦 Permata VA</option>
+                <option value="sampoerna_va">🏦 Sampoerna VA</option>
+                <option value="bnc_va">🏦 BNC VA</option>
+                <option value="atm_bersama_va">🏦 ATM Bersama VA</option>
+                <option value="artha_graha_va">🏦 Artha Graha VA</option>
+              </select>
+            </div>
+
+            {/* Cash Input & Discount / Message */}
+            {paymentMethod === 'tunai' ? (
+              <div className="space-y-2 bg-blue-50/50 p-2.5 rounded border border-blue-100">
+                <div>
+                  <Label htmlFor="cashReceived" className="text-xs font-bold text-gray-700 flex items-center gap-1">
+                    <Wallet className="h-3.5 w-3.5 text-[#ffd700]" /> Uang Diterima <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="cashReceived" type="text" value={cashReceived}
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/\D/g, '');
+                      const formattedValue = rawValue ? Number(rawValue).toLocaleString('id-ID') : '';
+                      setCashReceived(formattedValue);
+                    }}
+                    placeholder="Jumlah uang"
+                    className="h-9 text-base font-bold border-[#ffd700] mt-0.5 bg-white"
+                    autoFocus
+                  />
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setCashReceived(Number(getTotalAfterDiscount()).toLocaleString('id-ID'))} className="text-[10px] h-6 px-2 border-amber-300 hover:bg-amber-50 bg-white">Pas</Button>
+                    {[100000, 500000, 1000000, 3000000, 5000000].filter((val) => val > getTotalAfterDiscount()).map((val) => (
+                      <Button key={val} type="button" variant="outline" size="sm" onClick={() => setCashReceived(val.toLocaleString('id-ID'))} className="text-[10px] h-6 px-2 border-gray-200 hover:bg-gray-50 bg-white">
+                        {val === 100000 ? '100rb' : val === 500000 ? '500rb' : val === 1000000 ? '1jt' : val === 3000000 ? '3jt' : '5jt'}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : paymentMethod && (
+              <div className="text-xs text-gray-500 italic p-2 bg-gray-100/50 rounded border border-gray-200 text-center">
+                Pembayaran non-tunai diproses via QRIS / VA.
+              </div>
+            )}
+          </div>
+
+          {/* Col 3: Summary & Process */}
+          <div className="space-y-2">
+            {/* Collapsible Discount (Cash Only) */}
+            {paymentMethod === 'tunai' && (
+              <div className="border border-blue-200 rounded bg-white p-1.5 shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => setShowDiscountDropdown(!showDiscountDropdown)}
+                  className="flex items-center justify-between w-full text-xs font-bold text-blue-700 hover:text-blue-800 px-1"
+                >
+                  <span>Tambah Diskon</span>
+                  {showDiscountDropdown ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+                {showDiscountDropdown && (
+                  <div className="mt-1 pt-1 border-t border-gray-100">
+                    <Label htmlFor="discount" className="text-xs font-semibold text-gray-500">Diskon (Rp)</Label>
+                    <Input id="discount" type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0" className="h-8 text-sm mt-0.5" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="bg-white rounded border border-gray-200 p-2.5 space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Subtotal:</span>
+                <span className="font-semibold">{formatRupiah(getSubtotal())}</span>
+              </div>
+              {paymentMethod === 'tunai' && getDiscountAmount() > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Diskon:</span>
+                  <span className="font-semibold text-red-600">-{formatRupiah(getDiscountAmount())}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-gray-200 pt-1.5 mt-1.5">
+                <span className="font-bold text-gray-900">Total:</span>
+                <span className="font-bold text-[#ffd700] text-base">{formatRupiah(getTotalAfterDiscount())}</span>
+              </div>
+              {paymentMethod === 'tunai' && cashReceived && parseFloat(cashReceived) > 0 && (
+                <>
+                  {getChange() > 0 ? (
+                    <div className="flex justify-between bg-green-50 -mx-2 px-2 py-0.5 rounded">
+                      <span className="font-semibold text-green-800 text-xs">Kembalian:</span>
+                      <span className="font-bold text-green-700 text-xs">{formatRupiah(getChange())}</span>
+                    </div>
+                  ) : getChange() < 0 && (
+                    <div className="bg-red-50 -mx-2 px-2 py-0.5 rounded">
+                      <p className="text-xs text-red-700 font-medium">Kurang: {formatRupiah(Math.abs(getChange()))}</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <Button
+              onClick={handleCheckout}
+              className="w-full h-9 text-sm font-bold"
+              disabled={submitting || cart.length === 0 || !paymentMethod || (paymentMethod === 'tunai' && (getChange() < 0 || !cashReceived || parseFloat(cashReceived) <= 0))}
+            >
+              {submitting ? (<><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Memproses...</>) : (paymentMethod === 'tunai' ? 'Proses Tunai' : 'Proses Non-Tunai')}
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* Receipt Modal */}
       {showReceipt && receiptData && (
