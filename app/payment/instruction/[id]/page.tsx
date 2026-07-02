@@ -261,14 +261,22 @@ export default function PaymentInstructionPage() {
               <span>Menunggu konfirmasi pembayaran...</span>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex justify-between pb-3 border-b border-gray-100">
-                <span className="text-gray-600">Total Tagihan</span>
-                <span className="font-bold text-xl">{formatRupiah(totalPayment)}</span>
+            <div className="space-y-3">
+              <div className="flex justify-between pb-2 border-b border-gray-100 text-sm">
+                <span className="text-gray-500">Harga Pesanan</span>
+                <span className="font-medium text-gray-955">{formatRupiah(order.totalHarga)}</span>
               </div>
-              <div className="flex justify-between pb-3 border-b border-gray-100">
+              <div className="flex justify-between pb-2 border-b border-gray-100 text-sm">
+                <span className="text-gray-500">Biaya Admin</span>
+                <span className="font-medium text-gray-955">{formatRupiah(order.paymentFee || 0)}</span>
+              </div>
+              <div className="flex justify-between pb-3 border-b border-gray-100 items-center">
+                <span className="text-gray-600 font-semibold">Total Tagihan</span>
+                <span className="font-bold text-xl text-amber-600">{formatRupiah(totalPayment)}</span>
+              </div>
+              <div className="flex justify-between pb-3 border-b border-gray-100 text-sm">
                 <span className="text-gray-600">Metode Pembayaran</span>
-                <span className="font-medium uppercase">{order.paymentMethod.replace('_va', ' Virtual Account')}</span>
+                <span className="font-medium uppercase text-gray-900">{order.paymentMethod.replace('_va', ' Virtual Account')}</span>
               </div>
             </div>
 

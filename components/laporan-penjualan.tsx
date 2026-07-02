@@ -41,10 +41,21 @@ export default function LaporanPenjualan() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/api/pesanan');
+      const token = localStorage.getItem('token');
+      const headers: any = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch('/api/pesanan?limit=1000000', { headers });
       if (res.ok) {
-        const data = await res.json();
-        setOrders(Array.isArray(data) ? data : []);
+        const result = await res.json();
+        let ordersData = [];
+        if (Array.isArray(result)) {
+          ordersData = result;
+        } else if (result && Array.isArray(result.data)) {
+          ordersData = result.data;
+        }
+        setOrders(ordersData);
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -52,6 +63,8 @@ export default function LaporanPenjualan() {
       setLoading(false);
     }
   };
+
+  console.log('--- LaporanPenjualan Render ---', { ordersCount: orders.length, startDate, endDate });
 
   const filteredOrders = orders.filter((order) => {
     if (!startDate || !endDate) return true;
@@ -74,17 +87,18 @@ export default function LaporanPenjualan() {
 
   // Daily sales data
   const dailySales = filteredOrders.reduce((acc: any, order) => {
-    const date = new Date(order.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
-    if (!acc[date]) {
-      acc[date] = { date, revenue: 0, orders: 0 };
+    const dateKey = new Date(order.createdAt).toISOString().split('T')[0];
+    const dateDisplay = new Date(order.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+    if (!acc[dateKey]) {
+      acc[dateKey] = { dateKey, date: dateDisplay, revenue: 0, orders: 0 };
     }
-    acc[date].revenue += order.totalHarga;
-    acc[date].orders += 1;
+    acc[dateKey].revenue += order.totalHarga;
+    acc[dateKey].orders += 1;
     return acc;
   }, {});
 
   const dailySalesArray = Object.values(dailySales).sort((a: any, b: any) => 
-    new Date(a.date).getTime() - new Date(b.date).getTime()
+    (a as any).dateKey.localeCompare((b as any).dateKey)
   );
 
   // Status breakdown

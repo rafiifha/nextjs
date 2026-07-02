@@ -447,7 +447,8 @@ export class OrderService {
             items: { include: { product: true } },
           },
         });
-      } catch (pakasirErr) {
+      } catch (pakasirErr: any) {
+        console.error('Pakasir error during checkout:', pakasirErr);
         // Restore stock before deleting order
         for (const item of order.items) {
           if (item.variantId) {

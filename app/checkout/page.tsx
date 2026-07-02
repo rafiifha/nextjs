@@ -147,16 +147,6 @@ export default function CheckoutPage() {
 
   const PAKASIR_METHODS = [
     { id: 'qris', name: 'QRIS' },
-    { id: 'bca_va', name: 'BCA Virtual Account' },
-    { id: 'bni_va', name: 'BNI Virtual Account' },
-    { id: 'bri_va', name: 'BRI Virtual Account' },
-    { id: 'cimb_niaga_va', name: 'CIMB Niaga VA' },
-    { id: 'maybank_va', name: 'Maybank VA' },
-    { id: 'permata_va', name: 'Permata VA' },
-    { id: 'sampoerna_va', name: 'Sampoerna VA' },
-    { id: 'bnc_va', name: 'BNC VA' },
-    { id: 'atm_bersama_va', name: 'ATM Bersama VA' },
-    { id: 'artha_graha_va', name: 'Artha Graha VA' },
   ];
 
   const DEFAULT_NON_TUNAI_METHOD = PAKASIR_METHODS[0]?.id || 'qris';
@@ -507,7 +497,7 @@ export default function CheckoutPage() {
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                   >
-                    {deliveryMethod === 'pickup' && <option value="tunai">💵 Tunai (Bayar di Toko)</option>}
+                    {deliveryMethod === 'pickup' && <option value="tunai">Tunai (Bayar di Toko)</option>}
                     {PAKASIR_METHODS.map((method) => (
                       <option key={method.id} value={method.id}>💳 {method.name}</option>
                     ))}
