@@ -25,10 +25,13 @@ export class ProductService {
       .sort((a, b) => b.salesCount - a.salesCount);
   }
 
-  async getProductsPaginated(page: number, limit: number, search?: string) {
+  async getProductsPaginated(page: number, limit: number, search?: string, categoryId?: number) {
     const where: any = {};
     if (search) {
       where.name = { contains: search, mode: 'insensitive' };
+    }
+    if (categoryId) {
+      where.categoryId = categoryId;
     }
 
     const [products, total] = await Promise.all([

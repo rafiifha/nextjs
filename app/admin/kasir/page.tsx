@@ -302,10 +302,15 @@ export default function KasirPage() {
     return Math.max(0, getSubtotal() - getDiscountAmount());
   };
 
-  const getChange = () => {
+  const getCashValue = () => {
     const cashValue = cashReceived && cashReceived !== '' ? parseFloat(cashReceived.replace(/\./g, '')) : 0;
-    if (isNaN(cashValue) || cashValue <= 0) return 0;
-    return Math.max(0, cashValue - getTotalAfterDiscount());
+    return isNaN(cashValue) ? 0 : cashValue;
+  };
+
+  const getChange = () => {
+    const cashValue = getCashValue();
+    if (cashValue <= 0) return 0;
+    return cashValue - getTotalAfterDiscount();
   };
 
   const handleNewTransaction = () => {
@@ -336,14 +341,15 @@ export default function KasirPage() {
 
     // Validate cash payment
     if (paymentMethod === 'tunai') {
-      const cashValue = cashReceived && cashReceived !== '' ? parseFloat(cashReceived.replace(/\./g, '')) : 0;
-      if (isNaN(cashValue) || cashValue <= 0) {
+      const cashValue = getCashValue();
+      if (cashValue <= 0) {
         toast.error('Error', { description: 'Uang yang diterima harus diisi' });
         return;
       }
 
-      if (getChange() < 0) {
-        toast.error('Error', { description: `Uang tidak mencukupi! Kurang: ${formatRupiah(Math.abs(getChange()))}` });
+      const totalToPay = getTotalAfterDiscount();
+      if (cashValue < totalToPay) {
+        toast.error('Error', { description: `Uang tidak mencukupi! Kurang: ${formatRupiah(totalToPay - cashValue)}` });
         return;
       }
     }
@@ -701,7 +707,7 @@ export default function KasirPage() {
               </div>
             )}
 
-            {paymentMethod === 'tunai' && cashReceived && parseFloat(cashReceived) > 0 && (
+            {paymentMethod === 'tunai' && getCashValue() > 0 && (
               <div className={`flex items-center justify-between px-3 py-1 rounded text-sm font-bold font-mono ${getChange() >= 0 ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`}>
                 <span className="font-sans text-xs font-bold">Kembali</span>
                 <span className="text-lg">{getChange() >= 0 ? formatRupiah(getChange()) : `-${formatRupiah(Math.abs(getChange()))}`}</span>
@@ -720,7 +726,7 @@ export default function KasirPage() {
             <Button
               onClick={handleCheckout}
               className="w-full h-10 text-sm font-bold bg-[#ffd700] hover:bg-[#e6c200] text-black"
-              disabled={submitting || cart.length === 0 || !paymentMethod || (paymentMethod === 'tunai' && (getChange() < 0 || !cashReceived || parseFloat(cashReceived) <= 0))}
+              disabled={submitting || cart.length === 0 || !paymentMethod || (paymentMethod === 'tunai' && (getCashValue() <= 0 || getCashValue() < getTotalAfterDiscount()))}
             >
               {submitting ? (<><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Memproses...</>) : (<><CheckCircle className="h-4 w-4 mr-1.5" /> {paymentMethod === 'tunai' ? 'Proses Tunai' : 'Proses Pembayaran'}</>)}
             </Button>

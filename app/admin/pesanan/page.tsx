@@ -626,7 +626,15 @@ export default function ManajemenPesananPage() {
                 <div className="flex flex-wrap gap-2 pt-4 border-t">
                   <Button className="flex-1 bg-gray-900 text-white" onClick={() => handlePrintOrder(selectedOrder)}><Printer className="h-4 w-4 mr-2" />Cetak Resi</Button>
                   
-                  {selectedOrder.status === 'pending' && <Button className="flex-1 bg-green-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'paid')}>Set Sudah Dibayar</Button>}
+                  {['pending', 'expired', 'cancelled'].includes(selectedOrder.status) && (
+                    <Button
+                      className={`flex-1 bg-green-600 text-white ${['expired', 'cancelled'].includes(selectedOrder.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={['expired', 'cancelled'].includes(selectedOrder.status)}
+                      onClick={() => updateOrderStatus(selectedOrder.id, 'paid')}
+                    >
+                      Set Sudah Dibayar
+                    </Button>
+                  )}
                   {selectedOrder.status === 'paid' && <Button className="flex-1 bg-blue-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}>Set Diproses</Button>}
                   {selectedOrder.status === 'processing' && selectedOrder.deliveryMethod === 'delivery' && (
                     <div className="w-full space-y-2">

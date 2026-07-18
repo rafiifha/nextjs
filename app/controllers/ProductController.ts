@@ -13,6 +13,9 @@ export class ProductController {
       const { searchParams } = new URL(request.url);
       const page = searchParams.get('page');
       const limit = parseInt(searchParams.get('limit') || '10');
+      const search = searchParams.get('search') || undefined;
+      const categoryIdStr = searchParams.get('categoryId');
+      const categoryId = categoryIdStr ? parseInt(categoryIdStr) : undefined;
 
       // If page param present, return paginated response
       if (page) {
@@ -20,7 +23,7 @@ export class ProductController {
         if (isNaN(pageNum) || pageNum < 1) {
           return NextResponse.json({ error: 'Parameter page tidak valid' }, { status: 400 });
         }
-        const result = await this.productService.getProductsPaginated(pageNum, limit);
+        const result = await this.productService.getProductsPaginated(pageNum, limit, search, categoryId);
         return NextResponse.json({
           data: result.data,
           total: result.total,

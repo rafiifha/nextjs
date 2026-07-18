@@ -44,6 +44,8 @@ export default function ProdukPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [user, setUser] = useState<any>(null);
   const [cart, setCart] = useState<any[]>([]);
   const [addingToCart, setAddingToCart] = useState<{ [key: string]: boolean }>({});
@@ -64,6 +66,7 @@ export default function ProdukPage() {
       }
     }
     loadCart();
+    fetchCategories();
 
     // Listen for cart updates
     const handleCartUpdate = () => {
@@ -75,13 +78,25 @@ export default function ProdukPage() {
   }, []);
 
   useEffect(() => {
-    fetchProducts(currentPage, searchQuery);
+    fetchProducts(currentPage, searchQuery, selectedCategory);
   }, [currentPage]);
 
   useEffect(() => {
     setCurrentPage(1);
-    fetchProducts(1, searchQuery);
-  }, [searchQuery]);
+    fetchProducts(1, searchQuery, selectedCategory);
+  }, [searchQuery, selectedCategory]);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch('/api/kategori');
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
 
   const loadCart = () => {
     const cartData = cartService.getCart();
@@ -139,11 +154,12 @@ export default function ProdukPage() {
     return cart.some(item => item.productId === productId && item.priceType === priceType);
   };
 
-  const fetchProducts = async (page: number, search: string) => {
+  const fetchProducts = async (page: number, search: string, categoryId?: number | null) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(ITEMS_PER_PAGE) });
       if (search) params.set('search', search);
+      if (categoryId) params.set('categoryId', String(categoryId));
       const res = await fetch(`/api/produk?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
@@ -204,9 +220,9 @@ export default function ProdukPage() {
           <p className="text-gray-600">Pilih produk yang ingin Anda pesan</p>
         </div>
 
-        {/* Search Bar */}
-        <div className="mb-6">
-          <div className="relative max-w-md">
+        {/* Search Bar + Category Filter */}
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
               type="text"
@@ -216,6 +232,18 @@ export default function ProdukPage() {
               className="pl-10"
             />
           </div>
+          {categories.length > 0 && (
+            <select
+              value={selectedCategory ?? ''}
+              onChange={(e) => setSelectedCategory(e.target.value ? Number(e.target.value) : null)}
+              className="h-10 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:border-[#ffd700]"
+            >
+              <option value="">Semua Kategori</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {loading ? (

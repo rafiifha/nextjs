@@ -368,7 +368,11 @@ export class OrderService {
     const totalHarga = items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) + (shippingFee || 0);
 
     const expiredAt = new Date();
-    expiredAt.setMinutes(expiredAt.getMinutes() + 15); // 15 menit timeout
+    if (paymentMethod === 'tunai') {
+      expiredAt.setHours(expiredAt.getHours() + 1); // 1 jam timeout untuk bayar tunai
+    } else {
+      expiredAt.setMinutes(expiredAt.getMinutes() + 15); // 15 menit timeout untuk digital
+    }
 
     const order = await prisma.order.create({
       data: {

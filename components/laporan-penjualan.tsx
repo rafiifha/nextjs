@@ -54,6 +54,8 @@ export default function LaporanPenjualan() {
           ordersData = result;
         } else if (result && Array.isArray(result.data)) {
           ordersData = result.data;
+        } else if (result && Array.isArray(result.orders)) {
+          ordersData = result.orders;
         }
         setOrders(ordersData);
       }
@@ -166,6 +168,9 @@ export default function LaporanPenjualan() {
     );
   }
 
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  const isFutureDate = !!((startDate && startDate > todayStr) || (endDate && endDate > todayStr));
+
   return (
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
@@ -173,7 +178,7 @@ export default function LaporanPenjualan() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Laporan Penjualan</h1>
           <p className="text-gray-600">Analisis dan visualisasi data penjualan</p>
         </div>
-        <Button onClick={handleDownload}>
+        <Button onClick={handleDownload} disabled={isFutureDate}>
           <Download className="h-4 w-4 mr-2" />
           Download CSV
         </Button>
@@ -198,6 +203,19 @@ export default function LaporanPenjualan() {
                 onChange={(e) => setEndDate(e.target.value)}
                 className="w-40"
               />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const today = new Date().toLocaleDateString('en-CA');
+                  setStartDate(today);
+                  setEndDate(today);
+                }}
+                className="ml-2 border-amber-300 hover:bg-amber-50 text-gray-700 font-medium"
+              >
+                Hari Ini
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -261,10 +279,10 @@ export default function LaporanPenjualan() {
           <CardContent>
             {dailySalesArray.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={dailySalesArray}>
+                <LineChart data={dailySalesArray} margin={{ top: 15, right: 20, left: 15, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
-                  <YAxis />
+                  <YAxis width={104} tickFormatter={(value) => formatRupiah(value)} />
                   <Tooltip formatter={(value: any) => formatRupiah(value)} />
                   <Legend />
                   <Line type="monotone" dataKey="revenue" stroke="#ffd700" strokeWidth={2} name="Pendapatan" />
