@@ -395,13 +395,12 @@ export default function KasirPage() {
         return;
       }
 
-      // If payment method is tunai, order is already paid
+      // If payment method is tunai, order is already paid — langsung print
       if (paymentMethod === 'tunai') {
         const changeAmount = getChange();
 
-        // Set receipt data
-        // Note: API returns order directly, not wrapped in { order: ... }
-        setReceiptData({
+        // Set receipt data for print
+        const newReceiptData = {
           orderId: data.id,
           customerName: data.customerName,
           customerPhone: data.customerPhone,
@@ -413,12 +412,21 @@ export default function KasirPage() {
           change: changeAmount,
           paymentMethod: 'Tunai',
           date: new Date().toLocaleString('id-ID'),
-        });
+        };
 
         toast.success('Berhasil', { description: changeAmount > 0 ? `Pesanan berhasil dibuat! Kembalian: ${formatRupiah(changeAmount)}` : 'Pesanan berhasil dibuat!' });
 
-        // Show receipt
+        // Show receipt briefly for print, then auto-print
+        setReceiptData(newReceiptData);
         setShowReceipt(true);
+
+        // Use setTimeout to let React render the receipt DOM first, then print
+        setTimeout(() => {
+          window.print();
+          // Hide receipt after print dialog closes
+          setShowReceipt(false);
+          setReceiptData(null);
+        }, 300);
 
         // Reset form
         setCart([]);
