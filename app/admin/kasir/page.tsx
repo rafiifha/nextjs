@@ -752,8 +752,8 @@ export default function KasirPage() {
       {showReceipt && receiptData && (
         autoPrint ? (
           // Auto-print mode: render off-screen, invisible to user, but in DOM for @media print
-          <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
-            <div className="bg-white" id="receipt">
+          <div id="receipt" style={{ position: 'fixed', left: '-9999px', top: 0 }}>
+            <div className="bg-white">
               <div className="p-6">
                 <div className="text-center mb-6 border-b pb-4">
                   <h2 className="text-2xl font-bold text-gray-900 mb-1">STRUK PEMBELIAN</h2>
@@ -1018,9 +1018,9 @@ export default function KasirPage() {
             visibility: visible;
           }
           #receipt {
-            position: absolute;
-            left: 0;
-            top: 0;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 58mm;
             max-width: 58mm;
             padding: 2mm !important;
