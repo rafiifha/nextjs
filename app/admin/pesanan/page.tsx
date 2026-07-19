@@ -237,102 +237,105 @@ export default function ManajemenPesananPage() {
         console.error('Error updating status:', error);
       }
     }
-    
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    
-    const printContent = `
+
+    // Build receipt items HTML
+    const itemsHtml = order.items.map(item => `
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <div style="flex:1;padding-right:4px;">
+          <div style="font-weight:600;">${item.product.name}</div>
+          <div style="font-size:8px;color:#555;">${item.priceType.charAt(0).toUpperCase() + item.priceType.slice(1)} x ${item.quantity}</div>
+        </div>
+        <div style="text-align:right;font-weight:600;white-space:nowrap;align-self:flex-end;">Rp ${(item.price * item.quantity).toLocaleString('id-ID')}</div>
+      </div>
+    `).join('');
+
+    const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+    const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const discountHtml = order.discount && order.discount > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Diskon:</span><span style="color:red;">-Rp ${order.discount.toLocaleString('id-ID')}</span></div>` : '';
+    const shippingHtml = order.shippingFee && order.shippingFee > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Ongkir:</span><span>Rp ${order.shippingFee.toLocaleString('id-ID')}</span></div>` : '';
+    const cashHtml = order.cashReceived && order.cashReceived > 0 ? `
+      <div style="display:flex;justify-content:space-between;"><span>Uang Diterima:</span><span>Rp ${order.cashReceived.toLocaleString('id-ID')}</span></div>
+      ${order.change && order.change > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Kembalian:</span><span style="color:green;">Rp ${order.change.toLocaleString('id-ID')}</span></div>` : ''}
+    ` : '';
+    const deliveryHtml = order.deliveryMethod === 'delivery' ? `<div style="display:flex;justify-content:space-between;"><span>Pengiriman:</span><span style="font-weight:600;">Delivery</span></div>` : '';
+    const addressHtml = order.shippingAddress ? `<div style="display:flex;justify-content:space-between;"><span>Alamat:</span><span style="font-weight:600;text-align:right;max-width:55%;font-size:8px;">${order.shippingAddress}</span></div>` : '';
+
+    const html = `
       <!DOCTYPE html>
       <html>
-        <head>
-          <title>Detail Pesanan #${order.id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
-            .header h1 { margin: 0; color: #333; }
-            .section { margin-bottom: 25px; }
-            .section h3 { border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 15px; color: #333; }
-            .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
-            .info-label { font-weight: 600; color: #666; }
-            .info-value { color: #333; }
-            .items-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            .items-table th { background-color: #f5f5f5; padding: 12px; text-align: left; border-bottom: 2px solid #ddd; }
-            .items-table td { padding: 12px; border-bottom: 1px solid #eee; }
-            .total-row { font-weight: bold; font-size: 18px; background-color: #f9f9f9; }
-            .footer { margin-top: 40px; text-align: center; color: #666; font-size: 12px; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>DETAIL PESANAN</h1>
-            <p>Pesanan #${order.id}</p>
-            <p>${new Date(order.createdAt).toLocaleString('id-ID')}</p>
-          </div>
-          
-          <div class="section">
-            <h3>Informasi Pelanggan</h3>
-            <div class="info-row"><span class="info-label">Nama:</span><span class="info-value">${order.customerName}</span></div>
-            <div class="info-row"><span class="info-label">Telepon:</span><span class="info-value">${order.customerPhone}</span></div>
-            <div class="info-row"><span class="info-label">Metode Pengiriman:</span><span class="info-value">${order.deliveryMethod === 'delivery' ? 'Pengiriman' : 'Ambil di Toko'}</span></div>
-            <div class="info-row"><span class="info-label">Status:</span><span class="info-value">${getStatusIndonesian(order.status)}</span></div>
-            <div class="info-row"><span class="info-label">Pembayaran:</span><span class="info-value uppercase">${order.paymentMethod ? order.paymentMethod.replace('_va', ' Virtual Account') : '-'}</span></div>
-          </div>
-          
-          <div class="section">
-            <h3>Detail Items</h3>
-            <table class="items-table">
-              <thead>
-                <tr>
-                  <th>Produk</th>
-                  <th>Jenis</th>
-                  <th>Qty</th>
-                  <th>Harga</th>
-                  <th>Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${order.items.map(item => `
-                  <tr>
-                    <td>${item.product.name}</td>
-                    <td>${item.priceType.charAt(0).toUpperCase() + item.priceType.slice(1)}</td>
-                    <td>${item.quantity}</td>
-                    <td>${formatRupiah(item.price)}</td>
-                    <td>${formatRupiah(item.price * item.quantity)}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-          
-          <div class="section">
-            <h3>Ringkasan Pembayaran</h3>
-            ${order.discount && order.discount > 0 ? `
-            <div class="info-row"><span class="info-label">Subtotal:</span><span class="info-value">${formatRupiah(order.totalHarga + order.discount)}</span></div>
-            <div class="info-row"><span class="info-label">Diskon:</span><span class="info-value" style="color: red;">-${formatRupiah(order.discount)}</span></div>
-            ` : ''}
-            ${order.shippingFee && order.shippingFee > 0 ? `
-            <div class="info-row"><span class="info-label">Ongkir:</span><span class="info-value">${formatRupiah(order.shippingFee)}</span></div>
-            ` : ''}
-            <div class="info-row total-row">
-              <span class="info-label">Total:</span>
-              <span class="info-value">${formatRupiah(order.totalHarga)}</span>
-            </div>
-          </div>
-          
-          <div class="footer">
-            <p>Terima kasih atas kepercayaan Anda</p>
-            <p>Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
-          </div>
-        </body>
+      <head>
+        <title>Struk</title>
+        <style>
+          @page { size: 58mm auto; margin: 0; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { width: 48mm; font-family: 'Arial', sans-serif; font-size: 9px; padding: 1mm; color: #000; }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 4px 0; }
+          .row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+          .title { font-size: 13px; font-weight: bold; margin-bottom: 2px; }
+          .small { font-size: 8px; color: #555; }
+          .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 11px; padding-top: 4px; border-top: 1px dashed #000; }
+        </style>
+      </head>
+      <body>
+        <div class="center">
+          <div class="title" style="font-size:14px;letter-spacing:0.5px;">TOKO NANING</div>
+          <div class="small" style="margin-bottom:2px;font-size:7.5px;line-height:1.2;">Jl. Raya Cicalengka - Majalaya KM 1, Cikuya, Cicalengka</div>
+          <div class="divider"></div>
+          <div class="bold" style="font-size:10px;margin-bottom:2px;letter-spacing:0.5px;">STRUK PEMBELIAN</div>
+          <div class="small">${new Date(order.createdAt).toLocaleString('id-ID')}</div>
+        </div>
+        <div class="divider"></div>
+        <div class="row"><span>No. Pesanan:</span><span class="bold">#${order.id}</span></div>
+        <div class="row"><span>Pelanggan:</span><span class="bold">${order.customerName}</span></div>
+        <div class="row"><span>Telepon:</span><span class="bold">${order.customerPhone}</span></div>
+        <div class="row"><span>Pembayaran:</span><span class="bold">${order.paymentMethod ? order.paymentMethod.replace('_va', ' VA').toUpperCase() : '-'}</span></div>
+        <div class="row"><span>Status:</span><span class="bold">${getStatusIndonesian(order.status)}</span></div>
+        ${deliveryHtml}
+        ${addressHtml}
+        <div class="divider"></div>
+        ${itemsHtml}
+        <div class="divider"></div>
+        <div class="row"><span>Total Qty:</span><span class="bold">${totalItems} Item</span></div>
+        <div class="row"><span>Subtotal:</span><span class="bold">Rp ${subtotal.toLocaleString('id-ID')}</span></div>
+        ${discountHtml}
+        ${shippingHtml}
+        ${cashHtml}
+        <div class="total-row"><span>Total:</span><span>Rp ${order.totalHarga.toLocaleString('id-ID')}</span></div>
+        <div class="divider" style="margin-top:6px;"></div>
+        <div class="center small" style="margin-top:4px;">
+          <div>Produk yang sudah dibeli tidak dapat ditukar/dikembalikan</div>
+          <div style="margin-top:3px;font-weight:bold;">Terima Kasih Atas Kunjungan Anda</div>
+        </div>
+      </body>
       </html>
     `;
-    
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    printWindow.focus();
-    
-    setTimeout(() => { printWindow.print(); }, 250);
+
+    // Print via hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.style.overflow = 'hidden';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(html);
+      iframeDoc.close();
+
+      setTimeout(() => {
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 300);
+    }
   };
 
   const handleSearchChange = (value: string) => {
@@ -624,7 +627,7 @@ export default function ManajemenPesananPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-4 border-t">
-                  <Button className="flex-1 bg-gray-900 text-white" onClick={() => handlePrintOrder(selectedOrder)}><Printer className="h-4 w-4 mr-2" />Cetak Resi</Button>
+                  <Button className="flex-1 bg-gray-900 text-white" onClick={() => handlePrintOrder(selectedOrder)}><Printer className="h-4 w-4 mr-2" />Cetak Struk</Button>
                   
                   {['pending', 'expired', 'cancelled'].includes(selectedOrder.status) && (
                     <Button
@@ -635,7 +638,7 @@ export default function ManajemenPesananPage() {
                       Set Sudah Dibayar
                     </Button>
                   )}
-                  {selectedOrder.status === 'paid' && <Button className="flex-1 bg-blue-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}>Set Diproses</Button>}
+                  {selectedOrder.status === 'paid' && !isOfflineOrder(selectedOrder) && <Button className="flex-1 bg-blue-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}>Set Diproses</Button>}
                   {selectedOrder.status === 'processing' && selectedOrder.deliveryMethod === 'delivery' && (
                     <div className="w-full space-y-2">
                       <select
@@ -665,12 +668,12 @@ export default function ManajemenPesananPage() {
                       </Button>
                     </div>
                   )}
-                  {selectedOrder.status === 'processing' && selectedOrder.deliveryMethod !== 'delivery' && (
+                  {selectedOrder.status === 'processing' && selectedOrder.deliveryMethod !== 'delivery' && !isOfflineOrder(selectedOrder) && (
                     <Button className="flex-1 bg-purple-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}>
                       Set Terkirim
                     </Button>
                   )}
-                  {selectedOrder.status === 'shipped' && <Button className="flex-1 bg-purple-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}>Set Terkirim</Button>}
+                  {selectedOrder.status === 'shipped' && !isOfflineOrder(selectedOrder) && <Button className="flex-1 bg-purple-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}>Set Terkirim</Button>}
                 </div>
               </div>
             </div>
