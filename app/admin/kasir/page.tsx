@@ -939,9 +939,18 @@ export default function KasirPage() {
         </div>
       )}
 
-      {/* Print Styles */}
+      {/* Print Styles - 58mm Thermal Paper */}
       <style jsx global>{`
         @media print {
+          @page {
+            size: 58mm auto;
+            margin: 0;
+          }
+          html, body {
+            width: 58mm;
+            margin: 0;
+            padding: 0;
+          }
           body * {
             visibility: hidden;
           }
@@ -952,10 +961,69 @@ export default function KasirPage() {
             position: absolute;
             left: 0;
             top: 0;
-            width: 100%;
-            max-width: 100%;
+            width: 58mm;
+            max-width: 58mm;
+            padding: 2mm !important;
             box-shadow: none;
             border: none;
+            border-radius: 0;
+            font-size: 9px !important;
+            line-height: 1.3 !important;
+            font-family: 'Courier New', monospace !important;
+          }
+          #receipt h2 {
+            font-size: 12px !important;
+            margin-bottom: 2px !important;
+          }
+          #receipt p, #receipt span, #receipt div {
+            font-size: 9px !important;
+          }
+          #receipt .text-lg {
+            font-size: 11px !important;
+          }
+          #receipt .text-2xl {
+            font-size: 12px !important;
+          }
+          #receipt .text-xs {
+            font-size: 8px !important;
+          }
+          #receipt .text-sm {
+            font-size: 9px !important;
+          }
+          #receipt .p-6 {
+            padding: 2mm !important;
+          }
+          #receipt .mb-6 {
+            margin-bottom: 2mm !important;
+          }
+          #receipt .mb-4 {
+            margin-bottom: 2mm !important;
+          }
+          #receipt .my-4 {
+            margin-top: 2mm !important;
+            margin-bottom: 2mm !important;
+          }
+          #receipt .py-4 {
+            padding-top: 2mm !important;
+            padding-bottom: 2mm !important;
+          }
+          #receipt .pb-4 {
+            padding-bottom: 2mm !important;
+          }
+          #receipt .pt-4 {
+            padding-top: 2mm !important;
+          }
+          #receipt .mt-6 {
+            margin-top: 2mm !important;
+          }
+          #receipt .space-y-3 > * + * {
+            margin-top: 1mm !important;
+          }
+          #receipt .space-y-2 > * + * {
+            margin-top: 1mm !important;
+          }
+          #receipt .gap-3 {
+            gap: 1mm !important;
           }
           .print\\:hidden {
             display: none !important;
