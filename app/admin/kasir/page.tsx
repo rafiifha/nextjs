@@ -57,6 +57,7 @@ export default function KasirPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [autoPrint, setAutoPrint] = useState(false);
   const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<number, number>>({});
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showDiscountDropdown, setShowDiscountDropdown] = useState(false);
@@ -416,16 +417,18 @@ export default function KasirPage() {
 
         toast.success('Berhasil', { description: changeAmount > 0 ? `Pesanan berhasil dibuat! Kembalian: ${formatRupiah(changeAmount)}` : 'Pesanan berhasil dibuat!' });
 
-        // Show receipt briefly for print, then auto-print
+        // Render receipt off-screen for print (not visible to user)
         setReceiptData(newReceiptData);
+        setAutoPrint(true);
         setShowReceipt(true);
 
-        // Use setTimeout to let React render the receipt DOM first, then print
+        // Let React render receipt DOM off-screen, then trigger print
         setTimeout(() => {
           window.print();
-          // Hide receipt after print dialog closes
+          // Cleanup after print dialog closes
           setShowReceipt(false);
           setReceiptData(null);
+          setAutoPrint(false);
         }, 300);
 
         // Reset form
@@ -745,66 +748,115 @@ export default function KasirPage() {
         </div>
       </div>
 
-      {/* === RECEIPT MODAL === */}
+      {/* === RECEIPT MODAL / OFF-SCREEN PRINT === */}
       {showReceipt && receiptData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto" id="receipt">
-            <div className="p-6">
-              <div className="text-center mb-6 border-b pb-4">
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">STRUK PEMBELIAN</h2>
-                <p className="text-sm text-gray-600">Terima Kasih Atas Kunjungan Anda</p>
-                <p className="text-xs text-gray-500 mt-2">{receiptData.date}</p>
-              </div>
-
-              <div className="mb-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-600">No. Pesanan:</span><span className="font-semibold">#{receiptData.orderId}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Pelanggan:</span><span className="font-semibold">{receiptData.customerName}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Telepon:</span><span className="font-semibold">{receiptData.customerPhone}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Pembayaran:</span><span className="font-semibold">{receiptData.paymentMethod}</span></div>
-              </div>
-
-              <div className="border-t border-b py-4 my-4">
-                <div className="space-y-3">
-                  {receiptData.items.map((item: any, index: number) => (
-                    <div key={index} className="flex justify-between text-sm">
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-900">{item.product.name}</p>
-                        <p className="text-gray-600 text-xs">{item.priceType.charAt(0).toUpperCase() + item.priceType.slice(1)} x {item.quantity}</p>
-                      </div>
-                      <div className="text-right"><p className="font-semibold text-gray-900">{formatRupiah(item.price * item.quantity)}</p></div>
-                    </div>
-                  ))}
+        autoPrint ? (
+          // Auto-print mode: render off-screen, invisible to user, but in DOM for @media print
+          <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
+            <div className="bg-white" id="receipt">
+              <div className="p-6">
+                <div className="text-center mb-6 border-b pb-4">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-1">STRUK PEMBELIAN</h2>
+                  <p className="text-sm text-gray-600">Terima Kasih Atas Kunjungan Anda</p>
+                  <p className="text-xs text-gray-500 mt-2">{receiptData.date}</p>
                 </div>
-              </div>
-
-              <div className="space-y-2 text-sm mb-4">
-                <div className="flex justify-between"><span className="text-gray-600">Subtotal:</span><span className="font-semibold">{formatRupiah(receiptData.subtotal)}</span></div>
-                {receiptData.discount > 0 && (
-                  <div className="flex justify-between"><span className="text-gray-600">Diskon:</span><span className="font-semibold text-red-600">-{formatRupiah(receiptData.discount)}</span></div>
-                )}
-                {receiptData.cashReceived && receiptData.cashReceived > 0 && (
-                  <>
-                    <div className="flex justify-between"><span className="text-gray-600">Uang Diterima:</span><span className="font-semibold">{formatRupiah(receiptData.cashReceived)}</span></div>
-                    {receiptData.change && receiptData.change > 0 && (
-                      <div className="flex justify-between"><span className="text-gray-600">Kembalian:</span><span className="font-semibold text-green-600">{formatRupiah(receiptData.change)}</span></div>
-                    )}
-                  </>
-                )}
-                <div className="flex justify-between pt-2 border-t font-bold text-lg"><span>Total:</span><span className="text-[#b8960c]">{formatRupiah(receiptData.total)}</span></div>
-              </div>
-
-              <div className="text-center text-xs text-gray-500 border-t pt-4 mt-4">
-                <p>Produk yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
-                <p className="mt-2">Terima Kasih</p>
-              </div>
-
-              <div className="flex gap-3 mt-6 print:hidden">
-                <Button onClick={() => window.print()} className="flex-1"><Printer className="h-4 w-4 mr-2" /> Print</Button>
-                <Button onClick={() => { setShowReceipt(false); setReceiptData(null); }} variant="outline" className="flex-1">Tutup</Button>
+                <div className="mb-4 space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-600">No. Pesanan:</span><span className="font-semibold">#{receiptData.orderId}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Pelanggan:</span><span className="font-semibold">{receiptData.customerName}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Telepon:</span><span className="font-semibold">{receiptData.customerPhone}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Pembayaran:</span><span className="font-semibold">{receiptData.paymentMethod}</span></div>
+                </div>
+                <div className="border-t border-b py-4 my-4">
+                  <div className="space-y-3">
+                    {receiptData.items.map((item: any, index: number) => (
+                      <div key={index} className="flex justify-between text-sm">
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">{item.product.name}</p>
+                          <p className="text-gray-600 text-xs">{item.priceType.charAt(0).toUpperCase() + item.priceType.slice(1)} x {item.quantity}</p>
+                        </div>
+                        <div className="text-right"><p className="font-semibold text-gray-900">{formatRupiah(item.price * item.quantity)}</p></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2 text-sm mb-4">
+                  <div className="flex justify-between"><span className="text-gray-600">Subtotal:</span><span className="font-semibold">{formatRupiah(receiptData.subtotal)}</span></div>
+                  {receiptData.discount > 0 && (
+                    <div className="flex justify-between"><span className="text-gray-600">Diskon:</span><span className="font-semibold text-red-600">-{formatRupiah(receiptData.discount)}</span></div>
+                  )}
+                  {receiptData.cashReceived && receiptData.cashReceived > 0 && (
+                    <>
+                      <div className="flex justify-between"><span className="text-gray-600">Uang Diterima:</span><span className="font-semibold">{formatRupiah(receiptData.cashReceived)}</span></div>
+                      {receiptData.change && receiptData.change > 0 && (
+                        <div className="flex justify-between"><span className="text-gray-600">Kembalian:</span><span className="font-semibold text-green-600">{formatRupiah(receiptData.change)}</span></div>
+                      )}
+                    </>
+                  )}
+                  <div className="flex justify-between pt-2 border-t font-bold text-lg"><span>Total:</span><span className="text-[#b8960c]">{formatRupiah(receiptData.total)}</span></div>
+                </div>
+                <div className="text-center text-xs text-gray-500 border-t pt-4 mt-4">
+                  <p>Produk yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
+                  <p className="mt-2">Terima Kasih</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          // Manual mode: visible modal with Print & Tutup buttons
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto" id="receipt">
+              <div className="p-6">
+                <div className="text-center mb-6 border-b pb-4">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-1">STRUK PEMBELIAN</h2>
+                  <p className="text-sm text-gray-600">Terima Kasih Atas Kunjungan Anda</p>
+                  <p className="text-xs text-gray-500 mt-2">{receiptData.date}</p>
+                </div>
+                <div className="mb-4 space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-600">No. Pesanan:</span><span className="font-semibold">#{receiptData.orderId}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Pelanggan:</span><span className="font-semibold">{receiptData.customerName}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Telepon:</span><span className="font-semibold">{receiptData.customerPhone}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Pembayaran:</span><span className="font-semibold">{receiptData.paymentMethod}</span></div>
+                </div>
+                <div className="border-t border-b py-4 my-4">
+                  <div className="space-y-3">
+                    {receiptData.items.map((item: any, index: number) => (
+                      <div key={index} className="flex justify-between text-sm">
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">{item.product.name}</p>
+                          <p className="text-gray-600 text-xs">{item.priceType.charAt(0).toUpperCase() + item.priceType.slice(1)} x {item.quantity}</p>
+                        </div>
+                        <div className="text-right"><p className="font-semibold text-gray-900">{formatRupiah(item.price * item.quantity)}</p></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2 text-sm mb-4">
+                  <div className="flex justify-between"><span className="text-gray-600">Subtotal:</span><span className="font-semibold">{formatRupiah(receiptData.subtotal)}</span></div>
+                  {receiptData.discount > 0 && (
+                    <div className="flex justify-between"><span className="text-gray-600">Diskon:</span><span className="font-semibold text-red-600">-{formatRupiah(receiptData.discount)}</span></div>
+                  )}
+                  {receiptData.cashReceived && receiptData.cashReceived > 0 && (
+                    <>
+                      <div className="flex justify-between"><span className="text-gray-600">Uang Diterima:</span><span className="font-semibold">{formatRupiah(receiptData.cashReceived)}</span></div>
+                      {receiptData.change && receiptData.change > 0 && (
+                        <div className="flex justify-between"><span className="text-gray-600">Kembalian:</span><span className="font-semibold text-green-600">{formatRupiah(receiptData.change)}</span></div>
+                      )}
+                    </>
+                  )}
+                  <div className="flex justify-between pt-2 border-t font-bold text-lg"><span>Total:</span><span className="text-[#b8960c]">{formatRupiah(receiptData.total)}</span></div>
+                </div>
+                <div className="text-center text-xs text-gray-500 border-t pt-4 mt-4">
+                  <p>Produk yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
+                  <p className="mt-2">Terima Kasih</p>
+                </div>
+                <div className="flex gap-3 mt-6 print:hidden">
+                  <Button onClick={() => window.print()} className="flex-1"><Printer className="h-4 w-4 mr-2" /> Print</Button>
+                  <Button onClick={() => { setShowReceipt(false); setReceiptData(null); }} variant="outline" className="flex-1">Tutup</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       {/* === DIGITAL PAYMENT POPUP MODAL === */}
