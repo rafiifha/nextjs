@@ -131,7 +131,8 @@ export async function POST(
       );
     }
 
-    const { payment_number, fee, expired_at } = pakasirRes.payment;
+    const { payment_number, fee, total_payment, amount } = pakasirRes.payment;
+    const customerFee = (total_payment !== undefined && amount !== undefined) ? (total_payment - amount) : fee;
 
     // Re-reserve stock for expired orders (stock was returned when order expired)
     if (order.status === 'expired') {
@@ -155,7 +156,7 @@ export async function POST(
       data: {
         status: 'pending',
         paymentNumber: payment_number,
-        paymentFee: fee,
+        paymentFee: customerFee,
         expiredAt: expiredAt,
       },
       include: {

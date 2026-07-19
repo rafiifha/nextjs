@@ -150,14 +150,17 @@ export class CashierService {
           throw new Error('Pakasir tidak mengembalikan payment number');
         }
 
+        const { payment_number, fee, total_payment, amount } = pakasirRes.payment;
+        const customerFee = (total_payment !== undefined && amount !== undefined) ? (total_payment - amount) : fee;
+
         const expiredAt = new Date();
         expiredAt.setMinutes(expiredAt.getMinutes() + 15);
 
         updatedOrder = await prisma.order.update({
           where: { id: order.id },
           data: {
-            paymentNumber: pakasirRes.payment.payment_number,
-            paymentFee: pakasirRes.payment.fee,
+            paymentNumber: payment_number,
+            paymentFee: customerFee,
             expiredAt: expiredAt,
           },
           include: {
