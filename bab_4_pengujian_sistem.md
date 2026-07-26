@@ -1,4 +1,45 @@
+### 4.1 Implementasi Sistem
+
+Implementasi sistem merupakan tahap meletakkan dan menguji sistem agar siap dioperasikan. Tahap implementasi ini menjabarkan spesifikasi perangkat keras dan perangkat lunak yang digunakan, baik dalam lingkungan pengembangan (lokal) maupun lingkungan produksi (*cloud hosting*).
+
+#### 4.1.1 Implementasi Perangkat Keras
+Implementasi perangkat keras menjabarkan spesifikasi perangkat keras yang digunakan untuk membangun, mengoperasikan, dan menjalankan platform pemesanan dan manajemen toko di Toko Naning, baik pada sisi pengembangan lokal maupun *server hosting* tempat aplikasi dan database bermukim secara *online*. Spesifikasi perangkat keras yang digunakan dapat dilihat pada Tabel 4.1.
+
+**Tabel 4. 1 Implementasi Perangkat Keras**
+
+| No | Perangkat Keras | Spesifikasi |
+| :--- | :--- | :--- |
+| 1 | Prosesor | 11th Gen Intel(R) Core(TM) i5-11400H @ 2.70GHz |
+| 2 | Penyimpanan | 512 GB SSD |
+| 3 | Memori (RAM) | 16 GB |
+| 4 | Graphics Card / VGA | NVIDIA GeForce GTX 1650 Max-Q Design (4 GB) |
+| 5 | Server Hosting Aplikasi | Vercel Cloud Serverless (AWS Lambda Infrastructure, Hobby Tier, 360 GB-Hrs Fluid Provisioned Memory, 4h Active CPU) |
+| 6 | Server Hosting Database | Neon Cloud Database Infrastructure (PostgreSQL Serverless, Auto-scaling 0.25 - 2 Compute Units / CU, Storage 0.5 GB, Bandwidth 5 GB) |
+
+#### 4.1.2 Implementasi Perangkat Lunak
+Implementasi perangkat lunak menjelaskan tentang perangkat lunak pendukung, spesifikasi *hosting*, *Database Management System* (DBMS), serta *Application Programming Interface* (API) eksternal yang terintegrasi di dalam platform pemesanan dan manajemen toko di Toko Naning. Perangkat lunak yang digunakan dapat dilihat pada Tabel 4.2.
+
+**Tabel 4. 2 Implementasi Perangkat Lunak**
+
+| No | Perangkat Lunak | Spesifikasi |
+| :--- | :--- | :--- |
+| 1 | Sistem Operasi | Windows 11 |
+| 2 | Teks Editor | Visual Studio Code / Antigravity |
+| 3 | Web Browser | Google Chrome / Mozilla Firefox |
+| 4 | Spesifikasi Hosting Aplikasi | Vercel Hobby Tier (Serverless Next.js App, 100 GB Fast Data Transfer, 1M Function Invocations, 1M Edge Requests) |
+| 5 | Spesifikasi DBMS | Neon Serverless PostgreSQL (PostgreSQL v16, Quota Storage 0.5 GB, 100 CU-hrs Compute) & Prisma ORM (v6.19.0) |
+| 6 | Payment Gateway API | Pakasir REST API v1 (Layanan integrasi pembayaran digital QRIS & Virtual Account) |
+| 7 | WhatsApp Gateway API | Fonnte REST API v1 (Layanan pengiriman kode OTP verifikasi akun & notifikasi WhatsApp) |
+| 8 | Map & Geolocation API | Leaflet.js (v1.9.4) & OpenStreetMap Standard Tile API (Penentu titik koordinat GPS & kalkulasi ongkir per zona) |
+| 9 | Real-time Gateway API | Pusher Channels API v7 (Layanan sinkronisasi transaksi real-time POS kasir & admin) |
+
+
+
+
+---
+
 ### 4.2 Pengujian Sistem
+
 
 Pengujian sistem merupakan tahapan lanjutan dari pembangunan sistem yang telah direncanakan dan dibuat sebelumnya. Pengujian ini dilakukan dengan tujuan untuk menemukan kesalahan, bug, atau ketidaksesuaian fungsionalitas dari sistem yang dibangun, sehingga dapat diketahui apakah sistem telah sesuai dengan tujuan rancangan serta kebutuhan pengguna Toko Naning.
 

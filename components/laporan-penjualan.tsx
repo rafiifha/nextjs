@@ -133,28 +133,120 @@ export default function LaporanPenjualan() {
 
   const COLORS = ['#ffd700', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
-  const handleDownload = () => {
-    const csvData = [
-      ['ID Pesanan', 'Nama Pelanggan', 'Status', 'Total', 'Tanggal'],
-      ...filteredOrders.map((order) => [
-        order.id,
-        order.customerName,
-        order.status,
-        order.totalHarga,
-        new Date(order.createdAt).toLocaleString('id-ID'),
-      ]),
+  const handleDownload = async () => {
+    const ExcelJS = (await import('exceljs')).default;
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Sistem Laporan Penjualan';
+    workbook.created = new Date();
+
+    const worksheet = workbook.addWorksheet('Laporan Penjualan', {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    });
+
+    // Define columns with proper widths
+    worksheet.columns = [
+      { header: 'No', key: 'no', width: 6 },
+      { header: 'ID Pesanan', key: 'id', width: 12 },
+      { header: 'Nama Pelanggan', key: 'customerName', width: 28 },
+      { header: 'Total (Rp)', key: 'total', width: 22 },
+      { header: 'Tanggal', key: 'date', width: 24 },
     ];
 
-    const csvContent = csvData.map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Style header row
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFB8860B' }, // Dark goldenrod
+    };
+    headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    headerRow.height = 28;
+
+    // Only include paid (successful) orders
+    const paidOrders = filteredOrders.filter((order) => order.status === 'paid');
+
+    // Add data rows
+    paidOrders.forEach((order, index) => {
+      const row = worksheet.addRow({
+        no: index + 1,
+        id: order.id,
+        customerName: order.customerName,
+        total: order.totalHarga,
+        date: new Date(order.createdAt).toLocaleString('id-ID', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      });
+
+      // Alternate row colors
+      if (index % 2 === 0) {
+        row.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFF8E7' }, // Light gold tint
+        };
+      }
+
+      // Center align No and ID columns
+      row.getCell('no').alignment = { horizontal: 'center' };
+      row.getCell('id').alignment = { horizontal: 'center' };
+
+      // Format total as Rupiah
+      row.getCell('total').numFmt = '#,##0';
+      row.getCell('total').alignment = { horizontal: 'right' };
+    });
+
+    // Add summary row
+    const paidTotal = paidOrders.reduce((sum, o) => sum + o.totalHarga, 0);
+    const summaryRow = worksheet.addRow({
+      no: '',
+      id: '',
+      customerName: 'TOTAL',
+      total: paidTotal,
+      date: '',
+    });
+    summaryRow.font = { bold: true, size: 11 };
+    summaryRow.getCell('customerName').alignment = { horizontal: 'right' };
+    summaryRow.getCell('total').numFmt = '#,##0';
+    summaryRow.getCell('total').alignment = { horizontal: 'right' };
+    summaryRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFFF0C0' }, // Gold highlight
+    };
+
+    // Add borders to all data cells
+    const totalRows = paidOrders.length + 2; // header + data + summary
+    for (let rowIdx = 1; rowIdx <= totalRows; rowIdx++) {
+      const row = worksheet.getRow(rowIdx);
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+          left: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+          bottom: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+          right: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+        };
+      });
+    }
+
+    // Generate and download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `laporan-penjualan-${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `laporan-penjualan-${new Date().toISOString().split('T')[0]}.xlsx`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -180,7 +272,7 @@ export default function LaporanPenjualan() {
         </div>
         <Button onClick={handleDownload} disabled={isFutureDate}>
           <Download className="h-4 w-4 mr-2" />
-          Download CSV
+          Download Excel
         </Button>
       </div>
 
