@@ -143,7 +143,7 @@ export default function CheckoutPage() {
   };
 
   // Payment info
-  const [paymentMethod, setPaymentMethod] = useState<string>('tunai');
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
 
   const PAKASIR_METHODS = [
     { id: 'qris', name: 'QRIS' },
@@ -242,6 +242,10 @@ export default function CheckoutPage() {
     }
     if (!deliveryMethod) {
       toast.warning('Metode Pembelian Belum Dipilih', { description: 'Silakan pilih metode pembelian terlebih dahulu (Ambil Sendiri atau Antar)' });
+      return;
+    }
+    if (!paymentMethod) {
+      toast.warning('Metode Pembayaran Belum Dipilih', { description: 'Silakan pilih metode pembayaran terlebih dahulu' });
       return;
     }
     if (deliveryMethod === 'delivery' && !destinationAddress) {
@@ -382,10 +386,10 @@ export default function CheckoutPage() {
                 <div>
                   <Label>Metode Pembelian</Label>
                   <div className="flex gap-2 mt-2">
-                    <Button type="button" variant={deliveryMethod === 'pickup' ? 'default' : 'outline'} onClick={() => { setDeliveryMethod('pickup'); setShippingFee(0); setPaymentMethod('tunai'); }} className="flex-1">
+                    <Button type="button" variant={deliveryMethod === 'pickup' ? 'default' : 'outline'} onClick={() => { setDeliveryMethod('pickup'); setShippingFee(0); setPaymentMethod(''); }} className="flex-1">
                       <MapPin className="h-4 w-4 mr-2" /> Ambil Sendiri
                     </Button>
-                    <Button type="button" variant={deliveryMethod === 'delivery' ? 'default' : 'outline'} onClick={() => { setDeliveryMethod('delivery'); setShippingFee(0); if (paymentMethod === 'tunai') setPaymentMethod(DEFAULT_NON_TUNAI_METHOD); }} className="flex-1">
+                    <Button type="button" variant={deliveryMethod === 'delivery' ? 'default' : 'outline'} onClick={() => { setDeliveryMethod('delivery'); setShippingFee(0); setPaymentMethod(''); }} className="flex-1">
                       <Truck className="h-4 w-4 mr-2" /> Antar
                     </Button>
                   </div>
@@ -501,6 +505,7 @@ export default function CheckoutPage() {
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                   >
+                    <option value="">Pilih metode pembayaran</option>
                     {deliveryMethod === 'pickup' && <option value="tunai">Tunai (Bayar di Toko)</option>}
                     {PAKASIR_METHODS.map((method) => (
                       <option key={method.id} value={method.id}>💳 {method.name}</option>
