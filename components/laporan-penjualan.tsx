@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatRupiah } from '@/lib/utils';
+import { toast } from 'sonner';
 import { Download, Calendar, TrendingUp, Package, DollarSign, ShoppingCart, Loader2 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -38,6 +39,14 @@ export default function LaporanPenjualan() {
     
     fetchOrders();
   }, []);
+
+  useEffect(() => {
+    if (startDate && endDate && startDate > endDate) {
+      toast.error('Rentang Tanggal Tidak Valid', {
+        description: 'Tanggal awal tidak boleh lebih besar dari tanggal akhir.',
+      });
+    }
+  }, [startDate, endDate]);
 
   const fetchOrders = async () => {
     try {
@@ -262,6 +271,7 @@ export default function LaporanPenjualan() {
 
   const todayStr = new Date().toLocaleDateString('en-CA');
   const isFutureDate = !!((startDate && startDate > todayStr) || (endDate && endDate > todayStr));
+  const isInvalidRange = !!(startDate && endDate && startDate > endDate);
 
   return (
     <div className="p-6">
@@ -270,7 +280,7 @@ export default function LaporanPenjualan() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Laporan Penjualan</h1>
           <p className="text-gray-600">Analisis dan visualisasi data penjualan</p>
         </div>
-        <Button onClick={handleDownload} disabled={isFutureDate}>
+        <Button onClick={handleDownload} disabled={isFutureDate || isInvalidRange}>
           <Download className="h-4 w-4 mr-2" />
           Download Excel
         </Button>
