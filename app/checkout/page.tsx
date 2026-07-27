@@ -64,7 +64,7 @@ export default function CheckoutPage() {
   const [customerPhone, setCustomerPhone] = useState('');
 
   // Delivery info
-  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery' | null>(null);
   const [shippingFee, setShippingFee] = useState(0);
   const [destinationAddress, setDestinationAddress] = useState('');
   const [shippingNotes, setShippingNotes] = useState('');
@@ -238,6 +238,10 @@ export default function CheckoutPage() {
     }
     if (cart.length === 0) {
       toast.warning('Keranjang Kosong', { description: 'Tambahkan produk terlebih dahulu' });
+      return;
+    }
+    if (!deliveryMethod) {
+      toast.warning('Metode Pembelian Belum Dipilih', { description: 'Silakan pilih metode pembelian terlebih dahulu (Ambil Sendiri atau Antar)' });
       return;
     }
     if (deliveryMethod === 'delivery' && !destinationAddress) {
