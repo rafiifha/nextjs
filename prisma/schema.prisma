@@ -11,8 +11,6 @@ model Category {
   id          Int      @id @default(autoincrement())
   name        String   @unique
   priceTypes  String[] // Array of price type names, e.g., ["dus", "pak", "item"] or ["bal", "kg"]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
   products    Product[]
 }
 
