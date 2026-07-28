@@ -208,6 +208,13 @@ export default function ManajemenPesananPage() {
   };
 
   const handlePrintOrder = async (order: Order) => {
+    if (['cancelled', 'expired'].includes(order.status)) {
+      toast.error('Tidak Dapat Mencetak Struk', {
+        description: 'Pesanan yang telah dibatalkan tidak dapat dicetak struknya.',
+      });
+      return;
+    }
+
     if (!isOfflineOrder(order) && order.status === 'paid') {
       try {
         const res = await fetch(`/api/pesanan/${order.id}`, {
