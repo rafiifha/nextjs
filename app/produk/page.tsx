@@ -54,7 +54,7 @@ export default function ProdukPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
-  const ITEMS_PER_PAGE = 10;
+  const ITEMS_PER_PAGE = 12;
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
