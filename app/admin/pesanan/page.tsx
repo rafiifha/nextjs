@@ -274,6 +274,7 @@ export default function ManajemenPesananPage() {
         <title>Struk</title>
         <style>
           @page { size: 58mm auto; margin: 0; }
+          html, body { margin: 0; padding: 0; height: auto; overflow: hidden; }
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { width: 48mm; font-family: 'Arial', sans-serif; font-size: 9px; padding: 1mm; color: #000; }
           .center { text-align: center; }
