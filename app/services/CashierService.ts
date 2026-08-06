@@ -2,14 +2,23 @@ import { prisma } from '@/lib/db';
 import { triggerOrderEvent } from '@/services/pusherService';
 import { pakasirService } from '@/services/pakasirService';
 
+/**
+ * Service untuk menangani transaksi Kasir Offline (Point of Sale / POS).
+ */
 export class CashierService {
+  /**
+   * Mencatat transaksi pembelian offline secara langsung di toko fisik oleh Kasir.
+   * Transaksi ini mendukung pembayaran 'tunai' (langsung lunas) dan 'non-tunai' (menggunakan QRIS/Digital Payment via Pakasir).
+   */
   async createOfflineOrder(data: any) {
     const { customerName, customerPhone, paymentMethod, discount, cashReceived, items } = data;
 
+    // 1. Validasi input data dasar
     if (!customerName || !customerPhone || !items || items.length === 0) {
       throw new Error('Data tidak lengkap');
     }
 
+    // 2. Menormalisasi format data item belanjaan yang dimasukkan oleh kasir
     const normalizedItems = items.map((item: any) => ({
       productId: parseInt(item.productId),
       variantId: item.variantId ? parseInt(item.variantId) : null,
@@ -25,6 +34,7 @@ export class CashierService {
       if (!item.price || item.price <= 0) throw new Error('Price harus lebih dari 0');
     }
 
+    // 3. Mengambil data produk beserta varian harga dari database secara massal berdasarkan ID produk unik
     const productIds = normalizedItems.map((item: any) => item.productId);
     const uniqueProductIds = [...new Set(productIds)] as number[];
     
@@ -39,6 +49,7 @@ export class CashierService {
       throw new Error(`Produk dengan ID ${missingIds.join(', ')} tidak ditemukan`);
     }
 
+    // 4. Validasi Stok Offline: memastikan stok di toko fisik mencukupi sebelum checkout
     const stockErrors: string[] = [];
     for (const item of normalizedItems) {
       const product = products.find(p => p.id === item.productId);
@@ -65,6 +76,7 @@ export class CashierService {
       throw error;
     }
 
+    // 5. Kalkulasi finansial (Subtotal, Diskon, Total Bayar, dan Uang Kembalian Tunai)
     const subtotal = normalizedItems.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
     const discountAmount = discount && !isNaN(parseFloat(discount)) ? Math.max(0, parseFloat(discount)) : 0;
     const totalHarga = Math.max(0, subtotal - discountAmount);
@@ -76,9 +88,11 @@ export class CashierService {
       ? Math.max(0, cashReceivedAmount - totalHarga)
       : null;
 
+    // Menetapkan status awal pesanan: 'paid' jika tunai langsung lunas, 'pending' jika digital (menunggu payment gateway)
     const isTunai = paymentMethod === 'tunai';
     const orderStatus = isTunai ? 'paid' : 'pending';
     
+    // 6. Membuat data record transaksi baru di Database menggunakan Prisma
     const order = await prisma.order.create({
       data: {
         customerName,
@@ -125,7 +139,7 @@ export class CashierService {
 
     let updatedOrder = order;
 
-    // Reserve stock immediately for ALL orders (tunai maupun digital)
+    // 7. Mengurangi stok offline (stok toko fisik) secara real-time di database untuk barang yang dibeli
     for (const item of order.items) {
       if (!item.variantId) continue;
       try {
@@ -139,8 +153,10 @@ export class CashierService {
       }
     }
 
+    // 8. Mengintegrasikan ke Payment Gateway (Pakasir) jika memilih pembayaran Non-Tunai / Digital
     if (!isTunai) {
       try {
+        // Membuat transaksi pembayaran baru di server Pakasir
         const pakasirRes = await pakasirService.createTransaction(paymentMethod, {
           order_id: `INV-${order.id}`,
           amount: totalHarga,
@@ -154,8 +170,9 @@ export class CashierService {
         const customerFee = (total_payment !== undefined && amount !== undefined) ? (total_payment - amount) : fee;
 
         const expiredAt = new Date();
-        expiredAt.setMinutes(expiredAt.getMinutes() + 15);
+        expiredAt.setMinutes(expiredAt.getMinutes() + 15); // Masa aktif bayar qris/ewallet selama 15 menit
 
+        // Memperbarui database order dengan nomor pembayaran (qris link/va) & fee tambahan dari Pakasir
         updatedOrder = await prisma.order.update({
           where: { id: order.id },
           data: {
@@ -178,7 +195,7 @@ export class CashierService {
           },
         });
       } catch (pakasirErr: any) {
-        // Restore stock before deleting order
+        // ROLLBACK STOK: Jika integrasi Pakasir gagal, membatalkan pesanan dan mengembalikan stok offline toko
         for (const item of order.items) {
           if (!item.variantId) continue;
           await prisma.productVariant.update({
@@ -187,11 +204,13 @@ export class CashierService {
           });
           console.log(`↩️ Kasir stok restored: variant ${item.variantId} dikembalikan ${item.quantity}`);
         }
+        // Menghapus pesanan gagal dari DB agar data bersih
         await prisma.order.delete({ where: { id: order.id } });
         throw new Error(pakasirErr?.message || 'Gagal membuat transaksi Pakasir');
       }
     }
 
+    // 9. Mengirimkan event real-time via Pusher agar monitor transaksi kasir langsung memperbarui data di client browser
     await triggerOrderEvent('order-created', updatedOrder);
 
     return updatedOrder;

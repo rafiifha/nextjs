@@ -299,6 +299,11 @@ export class OrderService {
     return order;
   }
 
+  /**
+   * Mencatat pesanan baru (Checkout Online) dari aplikasi web pelanggan.
+   * Memproses validasi stok online, kalkulasi ongkos kirim, penyimpanan transaksi ke DB,
+   * pemesanan stok barang (stock reservation), integrasi Pakasir, serta pengiriman notifikasi WhatsApp.
+   */
   async createOrder(data: any) {
     const {
       customerName,
@@ -316,14 +321,17 @@ export class OrderService {
       shippingNotes,
     } = data;
 
+    // 1. Validasi input
     if (!customerName || !customerPhone || !items || items.length === 0) {
       throw new Error('Data pelanggan dan items harus diisi');
     }
 
+    // Aturan bisnis: Jika dikirim (delivery), maka pembayaran wajib non-tunai demi keamanan pengantaran kurir
     if (deliveryMethod === 'delivery' && paymentMethod === 'tunai') {
       throw new Error('Pesanan antar wajib menggunakan pembayaran non-tunai');
     }
 
+    // 2. Mengambil data produk & varian harga untuk pengecekan stok
     const productIds = items.map((item: any) => parseInt(item.productId));
     const uniqueProductIds = Array.from(new Set(productIds)) as number[];
     
@@ -336,6 +344,7 @@ export class OrderService {
       throw new Error('Produk tidak ditemukan');
     }
 
+    // 3. Validasi Stok Online: memastikan stok online mencukupi untuk setiap produk yang dipesan
     const stockErrors: string[] = [];
     for (const item of items) {
       const product = products.find(p => p.id === item.productId);
@@ -365,15 +374,19 @@ export class OrderService {
       throw error;
     }
 
+    // 4. Menghitung total harga (harga item + ongkir)
     const totalHarga = items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) + (shippingFee || 0);
 
+    // 5. Menetapkan batas waktu pembayaran (Expired Time)
+    // Tunai diberikan waktu 1 jam (karena harus ke kasir/COD), non-tunai (digital) diberikan waktu 15 menit
     const expiredAt = new Date();
     if (paymentMethod === 'tunai') {
-      expiredAt.setHours(expiredAt.getHours() + 1); // 1 jam timeout untuk bayar tunai
+      expiredAt.setHours(expiredAt.getHours() + 1);
     } else {
-      expiredAt.setMinutes(expiredAt.getMinutes() + 15); // 15 menit timeout untuk digital
+      expiredAt.setMinutes(expiredAt.getMinutes() + 15);
     }
 
+    // 6. Mencatat pesanan baru ini ke Database menggunakan Prisma
     const order = await prisma.order.create({
       data: {
         customerName,
@@ -416,7 +429,7 @@ export class OrderService {
 
     let updatedOrder = order;
 
-    // Reserve stock immediately on order creation
+    // 7. Mengurangi stok online (Reserve Stock): langsung memotong stok online di database agar barang tidak dibeli orang lain
     for (const item of order.items) {
       if (item.variantId) {
         await prisma.productVariant.update({
@@ -427,6 +440,7 @@ export class OrderService {
       }
     }
 
+    // 8. Membuat transaksi pembayaran non-tunai di Pakasir
     if (paymentMethod && paymentMethod !== 'tunai') {
       try {
         const pakasirRes = await pakasirService.createTransaction(paymentMethod, {
@@ -441,6 +455,7 @@ export class OrderService {
         const { payment_number, fee, total_payment, amount } = pakasirRes.payment;
         const customerFee = (total_payment !== undefined && amount !== undefined) ? (total_payment - amount) : fee;
         
+        // Simpan tautan bayar (payment number / e-wallet URL) & admin fee ke data order
         updatedOrder = await prisma.order.update({
           where: { id: order.id },
           data: {
@@ -449,12 +464,14 @@ export class OrderService {
             expiredAt: expiredAt,
           },
           include: {
-            items: { include: { product: true } },
+            items: {
+              include: { product: true },
+            },
           },
         });
       } catch (pakasirErr: any) {
+        // ROLLBACK STOK: Jika integrasi Pakasir gagal, mengembalikan stok online dan menghapus pesanan gagal tersebut
         console.error('Pakasir error during checkout:', pakasirErr);
-        // Restore stock before deleting order
         for (const item of order.items) {
           if (item.variantId) {
             await prisma.productVariant.update({
@@ -469,13 +486,14 @@ export class OrderService {
       }
     }
 
+    // 9. Mengirimkan event real-time ke web dashboard  via Pusher
     try {
       await triggerOrderEvent('order-created', updatedOrder);
     } catch (error) {
       console.error('Pusher error:', error);
     }
 
-    // Kirim WhatsApp secara async agar tidak menghambat response API
+    // 10. Mengirimkan notifikasi pesanan baru secara asinkron ke WhatsApp Pelanggan
     sendOrderNotification(customerPhone, {
       orderId: order.id,
       customerName,
@@ -493,6 +511,11 @@ export class OrderService {
     return updatedOrder;
   }
 
+  /**
+   * Memperbarui status pesanan (seperti pending -> processing -> shipped -> delivered, atau cancelled).
+   * Menangani logika pengembalian stok jika pesanan dibatalkan, penugasan kurir secara dinamis,
+   * pencatatan data logistik (shippedAt, deliveredAt), update real-time via Pusher, serta pengiriman notifikasi WhatsApp ke Kurir & Pelanggan.
+   */
   async updateOrder(id: number, data: any) {
     const {
       status,
@@ -515,7 +538,7 @@ export class OrderService {
       throw new Error('Pesanan tidak ditemukan');
     }
 
-    // Restore reserved stock when cancelling a pending order
+    // 1. ROLLBACK STOK jika pesanan dibatalkan (cancelled) saat masih berstatus pending
     if (status === 'cancelled' && existingOrder.status === 'pending') {
       for (const item of existingOrder.items) {
         if (item.variantId) {
@@ -527,7 +550,7 @@ export class OrderService {
         }
       }
 
-      // Cancel Pakasir transaction on manual cancel
+      // Memanggil API Pakasir untuk membatalkan transaksi digital secara resmi
       if (existingOrder.paymentMethod && existingOrder.paymentMethod !== 'tunai') {
         try {
           await pakasirService.cancelTransaction({
@@ -543,10 +566,12 @@ export class OrderService {
 
     const isOfflineOrder = existingOrder.deliveryMethod === 'pickup' && (!existingOrder.shippingFee || existingOrder.shippingFee === 0);
     
+    // Validasi aturan bisnis offline order
     if (status && isOfflineOrder && existingOrder.status === 'delivered' && status !== 'cancelled') {
       throw new Error('Pesanan offline yang sudah selesai tidak dapat diubah statusnya.');
     }
 
+    // 2. Menyusun objek perubahan data (Prisma data update)
     const updateData: Record<string, any> = {
       ...(status && { status }),
       ...(customerName && { customerName }),
@@ -558,6 +583,7 @@ export class OrderService {
       ...(paymentFee !== undefined && { paymentFee }),
     };
 
+    // 3. Memproses logika jika status diubah menjadi 'shipped' (Sedang Dikirim oleh Kurir)
     if (status === 'shipped') {
       if (!courierId) {
         throw new Error('Kurir wajib dipilih sebelum kirim pesanan');
@@ -572,13 +598,15 @@ export class OrderService {
       }
 
       updateData.courierId = Number(courierId);
-      updateData.shippedAt = new Date();
+      updateData.shippedAt = new Date(); // Catat waktu pengiriman
     }
 
+    // 4. Memproses logika jika status diubah menjadi 'delivered' (Sampai ke Pelanggan / Selesai)
     if (status === 'delivered') {
-      updateData.deliveredAt = new Date();
+      updateData.deliveredAt = new Date(); // Catat waktu pesanan sampai
     }
 
+    // 5. Memperbarui data transaksi tersebut di database
     const order = await prisma.order.update({
       where: { id },
       data: updateData,
@@ -590,14 +618,16 @@ export class OrderService {
       },
     });
 
+    // 6. Mengirimkan event real-time ke web client via Pusher
     try {
       await triggerOrderEvent('order-updated', order);
     } catch (error) {
       console.error('Pusher error:', error);
     }
 
+    // 7. Mengirimkan notifikasi WhatsApp secara asinkron setelah barang dikirim (shipped)
     if (status === 'shipped' && order.courier) {
-      // Kirim WhatsApp secara async
+      // 7a. Mengirimkan rincian tugas pengiriman ke WhatsApp Kurir
       sendCourierDeliveryNotification(order.courier.phone, {
         orderId: order.id,
         customerName: order.customerName,
@@ -612,6 +642,7 @@ export class OrderService {
         console.error('Courier WhatsApp error:', waError);
       });
 
+      // 7b. Mengirimkan info bahwa barang sedang jalan ke WhatsApp Pelanggan
       sendCustomerShippingNotification(order.customerPhone, {
         orderId: order.id,
         customerName: order.customerName,
@@ -626,9 +657,15 @@ export class OrderService {
     return order;
   }
 
+  /**
+   * Fungsi otomatis (Scheduler / Cron Job) untuk membatalkan pesanan yang kadaluarsa (melewati batas waktu bayar).
+   * Mengembalikan stok barang yang dipesan, memperbarui status di database menjadi 'expired',
+   * membatalkan tagihan di Pakasir, serta mengirimkan event update secara real-time.
+   */
   async checkExpiredOrders() {
     const now = new Date();
     
+    // 1. Mencari semua order pending yang batas waktu bayar (expiredAt) kurang dari sama dengan waktu sekarang
     const expiredOrders = await prisma.order.findMany({
       where: {
         status: 'pending',
@@ -642,7 +679,8 @@ export class OrderService {
     });
 
     for (const order of expiredOrders) {
-      // Restore reserved stock before marking as expired
+      // 2. Mengembalikan stok barang (Rollback Stock):
+      // Karena pesanan kadaluarsa/tidak dibayar, mengembalikan stok online agar bisa dibeli orang lain lagi
       for (const item of order.items) {
         if (item.variantId) {
           await prisma.productVariant.update({
@@ -653,12 +691,13 @@ export class OrderService {
         }
       }
 
+      // 3. Mengupdate status pesanan di database menjadi 'expired'
       await prisma.order.update({
         where: { id: order.id },
         data: { status: 'expired' },
       });
 
-      // Cancel Pakasir transaction on expiry
+      // 4. Membatalkan transaksi/tagihan di server Pakasir secara asinkron
       if (order.paymentMethod && order.paymentMethod !== 'tunai') {
         try {
           await pakasirService.cancelTransaction({
@@ -671,6 +710,7 @@ export class OrderService {
         }
       }
       
+      // 5. Mengirimkan update status real-time via Pusher ke Admin
       try {
         await triggerOrderEvent('order-updated', {
           ...order,

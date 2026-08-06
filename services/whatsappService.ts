@@ -1,29 +1,36 @@
 import axios from 'axios';
 import { env } from '@/lib/env';
 
+// Menginisialisasi instance Axios custom khusus untuk integrasi dengan API Fonnte (WhatsApp Gateway)
 const fonnteApi = axios.create({
   baseURL: env.FONNTE_API_URL,
   timeout: 15000,
   headers: {
+    // Mengambil token otentikasi Fonnte dari konfigurasi environment (.env)
     'Authorization': (env.FONNTE_API_KEY || '').trim(),
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
 });
 
+/**
+ * Menormalisasi nomor telepon agar sesuai dengan format standar internasional (ID: 62).
+ * Berguna agar API Fonnte tidak mengalami error akibat format nomor telepon yang tidak standar (seperti memakai spasi, '+' atau tanda baca).
+ */
 function normalizeWhatsAppNumber(rawPhone: string) {
   const trimmed = (rawPhone || '').trim();
   if (!trimmed) {
     throw new Error('Nomor WhatsApp kosong');
   }
 
-  // Keep digits only (drop spaces, +, -, parentheses)
+  // Menghapus semua karakter non-digit (seperti spasi, +, -, tanda kurung) menggunakan regex
   let digits = trimmed.replace(/\D/g, '');
   if (!digits) {
     throw new Error(`Format nomor WhatsApp tidak valid: ${rawPhone}`);
   }
 
-  // Indonesia normalization: 08xx -> 628xx, 8xx -> 628xx, 62xx -> 62xx
+  // Menormalisasi awalan nomor telepon Indonesia:
+  // Jika diawali '0' -> diubah ke '628...', jika diawali langsung '8' -> diubah ke '628...', selain itu jika tidak diawali '62' -> ditambahkan '62'
   if (digits.startsWith('0')) {
     digits = `62${digits.slice(1)}`;
   } else if (digits.startsWith('8')) {
@@ -32,6 +39,7 @@ function normalizeWhatsAppNumber(rawPhone: string) {
     digits = `62${digits}`;
   }
 
+  // Memastikan panjang nomor minimal 10 digit agar valid sebagai nomor seluler
   if (digits.length < 10) {
     throw new Error(`Nomor WhatsApp terlalu pendek: ${rawPhone}`);
   }
@@ -39,22 +47,31 @@ function normalizeWhatsAppNumber(rawPhone: string) {
   return digits;
 }
 
+/**
+ * Mengirimkan pesan WhatsApp ke nomor target tertentu via gateway API Fonnte (fungsi utama).
+ */
 export async function sendWhatsAppMessage(phone: string, message: string) {
   try {
+    // 1. Menormalisasi nomor tujuan terlebih dahulu ke format 62
     const normalizedPhone = normalizeWhatsAppNumber(phone);
+    
+    // 2. Mengirimkan HTTP POST request ke endpoint /send milik API Fonnte
     const response = await fonnteApi.post('/send', {
       target: normalizedPhone,
       message: message,
     });
 
     const data = response.data;
-    // Fonnte biasanya return { status: true/false, ... }
+    
+    // 3. Memeriksa properti status dari respon Fonnte.
+    // Jika API request sukses secara HTTP namun status bernilai false, lemparkan error.
     if (data?.status === false) {
       throw new Error(data?.reason || data?.message || 'Fonnte menolak permintaan');
     }
 
     return data;
   } catch (error) {
+    // Mencatat log detail kesalahan ke console jika terjadi error koneksi atau kegagalan dari Fonnte
     if (axios.isAxiosError(error)) {
       console.error('Fonnte WhatsApp error:', {
         message: error.message,
@@ -68,6 +85,9 @@ export async function sendWhatsAppMessage(phone: string, message: string) {
   }
 }
 
+/**
+ * Mengirimkan Notifikasi Pesanan Baru (Checkout Online) kepada Pelanggan/Admin.
+ */
 export async function sendOrderNotification(phone: string, orderData: {
   orderId: number;
   customerName: string;
@@ -75,6 +95,7 @@ export async function sendOrderNotification(phone: string, orderData: {
   shippingFee?: number | null;
   items: Array<{ name: string; quantity: number; price: number }>;
 }) {
+  // Memformat daftar produk pesanan menjadi baris list terpisah
   const itemsText = orderData.items
     .map(item => `- ${item.name} (${item.quantity}x) = Rp ${item.price.toLocaleString('id-ID')}`)
     .join('\n');
@@ -84,6 +105,7 @@ export async function sendOrderNotification(phone: string, orderData: {
     ? `\nOngkir: Rp ${orderData.shippingFee.toLocaleString('id-ID')}`
     : '';
 
+  // Menyusun teks pesan WhatsApp dengan format Markdown tebal (*)
   const message = `📦 *Pesanan Baru - Toko Naning*
 
 ID Pesanan: #${orderData.orderId}
@@ -96,9 +118,13 @@ ${orderData.shippingFee ? `\nSubtotal: Rp ${subtotal.toLocaleString('id-ID')}${o
 
 Terima kasih atas pesanan Anda!`;
 
+  // Mengeksekusi pengiriman pesan WhatsApp
   return sendWhatsAppMessage(phone, message);
 }
 
+/**
+ * Mengirimkan Struk / Bukti Transaksi setelah pembayaran terkonfirmasi (Paid).
+ */
 export async function sendReceipt(phone: string, orderData: {
   orderId: number;
   customerName: string;
@@ -108,6 +134,7 @@ export async function sendReceipt(phone: string, orderData: {
   items: Array<{ name: string; quantity: number; price: number }>;
   createdAt: string;
 }) {
+  // Memformat daftar produk pesanan menjadi baris list
   const itemsText = orderData.items
     .map(item => `- ${item.name} (${item.quantity}x) = Rp ${item.price.toLocaleString('id-ID')}`)
     .join('\n');
@@ -124,6 +151,7 @@ export async function sendReceipt(phone: string, orderData: {
     ? `\nOngkir: Rp ${orderData.shippingFee.toLocaleString('id-ID')}`
     : '';
 
+  // Menyusun template pesan bukti transaksi
   const message = `🧾 *Bukti Transaksi - Toko Naning*
 
 ID Pesanan: #${orderData.orderId}
@@ -138,9 +166,13 @@ ${orderData.shippingFee ? `\nSubtotal: Rp ${subtotal.toLocaleString('id-ID')}${o
 
 Terima kasih telah berbelanja di Toko Naning! 🛒`;
 
+  // Mengeksekusi pengiriman pesan WhatsApp bukti transaksi
   return sendWhatsAppMessage(phone, message);
 }
 
+/**
+ * Mengirimkan notifikasi penugasan pengiriman baru kepada Kurir.
+ */
 export async function sendCourierDeliveryNotification(phone: string, orderData: {
   orderId: number;
   customerName: string;
@@ -153,6 +185,7 @@ export async function sendCourierDeliveryNotification(phone: string, orderData: 
     .map((item) => `- ${item.name} (${item.quantity}x)`)
     .join('\n');
 
+  // Menyusun template notifikasi kurir
   const message = `🚚 *Tugas Pengiriman Baru - Toko Naning*
 
 Pelanggan: ${orderData.customerName} (${orderData.customerPhone})
@@ -163,9 +196,13 @@ ${itemsText}
 
 📝 Catatan: ${orderData.shippingNotes || '-'}`;
 
+  // Mengeksekusi pengiriman pesan WhatsApp ke Kurir
   return sendWhatsAppMessage(phone, message);
 }
 
+/**
+ * Memberi tahu Pelanggan bahwa pesanan mereka sedang dalam proses pengiriman oleh kurir.
+ */
 export async function sendCustomerShippingNotification(phone: string, orderData: {
   orderId: number;
   customerName: string;
@@ -173,6 +210,7 @@ export async function sendCustomerShippingNotification(phone: string, orderData:
   courierName: string;
   courierPhone: string;
 }) {
+  // Menyusun template pesan pengiriman pelanggan
   const message = `🚚 *Pesanan Sedang Dikirim - Toko Naning*
 
 Halo ${orderData.customerName},
@@ -184,6 +222,7 @@ Kurir: ${orderData.courierName} (${orderData.courierPhone})
 
 Terima kasih sudah berbelanja di Toko Naning 🙏`;
 
+  // Mengeksekusi pengiriman pesan WhatsApp ke pelanggan
   return sendWhatsAppMessage(phone, message);
 }
 
