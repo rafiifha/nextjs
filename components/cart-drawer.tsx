@@ -19,12 +19,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Memantau status drawer terbuka dan mendengarkan event 'cartUpdated' untuk sinkronisasi keranjang
   useEffect(() => {
     if (isOpen) {
       loadCart();
     }
 
-    // Listen for cart updates
     const handleCartUpdate = () => {
       loadCart();
     };
@@ -33,6 +33,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     return () => window.removeEventListener('cartUpdated', handleCartUpdate);
   }, [isOpen]);
 
+  // Mengambil data keranjang dari local storage sesuai ID pengguna yang sedang login
   const loadCart = () => {
     const userStr = localStorage.getItem('user');
     let userId: number | null = null;
@@ -41,7 +42,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         const user = JSON.parse(userStr);
         userId = user?.id || null;
       } catch (e) {
-        // ignore
+        // abaikan
       }
     }
     const cartData = cartService.getCart(userId);
@@ -49,6 +50,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     setLoading(false);
   };
 
+  // Memperbarui kuantitas item dalam keranjang belanja lokal
   const updateQuantity = (productId: number, priceType: string, quantity: number) => {
     const userStr = localStorage.getItem('user');
     let userId: number | null = null;
@@ -57,12 +59,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         const user = JSON.parse(userStr);
         userId = user?.id || null;
       } catch (e) {
-        // ignore
+        // abaikan
       }
     }
     const newCart = cartService.updateQuantity(productId, priceType, quantity, userId);
     setCart(newCart);
-    window.dispatchEvent(new Event('cartUpdated'));
+    window.dispatchEvent(new Event('cartUpdated')); // Trigger event global untuk navbar/drawer lain
 
     if (quantity === 0) {
       toast.info('Produk Dihapus', { description: 'Produk telah dihapus dari keranjang' });
@@ -71,6 +73,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     }
   };
 
+  // Menghapus item dari keranjang belanja lokal
   const removeFromCart = (productId: number, priceType: string) => {
     const userStr = localStorage.getItem('user');
     let userId: number | null = null;
@@ -79,7 +82,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         const user = JSON.parse(userStr);
         userId = user?.id || null;
       } catch (e) {
-        // ignore
+        // abaikan
       }
     }
     const newCart = cartService.removeFromCart(productId, priceType, userId);
@@ -89,10 +92,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     toast.info('Produk Dihapus', { description: 'Produk telah dihapus dari keranjang' });
   };
 
+  // Menghitung subtotal belanja (jumlah harga dikali kuantitas per item)
   const getTotalPrice = () => {
     return cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
   };
 
+  // Mengarahkan pengguna ke halaman checkout jika keranjang tidak kosong
   const handleCheckout = () => {
     if (cart.length === 0) {
       toast.warning('Keranjang masih kosong');

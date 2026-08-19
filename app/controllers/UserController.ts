@@ -1,31 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UserService } from '../services/UserService';
 
+/**
+ * Controller untuk mengelola data Pengguna (User).
+ * Menyediakan fungsi pembaruan profil customer, manajemen pegawai/kasir (tambah, edit, hapus, reset password kasir).
+ */
 export class UserController {
   private userService: UserService;
 
+  /**
+   * Menghubungkan controller dengan UserService.
+   */
   constructor() {
     this.userService = new UserService();
   }
 
+  /**
+   * Memperbarui informasi profil pengguna yang sedang login (nama, email, phone, password).
+   * HTTP PUT /api/user/profil
+   */
   async updateProfile(request: NextRequest) {
     try {
+      // 1. Memeriksa keberadaan JWT Token pada header Authorization untuk keamanan
       const authHeader = request.headers.get('authorization');
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
       const body = await request.json();
+      // 2. Memanggil service untuk memproses pembaruan data profil
       const updatedUser = await this.userService.updateProfile(body);
 
       return NextResponse.json(updatedUser);
     } catch (error: any) {
       console.error('Update profile error:', error);
 
+      // Menangani error validasi data wajib (status 400 Bad Request)
       if (error.message === 'ID dan Nama harus diisi') {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
 
+      // Menangani error duplikasi data unik email/whatsapp (Prisma unique constraint error P2002)
       if (error.code === 'P2002') {
         return NextResponse.json({ error: 'Email atau nomor whatsapp sudah digunakan' }, { status: 400 });
       }
@@ -37,15 +52,12 @@ export class UserController {
     }
   }
 
+  /**
+   * Mengambil daftar seluruh akun pegawai yang memiliki role 'kasir'.
+   * HTTP GET /api/auth/employees
+   */
   async getEmployees(request: NextRequest) {
     try {
-      const authHeader = request.headers.get('authorization');
-      // In real scenario, we should use verifyToken from lib/auth, but keeping it simple for Controller layer
-      // If we need to verify role='admin', we can decode here or let the service do it.
-      // Since `getAuthUser` was in route.ts, let's keep the logic mostly the same.
-      // For brevity, we assume the route.ts can pass the authUser or the controller parses it.
-      // Actually, we'll just implement the core logic.
-
       const employees = await this.userService.getEmployees();
       return NextResponse.json(employees);
     } catch (error) {
@@ -54,18 +66,25 @@ export class UserController {
     }
   }
 
+  /**
+   * Mendaftarkan akun kasir baru (oleh Admin).
+   * HTTP POST /api/auth/employees
+   */
   async createEmployee(request: NextRequest) {
     try {
       const body = await request.json();
+      // Memproses penambahan kasir baru di UserService
       const employee = await this.userService.createEmployee(body);
       return NextResponse.json(employee, { status: 201 });
     } catch (error: any) {
       console.error('Create employee error:', error);
 
+      // Menangani error validasi input wajib
       if (error.message === 'Nama, nomor HP, dan password wajib diisi') {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
 
+      // Menangani error jika nomor HP kasir sudah digunakan oleh akun lain (status 409 Conflict)
       if (error?.code === 'P2002') {
         return NextResponse.json({ error: 'Nomor HP sudah dipakai' }, { status: 409 });
       }
@@ -74,12 +93,17 @@ export class UserController {
     }
   }
 
+  /**
+   * Mereset password akun kasir (oleh Admin).
+   * HTTP POST /api/auth/reset-password
+   */
   async resetEmployeePassword(request: NextRequest) {
     try {
       const body = await request.json();
       const userId = Number(body?.userId);
       const newPassword = String(body?.newPassword || '');
 
+      // Memanggil fungsi reset password pegawai di UserService
       const result = await this.userService.resetEmployeePassword(userId, newPassword);
       return NextResponse.json(result);
     } catch (error: any) {
@@ -97,9 +121,14 @@ export class UserController {
     }
   }
 
+  /**
+   * Memperbarui data profil akun kasir (oleh Admin).
+   * HTTP PUT /api/auth/employees/[id]
+   */
   async updateEmployee(request: NextRequest, userId: number) {
     try {
       const body = await request.json();
+      // Memanggil fungsi update kasir di UserService
       const result = await this.userService.updateEmployee(userId, body);
       return NextResponse.json(result);
     } catch (error: any) {
@@ -114,8 +143,13 @@ export class UserController {
     }
   }
 
+  /**
+   * Menghapus akun kasir (oleh Admin).
+   * HTTP DELETE /api/auth/employees/[id]
+   */
   async deleteEmployee(userId: number) {
     try {
+      // Memanggil fungsi penghapusan akun kasir di UserService
       const result = await this.userService.deleteEmployee(userId);
       return NextResponse.json(result);
     } catch (error: any) {

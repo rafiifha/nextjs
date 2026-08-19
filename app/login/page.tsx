@@ -37,6 +37,7 @@ export default function LoginPage() {
     }
   }, []);
 
+  // Menangani pengiriman data login (email/phone & password) ke server API /api/auth/login
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -56,10 +57,9 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        // Show user-friendly error message
+        // Tampilkan pesan error ramah pengguna jika gagal
         let errorMessage = data.error || 'Login gagal';
         
-        // Handle specific error cases
         if (errorMessage.includes('database') || errorMessage.includes('database server')) {
           errorMessage = 'Tidak dapat terhubung ke database. Silakan coba lagi nanti.';
         } else if (errorMessage.includes('Email/Phone atau password salah')) {
@@ -71,20 +71,20 @@ export default function LoginPage() {
         return;
       }
 
+      // Menyimpan token JWT dan data user ke localStorage setelah login sukses
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
-      // Migrate cart from old key to user-specific key if needed
+      // Memigrasikan keranjang belanja lokal ke database atau key user spesifik jika ada
       if (data.user?.id) {
         cartService.migrateCartToUser(data.user.id);
       }
 
-      // Dispatch custom event to notify Navbar
+      // Dispatch event login untuk memberitahu komponen navbar & mengupdate jumlah keranjang
       window.dispatchEvent(new Event('userLogin'));
-      
-      // Also dispatch cartUpdated to refresh cart count
       window.dispatchEvent(new Event('cartUpdated'));
 
+      // Melakukan redirect ke halaman yang sesuai berdasarkan role user
       if (data.user.role === 'admin') {
         router.push('/admin/dashboard');
       } else if (data.user.role === 'kasir') {
@@ -94,7 +94,6 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      // Handle network errors
       if (err.message?.includes('fetch') || err.message?.includes('network')) {
         setError('Tidak dapat terhubung ke server. Pastikan server berjalan dan coba lagi.');
       } else {

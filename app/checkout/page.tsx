@@ -82,7 +82,8 @@ export default function CheckoutPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debouncedQuery = useDebounce(addressQuery, 500);
 
-  // Auto-search when typing address
+  // Pencarian Alamat Otomatis (Geocoding): Menggunakan API OpenStreetMap (Nominatim)
+  // untuk mencari koordinat lat/lng berdasarkan teks nama lokasi/jalan yang diinput pembeli
   useEffect(() => {
     if (debouncedQuery.length < 3 || deliveryMethod !== 'delivery') {
       setAddressSuggestions([]);
@@ -106,18 +107,35 @@ export default function CheckoutPage() {
     searchAddress();
   }, [debouncedQuery, deliveryMethod]);
 
-  const selectAddressSuggestion = async (suggestion: { display_name: string; lat: string; lon: string }) => {
-    const lat = parseFloat(suggestion.lat);
-    const lng = parseFloat(suggestion.lon);
-    setAddressQuery(suggestion.display_name);
-    setDestinationAddress(suggestion.display_name);
+  // Reverse Geocoding & Hitung Tarif Ongkir:
+  // 1. Mengubah koordinat lat/lng menjadi deskripsi teks alamat jalan menggunakan API OpenStreetMap (Reverse Geocoding)
+  // 2. Mengirim koordinat ke endpoint internal /api/delivery/calculate untuk menghitung jarak pengantaran
+  //    (rumus Haversine) serta tarif ongkir berdasarkan zona jarak.
+  const updateLocationAndCalculateFee = async (lat: number, lng: number, addressName?: string) => {
     setShippingLat(lat);
     setShippingLng(lng);
     setFlyToPosition([lat, lng]);
     setShowSuggestions(false);
     setAddressSuggestions([]);
 
-    // Calculate delivery fee
+    if (addressName) {
+      setDestinationAddress(addressName);
+      setAddressQuery(addressName);
+    } else {
+      try {
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        if (geoRes.ok) {
+          const geoData = await geoRes.json();
+          if (geoData && geoData.display_name) {
+            setDestinationAddress(geoData.display_name);
+            setAddressQuery(geoData.display_name);
+          }
+        }
+      } catch (err) {
+        console.error('Reverse geocoding error:', err);
+      }
+    }
+
     try {
       const res = await fetch('/api/delivery/calculate', {
         method: 'POST',
@@ -138,8 +156,38 @@ export default function CheckoutPage() {
       setShippingZone(data.zone);
       setShippingFee(data.shippingFee);
     } catch {
-      toast.error('Gagal', { description: 'Coba pilih lokasi lagi.' });
+      toast.error('Gagal menghitung ongkos kirim.', { description: 'Coba pilih lokasi lagi.' });
     }
+  };
+
+  const selectAddressSuggestion = async (suggestion: { display_name: string; lat: string; lon: string }) => {
+    const lat = parseFloat(suggestion.lat);
+    const lng = parseFloat(suggestion.lon);
+    await updateLocationAndCalculateFee(lat, lng, suggestion.display_name);
+  };
+
+  // GPS Geolocation: Mendeteksi lokasi GPS fisik pembeli langsung dari browser (navigator.geolocation)
+  const handleGetGeolocation = () => {
+    if (!navigator.geolocation) {
+      console.warn('GPS tidak didukung oleh browser Anda');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        await updateLocationAndCalculateFee(lat, lng);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
   };
 
   // Payment info
@@ -231,7 +279,9 @@ export default function CheckoutPage() {
     return getItemsTotal() + (deliveryMethod === 'delivery' ? shippingFee : 0);
   };
 
+  // Kirim data pesanan ke server API (POST /api/pesanan)
   const handleCheckout = async () => {
+    // Validasi form awal
     if (!customerName || !customerPhone) {
       toast.warning('Data Belum Lengkap', { description: 'Nama dan nomor whatsapp harus diisi' });
       return;
@@ -309,13 +359,16 @@ export default function CheckoutPage() {
         return;
       }
 
+      // Kosongkan keranjang belanja setelah checkout sukses
       cartService.clearCart();
 
+      // Alur redirect halaman sesuai metode pembayaran
       if (paymentMethod === 'tunai') {
         toast.success('Pesanan Berhasil', { description: 'Silakan lakukan pembayaran tunai saat ambil pesanan.' });
         router.push('/pesanan');
       } else {
-        // Redirect to Pakasir instruction page
+        // Redirect ke instruksi cara pembayaran non-tunai / link pembayaran digital
+
         router.push(`/payment/instruction/${orderData.id}`);
       }
     } catch (error: any) {
@@ -389,7 +442,7 @@ export default function CheckoutPage() {
                     <Button type="button" variant={deliveryMethod === 'pickup' ? 'default' : 'outline'} onClick={() => { setDeliveryMethod('pickup'); setShippingFee(0); setPaymentMethod(''); }} className="flex-1">
                       <MapPin className="h-4 w-4 mr-2" /> Ambil Sendiri
                     </Button>
-                    <Button type="button" variant={deliveryMethod === 'delivery' ? 'default' : 'outline'} onClick={() => { setDeliveryMethod('delivery'); setShippingFee(0); setPaymentMethod(''); }} className="flex-1">
+                    <Button type="button" variant={deliveryMethod === 'delivery' ? 'default' : 'outline'} onClick={() => { setDeliveryMethod('delivery'); setShippingFee(0); setPaymentMethod(''); handleGetGeolocation(); }} className="flex-1">
                       <Truck className="h-4 w-4 mr-2" /> Antar
                     </Button>
                   </div>
@@ -441,40 +494,7 @@ export default function CheckoutPage() {
                       <Label>Pilih Lokasi di Peta</Label>
                       <MapPicker
                         onLocationSelect={async (lat, lng) => {
-                          setShippingLat(lat);
-                          setShippingLng(lng);
-                          setShowSuggestions(false);
-                          setAddressSuggestions([]);
-                          try {
-                            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-                            if (geoRes.ok) {
-                              const geoData = await geoRes.json();
-                              if (geoData && geoData.display_name) {
-                                setDestinationAddress(geoData.display_name);
-                                setAddressQuery(geoData.display_name);
-                              }
-                            }
-                            const res = await fetch('/api/delivery/calculate', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ lat, lng }),
-                            });
-                            const data = await res.json();
-                            if (!res.ok) {
-                              setDeliveryOutOfRange(true);
-                              setShippingDistance(null);
-                              setShippingZone(null);
-                              setShippingFee(0);
-                              toast.error('Lokasi Di Luar Jangkauan', { description: data.error || 'Maksimal 10km' });
-                              return;
-                            }
-                            setDeliveryOutOfRange(false);
-                            setShippingDistance(data.distanceKm);
-                            setShippingZone(data.zone);
-                            setShippingFee(data.shippingFee);
-                          } catch (error) {
-                            toast.error('Gagal', { description: 'Coba pilih lokasi lagi.' });
-                          }
+                          await updateLocationAndCalculateFee(lat, lng);
                         }}
                         initialPosition={shippingLat && shippingLng ? [shippingLat, shippingLng] : undefined}
                         flyToPosition={flyToPosition}

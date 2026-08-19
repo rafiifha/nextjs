@@ -3,9 +3,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ShoppingCart, Package, Truck, ArrowRight, CheckCircle2 } from 'lucide-react';
 
+/**
+ * Halaman Utama (Landing Page / Home) untuk Pelanggan.
+ * Menyediakan informasi profil singkat Toko Naning, kelebihan toko,
+ * panduan tata cara pemesanan sembako, dan tombol navigasi langsung ke katalog produk.
+ */
 export default function Home() {
   return (
     <div className="flex flex-col bg-white">
+      {/* SECTION HERO: Judul Utama, Tagline & Tombol Navigasi Utama */}
       <section className="bg-gradient-to-b from-[#fff8d6] to-white py-14 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
@@ -40,6 +46,7 @@ export default function Home() {
               </div>
             </div>
 
+            {/* SECTION CARA PESAN: Alur 3 Langkah Sederhana Pemesanan Sembako */}
             <Card className="border-gray-200 shadow-lg">
               <CardContent className="p-6 sm:p-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-5">Cara pesan</h3>
@@ -73,6 +80,7 @@ export default function Home() {
       </section>
 
 
+      {/* SECTION CALL-TO-ACTION: Ajakan Bertindak bagi Pelanggan */}
       <section className="py-14 sm:py-16 bg-gray-50 border-y border-gray-100">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">

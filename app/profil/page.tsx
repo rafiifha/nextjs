@@ -25,6 +25,8 @@ export default function ProfilPage() {
     confirmPassword: '',
   });
 
+  // Pengecekan Autentikasi: Mengambil token JWT dan data user dari localStorage.
+  // Jika tidak valid/kadaluwarsa, redirect ke halaman login.
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
@@ -53,14 +55,17 @@ export default function ProfilPage() {
     }
   }, [router]);
 
+  // Handler input change form profil
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Menyimpan perubahan profil (nama, email, phone, password baru jika diisi) ke API PUT /api/user/profil
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validasi form awal
     if (!formData.name) {
       toast.error('Error', { description: 'Nama tidak boleh kosong' });
       return;
@@ -98,9 +103,9 @@ export default function ProfilPage() {
         throw new Error(data.error || 'Gagal memperbarui profil');
       }
 
-      // Update local storage
+      // Update data user di localStorage agar navbar ter-update
       localStorage.setItem('user', JSON.stringify(data));
-      window.dispatchEvent(new Event('userLogin')); // To update navbar
+      window.dispatchEvent(new Event('userLogin')); // Update event navbar
 
       toast.success('Berhasil', { description: 'Profil berhasil diperbarui' });
       

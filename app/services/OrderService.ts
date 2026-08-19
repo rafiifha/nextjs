@@ -3,7 +3,16 @@ import { triggerOrderEvent } from '@/services/pusherService';
 import { sendOrderNotification, sendCourierDeliveryNotification, sendCustomerShippingNotification } from '@/services/whatsappService';
 import { pakasirService } from '@/services/pakasirService';
 
+/**
+ * Service untuk memproses logika bisnis transaksi pesanan (Order).
+ * Mengatur pengambilan riwayat order, proses checkout online (createOrder), perubahan status logistik (updateOrder),
+ * penanganan pembatalan otomatis order expired (checkExpiredOrders), dan pengiriman notifikasi WhatsApp.
+ */
 export class OrderService {
+  /**
+   * Mengambil semua daftar pesanan milik customer tertentu.
+   * Melakukan normalisasi data (formatting ISOString, default type, dll.) agar siap dikonsumsi di frontend.
+   */
   async getOrdersByCustomer(userId: number) {
     const orders = await prisma.order.findMany({
       where: { userId },
@@ -19,9 +28,10 @@ export class OrderService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' }, // Menampilkan transaksi terbaru di atas
     });
 
+    // Menormalisasi format data sebelum dikembalikan ke front-end
     return orders.map(order => {
       try {
         return {
@@ -84,6 +94,9 @@ export class OrderService {
     }).filter(order => order !== null);
   }
 
+  /**
+   * Mengambil riwayat pesanan customer secara berpaginasi.
+   */
   async getOrdersByCustomerPaginated(userId: number, page: number, limit: number) {
     const skip = (page - 1) * limit;
 
@@ -173,6 +186,10 @@ export class OrderService {
     return { data, total };
   }
 
+  /**
+   * Mengambil seluruh data pesanan untuk dashboard admin.
+   * Mendukung filter pencarian nama/HP/ID pesanan, status pesanan, serta paginasi.
+   */
   async getAllOrders(options?: { page?: number; limit?: number; search?: string; status?: string }) {
     const page = options?.page || 1;
     const limit = options?.limit || 10;
@@ -182,10 +199,12 @@ export class OrderService {
 
     const where: any = {};
 
+    // Filter status jika spesifik
     if (status && status !== 'all') {
       where.status = status;
     }
 
+    // Pencarian jika ada query (mencari nama pelanggan, nomor telepon, atau ID pesanan)
     if (search) {
       where.OR = [
         { customerName: { contains: search, mode: 'insensitive' } },
@@ -280,6 +299,9 @@ export class OrderService {
     return { orders: data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
+  /**
+   * Mengambil detail satu data pesanan berdasarkan ID.
+   */
   async getOrderById(id: number) {
     const order = await prisma.order.findUnique({
       where: { id },
@@ -301,8 +323,14 @@ export class OrderService {
 
   /**
    * Mencatat pesanan baru (Checkout Online) dari aplikasi web pelanggan.
-   * Memproses validasi stok online, kalkulasi ongkos kirim, penyimpanan transaksi ke DB,
-   * pemesanan stok barang (stock reservation), integrasi Pakasir, serta pengiriman notifikasi WhatsApp.
+   * Alur proses meliputi:
+   * 1. Validasi input & metode pembayaran (pesanan antar wajib non-tunai)
+   * 2. Pengecekan ketersediaan stok online produk
+   * 3. Penyimpanan data transaksi ke database menggunakan Prisma
+   * 4. Pemesanan/pengurangan stok online secara langsung (stock reservation)
+   * 5. Pembuatan transaksi pembayaran digital di gateway Pakasir (QRIS/VA)
+   * 6. Logika rollback stok jika integrasi ke payment gateway gagal
+   * 7. Trigger notifikasi WebSocket Pusher dan notifikasi WhatsApp ke pembeli.
    */
   async createOrder(data: any) {
     const {
@@ -724,6 +752,9 @@ export class OrderService {
     return expiredOrders;
   }
 
+  /**
+   * Mengambil daftar pesanan yang kadaluwarsa untuk tujuan testing.
+   */
   async getExpiredOrdersForTest() {
     const now = new Date();
     
@@ -742,6 +773,9 @@ export class OrderService {
     });
   }
 
+  /**
+   * Mengirim e-receipt transaksi ke WhatsApp pelanggan.
+   */
   async sendReceipt(orderId: number) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -756,10 +790,10 @@ export class OrderService {
       throw new Error('Pesanan tidak ditemukan');
     }
 
-    // Dynamic import to avoid circular dependencies if any, but since we already import it above, we can just use another service function if we imported it.
-    // Let's import sendReceipt from whatsappService at the top of the file, or assume it's available.
+    // Dynamic import layanan WhatsApp untuk mencegah circular dependencies jika ada
     const { sendReceipt: sendWaReceipt } = await import('@/services/whatsappService');
     
+    // Kirim pesan WhatsApp struk belanja
     await sendWaReceipt(order.customerPhone, {
       orderId: order.id,
       customerName: order.customerName,

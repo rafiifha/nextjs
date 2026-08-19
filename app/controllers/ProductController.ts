@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ProductService } from '../services/ProductService';
 
+/**
+ * Controller untuk mengelola data produk dan varian harga.
+ * Menyediakan endpoint CRUD (Create, Read, Update, Delete) untuk barang sembako yang dijual di toko.
+ */
 export class ProductController {
   private productService: ProductService;
 
+  /**
+   * Menghubungkan controller dengan ProductService.
+   */
   constructor() {
     this.productService = new ProductService();
   }
 
+  /**
+   * Mengambil daftar produk (mendukung pencarian, filter kategori, dan paginasi).
+   * HTTP GET /api/produk
+   */
   async getProducts(request: NextRequest) {
     try {
       const { searchParams } = new URL(request.url);
@@ -17,7 +28,7 @@ export class ProductController {
       const categoryIdStr = searchParams.get('categoryId');
       const categoryId = categoryIdStr ? parseInt(categoryIdStr) : undefined;
 
-      // If page param present, return paginated response
+      // Jika terdapat parameter query 'page', kembalikan data dalam format paginasi (untuk katalog online)
       if (page) {
         const pageNum = parseInt(page);
         if (isNaN(pageNum) || pageNum < 1) {
@@ -32,7 +43,7 @@ export class ProductController {
         });
       }
 
-      // No page param - return all products (backward compat for kasir/checkout)
+      // Jika tidak ada parameter 'page', kembalikan seluruh produk tanpa paginasi (backward compatibility untuk kasir offline/checkout)
       const products = await this.productService.getAllProducts();
       return NextResponse.json(products);
     } catch (error) {
@@ -44,6 +55,10 @@ export class ProductController {
     }
   }
 
+  /**
+   * Mengambil informasi detail satu produk berdasarkan ID.
+   * HTTP GET /api/produk/[id]
+   */
   async getProductById(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
     try {
       const resolvedParams = params instanceof Promise ? await params : params;
@@ -69,15 +84,21 @@ export class ProductController {
     }
   }
 
+  /**
+   * Menambahkan produk baru beserta varian harganya (oleh Admin).
+   * HTTP POST /api/produk
+   */
   async createProduct(request: NextRequest) {
     try {
       const body = await request.json();
+      // Memproses penambahan produk baru di ProductService
       const product = await this.productService.createProduct(body);
       return NextResponse.json(product, { status: 201 });
     } catch (error: any) {
       console.error('Create product error:', error);
       const errorMessage = error.message;
 
+      // Menangani error validasi masukan atau relasi kategori yang tidak valid (status 400 Bad Request)
       if (['Nama, kategori, dan varian harga harus diisi', 'Kategori tidak ditemukan'].includes(errorMessage) || errorMessage.startsWith('Jenis harga tidak valid')) {
         return NextResponse.json({ error: errorMessage }, { status: 400 });
       }
@@ -89,6 +110,10 @@ export class ProductController {
     }
   }
 
+  /**
+   * Memperbarui data produk dan varian harganya (oleh Admin).
+   * HTTP PUT /api/produk/[id]
+   */
   async updateProduct(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
     try {
       const body = await request.json();
@@ -99,6 +124,7 @@ export class ProductController {
         return NextResponse.json({ error: 'ID produk tidak valid' }, { status: 400 });
       }
 
+      // Memproses pembaruan produk di ProductService
       const product = await this.productService.updateProduct(id, body);
       return NextResponse.json(product);
     } catch (error: any) {
@@ -120,6 +146,10 @@ export class ProductController {
     }
   }
 
+  /**
+   * Menghapus produk dari sistem (oleh Admin).
+   * HTTP DELETE /api/produk/[id]
+   */
   async deleteProduct(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
     try {
       const resolvedParams = params instanceof Promise ? await params : params;
@@ -129,6 +159,7 @@ export class ProductController {
         return NextResponse.json({ error: 'ID produk tidak valid' }, { status: 400 });
       }
 
+      // Memanggil fungsi penghapusan produk di ProductService
       const result = await this.productService.deleteProduct(id);
       return NextResponse.json(result);
     } catch (error: any) {
@@ -138,6 +169,7 @@ export class ProductController {
         return NextResponse.json({ error: error.message }, { status: 404 });
       }
       
+      // Menangani error constraints integrity (Prisma P2003) jika produk masih digunakan dalam histori transaksi order (status 400 Bad Request)
       if (error.code === 'P2003') {
         return NextResponse.json(
           { error: 'Produk tidak dapat dihapus karena masih digunakan dalam pesanan' },

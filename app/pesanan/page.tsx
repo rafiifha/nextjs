@@ -56,6 +56,8 @@ export default function PesananPage() {
   const ITEMS_PER_PAGE = 10;
 
 
+  // Pengecekan autentikasi token JWT pelanggan saat halaman dimuat
+  // dan menangani scroll otomatis ke pesanan tertentu (misal: setelah pembayaran sukses)
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
@@ -90,6 +92,7 @@ export default function PesananPage() {
               toast.success('Pembayaran Berhasil!', { description: `Pesanan #${orderId} Anda berhasil dibayar dan sedang diproses.` });
             }
             
+            // Scroll otomatis ke elemen pesanan terkait di daftar riwayat
             const scrollToOrder = () => {
               const element = document.getElementById(`order-${orderId}`);
               if (element) {
@@ -113,6 +116,8 @@ export default function PesananPage() {
     }
   }, [router]);
 
+  // Polling Asinkron: Melakukan fetch data pesanan otomatis setiap 10 detik
+  // jika terdapat pesanan berstatus 'pending' (menunggu bayar) agar UI terupdate real-time
   useEffect(() => {
     if (!isAuthenticated) return;
     const hasPendingOrders = orders.some(order => order.status === 'pending');
@@ -121,6 +126,7 @@ export default function PesananPage() {
     return () => clearInterval(interval);
   }, [orders, isAuthenticated]);
 
+  // Mengambil daftar pesanan milik pelanggan dari API /api/pesanan dengan paginasi
   const fetchOrders = async (page?: number) => {
     try {
       const token = localStorage.getItem('token');
@@ -135,6 +141,8 @@ export default function PesananPage() {
         const data = await res.json();
         if (data && !Array.isArray(data) && data.data) {
           const newOrders = data.data;
+          
+          // Memantau perubahan status pesanan untuk memicu notifikasi toast sukses bayar
           setOrders(prevOrders => {
             if (prevOrders && prevOrders.length > 0) {
               newOrders.forEach((newOrder: Order) => {

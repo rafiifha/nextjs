@@ -21,6 +21,10 @@ interface Courier {
   isActive: boolean;
 }
 
+/**
+ * Halaman Manajemen Pegawai.
+ * Mengelola akun kasir (tambah, hapus, reset password) dan kurir (tambah, aktifkan/nonaktifkan).
+ */
 export default function PegawaiPage() {
   const [activeTab, setActiveTab] = useState<'kasir' | 'kurir'>('kasir');
   const [cashiers, setCashiers] = useState<Employee[]>([]);
@@ -36,8 +40,10 @@ export default function PegawaiPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [courierTab, setCourierTab] = useState<'aktif' | 'nonaktif'>('aktif');
 
+  // Mengambil token JWT dari localStorage untuk autentikasi API
   const getToken = () => localStorage.getItem('token');
 
+  // Mengambil data kasir dan kurir secara paralel dari API
   const fetchData = async () => {
     const token = getToken();
     if (!token) return;
@@ -55,10 +61,12 @@ export default function PegawaiPage() {
     }
   };
 
+  // Saat komponen dimuat, ambil data pegawai
   useEffect(() => {
     fetchData();
   }, []);
 
+  // Membuat akun kasir baru melalui API
   const createCashier = async () => {
     const token = getToken();
     if (!token) return;
@@ -80,6 +88,7 @@ export default function PegawaiPage() {
     }
   };
 
+  // Menghapus akun kasir berdasarkan ID
   const deleteCashier = async (id: number) => {
     const token = getToken();
     if (!token) return;
@@ -99,12 +108,14 @@ export default function PegawaiPage() {
     }
   };
 
+  // Membuka modal reset password kasir
   const openResetPasswordModal = (cashier: Employee) => {
     setResetTarget(cashier);
     setNewPassword('');
     setResetModalOpen(true);
   };
 
+  // Mereset password kasir melalui API
   const resetPassword = async () => {
     const token = getToken();
     if (!token || !resetTarget) return;
@@ -134,6 +145,7 @@ export default function PegawaiPage() {
     }
   };
 
+  // Menambahkan kurir baru melalui API
   const createCourier = async () => {
     setLoading(true);
     try {
@@ -153,6 +165,7 @@ export default function PegawaiPage() {
     }
   };
 
+  // Mengaktifkan atau menonaktifkan kurir (soft delete)
   const toggleCourierStatus = async (id: number, activate: boolean) => {
     try {
       const res = await fetch(`/api/delivery/couriers/${id}`, {
@@ -177,6 +190,7 @@ export default function PegawaiPage() {
     }
   };
 
+  // Memisahkan kurir aktif dan nonaktif untuk tampilan tab
   const activeCouriers = couriers.filter((c) => c.isActive);
   const inactiveCouriers = couriers.filter((c) => !c.isActive);
 

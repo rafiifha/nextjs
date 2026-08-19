@@ -60,7 +60,7 @@ export class AuthService {
     };
   }
 
-  // ========== OTP METHODS ==========
+  // OTP METHODS
 
   /**
    * Menghasilkan kode OTP 6-digit acak secara matematis.

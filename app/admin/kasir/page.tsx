@@ -66,11 +66,14 @@ export default function KasirPage() {
   const [copied, setCopied] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Meng-update waktu real-time setiap detik untuk keperluan tampilan jam di kasir
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Polling Real-time: Secara otomatis melakukan pengecekan status transaksi pembayaran digital (QRIS/VA) setiap 5 detik.
+  // Jika database merespon status transaksi sudah lunas ('paid'/'processing'), kasir akan menampilkan notifikasi sukses.
   useEffect(() => {
     if (!showDigitalPaymentModal || !digitalPaymentData?.orderId) return;
     if (digitalPaymentData.status === 'paid' || digitalPaymentData.status === 'processing') return;
@@ -78,11 +81,13 @@ export default function KasirPage() {
     let isSubscribed = true;
     const interval = setInterval(async () => {
       try {
+        // Melakukan request GET ke server untuk status pesanan
         const res = await fetch(`/api/pesanan/${digitalPaymentData.orderId}?t=${Date.now()}`, {
           cache: 'no-store'
         });
         if (res.ok && isSubscribed) {
           const data = await res.json();
+          // Jika status berubah menjadi paid atau processing (sudah dibayar)
           if (data.status === 'paid' || data.status === 'processing') {
             setDigitalPaymentData((prev: any) => ({
               ...prev,
@@ -93,7 +98,7 @@ export default function KasirPage() {
             toast.success('Pembayaran Terkonfirmasi!', {
               description: 'Pesanan telah dibayar dan lunas.',
             });
-            clearInterval(interval);
+            clearInterval(interval); // Stop polling
           }
         }
       } catch (error) {
@@ -107,6 +112,7 @@ export default function KasirPage() {
     };
   }, [showDigitalPaymentModal, digitalPaymentData]);
 
+  // Fungsi menyalin nomor VA atau link bayar ke clipboard
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -114,7 +120,8 @@ export default function KasirPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Helper: print receipt via hidden iframe (no popup, no preview)
+  // Fungsi utilitas untuk mencetak struk belanja fisik menggunakan hidden iframe.
+  // Membaca data struk, menyusun template HTML kasir thermal 58mm, lalu mengaktifkan window.print().
   const printReceipt = (data: any) => {
     const itemsHtml = (data.items || []).map((item: any) => `
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
@@ -182,7 +189,7 @@ export default function KasirPage() {
       </html>
     `;
 
-    // Create hidden iframe
+    // Membuat hidden iframe dinamis untuk mencetak struk thermal tanpa mengganggu UI utama
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -199,10 +206,10 @@ export default function KasirPage() {
       iframeDoc.write(html);
       iframeDoc.close();
 
-      // Wait for iframe to render, then print
+      // Menunggu sebentar agar dokumen di iframe siap dirender, lalu jalankan print
       setTimeout(() => {
         iframe.contentWindow?.print();
-        // Remove iframe after print dialog closes
+        // Menghapus iframe setelah print dialog ditutup
         setTimeout(() => {
           document.body.removeChild(iframe);
         }, 1000);
@@ -210,6 +217,7 @@ export default function KasirPage() {
     }
   };
 
+  // Menyiapkan data struk belanja untuk dimasukkan ke state cetak
   const handleShowReceiptForOrder = (orderObj: any) => {
     const subtotal = orderObj.items ? orderObj.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) : orderObj.totalHarga || orderObj.total;
     setReceiptData({
@@ -229,15 +237,13 @@ export default function KasirPage() {
   };
 
 
+  // Saat komponen pertama kali dimuat, ambil data produk dan kategori dari server
   useEffect(() => {
     fetchProducts();
     fetchCategories();
   }, []);
 
-  // Pakasir does not use Snap popup, we redirect to instruction page
-
-  // Removed Pakasir snap script loader (atau Midtrans yang sebelumnya)
-
+  // Mengambil daftar semua produk beserta varian dan stok offline dari API
   const fetchProducts = async () => {
     try {
       const res = await fetch('/api/produk');
@@ -264,6 +270,7 @@ export default function KasirPage() {
     }
   };
 
+  // Mengambil daftar kategori produk dari API untuk filter di tampilan kasir
   const fetchCategories = async () => {
     try {
       const res = await fetch('/api/kategori');
@@ -276,14 +283,16 @@ export default function KasirPage() {
     }
   };
 
+  // Filter produk berdasarkan kata kunci pencarian dan kategori yang dipilih
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !selectedCategoryId || product.categoryId === parseInt(selectedCategoryId);
     return matchesSearch && matchesCategory;
   });
 
+  // Menambahkan produk ke keranjang belanja kasir dengan validasi stok offline
   const addToCart = (product: Product, variant: ProductVariant, quantity: number = 1) => {
-    // Validate data before adding to cart
+    // Validasi data produk sebelum ditambahkan ke keranjang
     if (!product || !product.id) {
       toast.error('Error', { description: 'Data produk tidak valid' });
       return;
@@ -341,6 +350,7 @@ export default function KasirPage() {
     });
   };
 
+  // Memperbarui jumlah item di keranjang, dengan pengecekan batas stok offline
   const updateCartQuantity = (productId: number, priceType: string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(productId, priceType);
@@ -375,40 +385,48 @@ export default function KasirPage() {
     });
   };
 
+  // Menghapus item dari keranjang belanja
   const removeFromCart = (productId: number, priceType: string) => {
     setCart((prev) =>
       prev.filter((item) => !(item.productId === productId && item.priceType === priceType))
     );
   };
 
+  // Menghitung total harga seluruh item di keranjang
   const getTotalPrice = () => {
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   };
 
+  // Mengambil nilai diskon yang diinput kasir
   const getDiscountAmount = () => {
     const discountValue = discount && discount !== '' ? parseFloat(discount) : 0;
     return isNaN(discountValue) ? 0 : discountValue;
   };
 
+  // Menghitung subtotal (sama dengan total harga sebelum diskon)
   const getSubtotal = () => {
     return getTotalPrice();
   };
 
+  // Menghitung total akhir setelah dikurangi diskon
   const getTotalAfterDiscount = () => {
     return Math.max(0, getSubtotal() - getDiscountAmount());
   };
 
+  // Mengambil nilai uang tunai yang diterima dari input kasir
   const getCashValue = () => {
     const cashValue = cashReceived && cashReceived !== '' ? parseFloat(cashReceived.replace(/\./g, '')) : 0;
     return isNaN(cashValue) ? 0 : cashValue;
   };
 
+  // Menghitung kembalian (uang diterima - total setelah diskon)
   const getChange = () => {
     const cashValue = getCashValue();
     if (cashValue <= 0) return 0;
     return cashValue - getTotalAfterDiscount();
   };
 
+  // Mereset semua state form kasir untuk memulai transaksi baru
   const handleNewTransaction = () => {
     setCart([]);
     setCustomerName('Pelanggan Umum');
@@ -419,23 +437,28 @@ export default function KasirPage() {
     setSearchQuery('');
   };
 
+  // Proses checkout kasir: validasi input, kirim data ke API /api/kasir,
+  // lalu cetak struk (tunai) atau tampilkan modal pembayaran digital (non-tunai)
   const handleCheckout = async () => {
+    // Validasi: nama dan nomor telepon pelanggan wajib diisi
     if (!customerName || !customerPhone) {
       toast.error('Error', { description: 'Nama dan nomor whatsapp harus diisi' });
       return;
     }
 
+    // Validasi: keranjang tidak boleh kosong
     if (cart.length === 0) {
       toast.error('Error', { description: 'Keranjang masih kosong' });
       return;
     }
 
+    // Validasi: metode pembayaran harus sudah dipilih
     if (!paymentMethod) {
       toast.error('Error', { description: 'Pilih metode pembayaran terlebih dahulu' });
       return;
     }
 
-    // Validate cash payment
+    // Validasi khusus pembayaran tunai: uang diterima harus cukup
     if (paymentMethod === 'tunai') {
       const cashValue = getCashValue();
       if (cashValue <= 0) {
@@ -453,7 +476,7 @@ export default function KasirPage() {
     setSubmitting(true);
 
     try {
-      // Create order first
+      // Mengirim data pesanan kasir ke endpoint API /api/kasir (POST)
       const response = await fetch('/api/kasir', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -491,11 +514,11 @@ export default function KasirPage() {
         return;
       }
 
-      // If payment method is tunai, order is already paid — langsung print
+      // Jika pembayaran tunai: pesanan langsung lunas, cetak struk fisik
       if (paymentMethod === 'tunai') {
         const changeAmount = getChange();
 
-        // Set receipt data for print
+        // Menyiapkan data struk untuk dicetak
         const newReceiptData = {
           orderId: data.id,
           customerName: data.customerName,
@@ -512,10 +535,10 @@ export default function KasirPage() {
 
         toast.success('Berhasil', { description: changeAmount > 0 ? `Pesanan berhasil dibuat! Kembalian: ${formatRupiah(changeAmount)}` : 'Pesanan berhasil dibuat!' });
 
-        // Langsung print via popup window (no preview modal)
+        // Langsung cetak struk via hidden iframe
         printReceipt(newReceiptData);
 
-        // Reset form
+        // Reset form kasir untuk transaksi selanjutnya
         setCart([]);
         setCustomerName('Pelanggan Umum');
         setCustomerPhone('081234567890');
@@ -524,13 +547,13 @@ export default function KasirPage() {
         setDiscount('');
         setSearchQuery('');
 
-        // Refresh products
+        // Muat ulang data produk (stok sudah berubah setelah transaksi)
         fetchProducts();
         setSubmitting(false);
         return;
       }
 
-      // If payment method is not tunai, show digital payment modal
+      // Jika pembayaran non-tunai (QRIS/VA): tampilkan modal pembayaran digital
       if (paymentMethod !== 'tunai') {
         toast.success('Berhasil', { description: 'Pesanan berhasil dibuat! Silakan bayar.' });
         setDigitalPaymentData({
@@ -548,7 +571,7 @@ export default function KasirPage() {
         });
         setShowDigitalPaymentModal(true);
 
-        // Reset form immediately
+        // Reset form kasir segera setelah pesanan digital dibuat
         setCart([]);
         setCustomerName('Pelanggan Umum');
         setCustomerPhone('081234567890');
@@ -557,7 +580,7 @@ export default function KasirPage() {
         setDiscount('');
         setSearchQuery('');
 
-        // Refresh products
+        // Muat ulang data produk (stok sudah berubah)
         fetchProducts();
       }
     } catch (error: any) {

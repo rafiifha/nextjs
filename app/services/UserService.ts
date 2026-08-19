@@ -1,7 +1,15 @@
 import { prisma } from '@/lib/db';
 import * as bcrypt from 'bcryptjs';
 
+/**
+ * Service untuk memproses logika bisnis terkait profil pengguna (User) dan pegawai (kasir).
+ * Berinteraksi langsung dengan database PostgreSQL menggunakan Prisma ORM.
+ */
 export class UserService {
+  /**
+   * Memperbarui profil customer yang sedang login.
+   * @param data Objek berisi id, name, email, phone, dan password (opsional).
+   */
   async updateProfile(data: any) {
     const { id, name, email, phone, password } = data;
 
@@ -9,17 +17,20 @@ export class UserService {
       throw new Error('ID dan Nama harus diisi');
     }
 
+    // Menyiapkan data yang akan diperbarui
     const dataToUpdate: any = {
       name,
       email: email || null,
       phone: phone || null,
     };
 
+    // Jika pengguna memasukkan password baru, lakukan hashing menggunakan bcrypt
     if (password) {
       const salt = await bcrypt.genSalt(10);
       dataToUpdate.password = await bcrypt.hash(password, salt);
     }
 
+    // Melakukan update data user di database berdasarkan ID unik
     const updatedUser = await prisma.user.update({
       where: { id: parseInt(id) },
       data: dataToUpdate,
@@ -36,6 +47,9 @@ export class UserService {
     return updatedUser;
   }
 
+  /**
+   * Mengambil semua daftar pegawai yang memiliki peran 'kasir'.
+   */
   async getEmployees() {
     return await prisma.user.findMany({
       where: { role: 'kasir' },
@@ -47,20 +61,27 @@ export class UserService {
         role: true,
         createdAt: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' }, // Mengurutkan dari pegawai yang paling baru didaftarkan
     });
   }
 
+  /**
+   * Membuat/mendaftarkan akun pegawai (kasir) baru (oleh Admin).
+   */
   async createEmployee(data: any) {
     const name = String(data?.name || '').trim();
     const phone = String(data?.phone || '').trim();
     const password = String(data?.password || '');
 
+    // Validasi masukan wajib
     if (!name || !phone || !password) {
       throw new Error('Nama, nomor HP, dan password wajib diisi');
     }
 
+    // Mengenkripsi password kasir menggunakan bcrypt dengan salt rounds = 10
     const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Menyimpan kasir baru ke database
     const employee = await prisma.user.create({
       data: {
         name,
@@ -81,17 +102,24 @@ export class UserService {
     return employee;
   }
 
+  /**
+   * Mereset password pegawai kasir tertentu ke password yang baru ditentukan oleh Admin.
+   */
   async resetEmployeePassword(userId: number, newPassword: string) {
     if (!Number.isFinite(userId) || !newPassword) {
       throw new Error('userId dan newPassword wajib diisi');
     }
 
+    // Memastikan kasir tersebut benar-benar ada di database
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser || targetUser.role !== 'kasir') {
       throw new Error('User kasir tidak ditemukan');
     }
 
+    // Hashing password baru
     const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    // Update password di database
     await prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
@@ -100,6 +128,9 @@ export class UserService {
     return { success: true, message: 'Password kasir berhasil direset' };
   }
 
+  /**
+   * Mengupdate data nama atau nomor HP akun kasir (oleh Admin).
+   */
   async updateEmployee(userId: number, data: { name?: string; phone?: string }) {
     if (!Number.isFinite(userId)) {
       throw new Error('ID kasir tidak valid');
@@ -125,6 +156,9 @@ export class UserService {
     });
   }
 
+  /**
+   * Menghapus akun pegawai kasir tertentu dari sistem.
+   */
   async deleteEmployee(userId: number) {
     if (!Number.isFinite(userId)) {
       throw new Error('ID kasir tidak valid');
@@ -135,6 +169,7 @@ export class UserService {
       throw new Error('User kasir tidak ditemukan');
     }
 
+    // Melakukan penghapusan data pegawai di database
     await prisma.user.delete({ where: { id: userId } });
     return { success: true, message: 'Akun kasir berhasil dihapus' };
   }

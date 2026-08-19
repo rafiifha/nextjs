@@ -24,6 +24,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
 
+  // Meng-update hitung mundur waktu tunggu kirim ulang OTP
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
@@ -31,11 +32,12 @@ export default function RegisterPage() {
     }
   }, [countdown]);
 
-  // Submit form → kirim OTP
+  // Langkah 1: Kirim kode OTP WhatsApp ke nomor pembeli untuk divalidasi
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
+    // Validasi form awal
     if (!name) { setError('Nama harus diisi'); return; }
     if (!phone) { setError('Nomor WhatsApp harus diisi'); return; }
     if (password.length < 6) { setError('Password minimal 6 karakter'); return; }
@@ -43,6 +45,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
+      // Mengirim request ke API OTP send
       const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -51,6 +54,7 @@ export default function RegisterPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Gagal mengirim OTP'); return; }
 
+      // Jika berhasil, tampilkan input kode OTP dan nyalakan timer 60 detik
       setShowOtp(true);
       setCountdown(60);
       setOtpCode('');
@@ -61,7 +65,7 @@ export default function RegisterPage() {
     }
   };
 
-  // Verifikasi OTP → register
+  // Langkah 2: Verifikasi kode OTP WhatsApp dan lakukan registrasi akun ke database
   const handleVerifyAndRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -69,7 +73,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      // 1. Verify OTP
+      // 1. Kirim request verifikasi OTP ke server
       const verifyRes = await fetch('/api/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -78,7 +82,7 @@ export default function RegisterPage() {
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok) { setError(verifyData.error || 'Verifikasi gagal'); return; }
 
-      // 2. Register
+      // 2. Jika OTP valid, buat akun baru di database dengan request register
       const regRes = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,6 +91,7 @@ export default function RegisterPage() {
       const regData = await regRes.json();
       if (!regRes.ok) { setError(regData.error || 'Registrasi gagal'); return; }
 
+      // Redirect ke halaman login dengan query params registered=true
       router.push('/login?registered=true');
     } catch {
       setError('Terjadi kesalahan saat registrasi.');
@@ -95,6 +100,7 @@ export default function RegisterPage() {
     }
   };
 
+  // Mengirim ulang kode OTP WhatsApp jika waktu hitung mundur telah habis
   const handleResendOtp = async () => {
     if (countdown > 0) return;
     setError('');

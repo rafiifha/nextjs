@@ -1,39 +1,57 @@
 import { prisma } from '@/lib/db';
 
+/**
+ * Service untuk memproses logika bisnis terkait manajemen produk sembako dan variannya.
+ * Berinteraksi langsung dengan database PostgreSQL menggunakan Prisma ORM.
+ */
 export class ProductService {
+  /**
+   * Mengambil semua produk dari database, lengkap dengan data kategori, varian harga,
+   * dan jumlah penjualan (salesCount) per produk.
+   * Diurutkan berdasarkan jumlah produk terlaris.
+   */
   async getAllProducts() {
+    // 1. Mengambil produk beserta relasinya dari database
     const products = await prisma.product.findMany({
       include: {
         category: true,
         variants: {
-          orderBy: { priceType: 'asc' },
+          orderBy: { priceType: 'asc' }, // Urutkan varian harga
         },
         items: {
           select: {
-            quantity: true,
+            quantity: true, // Ambil qty penjualan untuk hitung penjualan terlaris
           },
         },
       },
     });
 
+    // 2. Memetakan salesCount (menghitung total item yang terjual) secara fungsional
     return products
       .map((p) => {
         const salesCount = p.items.reduce((sum, item) => sum + item.quantity, 0);
         const { items, ...rest } = p;
         return { ...rest, salesCount };
       })
-      .sort((a, b) => b.salesCount - a.salesCount);
+      .sort((a, b) => b.salesCount - a.salesCount); // Diurutkan dari yang paling laris (descending)
   }
 
+  /**
+   * Mengambil data produk berpaginasi untuk halaman katalog depan client.
+   * Mendukung filter pencarian nama produk dan filter berdasarkan kategori.
+   */
   async getProductsPaginated(page: number, limit: number, search?: string, categoryId?: number) {
     const where: any = {};
+    // Menambahkan filter pencarian jika diinput oleh user
     if (search) {
-      where.name = { contains: search, mode: 'insensitive' };
+      where.name = { contains: search, mode: 'insensitive' }; // Case-insensitive search
     }
+    // Menambahkan filter kategori jika dipilih
     if (categoryId) {
       where.categoryId = categoryId;
     }
 
+    // Melakukan query pararel untuk menghemat waktu respon database
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
@@ -43,11 +61,11 @@ export class ProductService {
             orderBy: { priceType: 'asc' },
           },
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
+        orderBy: { createdAt: 'desc' }, // Produk terbaru tampil di depan
+        skip: (page - 1) * limit, // Skip record untuk paginasi
+        take: limit, // Batasi jumlah data yang diambil
       }),
-      prisma.product.count({ where }),
+      prisma.product.count({ where }), // Hitung total record untuk kalkulasi total halaman
     ]);
 
     return {
@@ -58,6 +76,9 @@ export class ProductService {
     };
   }
 
+  /**
+   * Mengambil satu produk berdasarkan ID produk.
+   */
   async getProductById(id: number) {
     return await prisma.product.findUnique({
       where: { id },
@@ -70,13 +91,18 @@ export class ProductService {
     });
   }
 
+  /**
+   * Menambahkan produk baru beserta varian harganya (oleh Admin).
+   */
   async createProduct(data: any) {
     const { name, categoryId, variants, image } = data;
 
+    // Validasi input wajib
     if (!name || !categoryId || !variants || !Array.isArray(variants) || variants.length === 0) {
       throw new Error('Nama, kategori, dan varian harga harus diisi');
     }
 
+    // Pastikan kategori yang dituju ada di database
     const category = await prisma.category.findUnique({
       where: { id: categoryId },
     });
@@ -85,6 +111,7 @@ export class ProductService {
       throw new Error('Kategori tidak ditemukan');
     }
 
+    // Aturan bisnis: Varian jenis harga yang dimasukkan produk harus didukung oleh kategori produk tersebut
     const categoryPriceTypes = category.priceTypes;
     const variantPriceTypes = variants.map((v: any) => v.priceType);
     const invalidTypes = variantPriceTypes.filter((type: string) => !categoryPriceTypes.includes(type));
@@ -93,6 +120,7 @@ export class ProductService {
       throw new Error(`Jenis harga tidak valid untuk kategori ini: ${invalidTypes.join(', ')}. Kategori ini hanya mendukung: ${categoryPriceTypes.join(', ')}`);
     }
 
+    // Menyimpan produk baru beserta variannya menggunakan fitur nested write Prisma
     const product = await prisma.product.create({
       data: {
         name,
@@ -111,6 +139,9 @@ export class ProductService {
     return product;
   }
 
+  /**
+   * Memperbarui data produk dan varian harganya (oleh Admin).
+   */
   async updateProduct(id: number, data: any) {
     const { name, categoryId, variants, image } = data;
 
@@ -134,6 +165,7 @@ export class ProductService {
       throw new Error('Kategori tidak ditemukan');
     }
 
+    // Validasi tipe jenis harga varian produk terhadap kategori
     const categoryPriceTypes = category.priceTypes;
     const variantPriceTypes = variants.map((v: any) => v.priceType);
     const invalidTypes = variantPriceTypes.filter((type: string) => !categoryPriceTypes.includes(type));
@@ -142,10 +174,12 @@ export class ProductService {
       throw new Error(`Jenis harga tidak valid untuk kategori ini: ${invalidTypes.join(', ')}. Kategori ini hanya mendukung: ${categoryPriceTypes.join(', ')}`);
     }
 
+    // 1. Hapus varian produk yang lama terlebih dahulu
     await prisma.productVariant.deleteMany({
       where: { productId: id },
     });
 
+    // 2. Update produk dan masukkan varian baru
     const product = await prisma.product.update({
       where: { id },
       data: {
@@ -167,6 +201,9 @@ export class ProductService {
     return product;
   }
 
+  /**
+   * Menghapus produk dari database berdasarkan ID.
+   */
   async deleteProduct(id: number) {
     const product = await prisma.product.findUnique({
       where: { id },
@@ -176,6 +213,7 @@ export class ProductService {
       throw new Error('Produk tidak ditemukan');
     }
 
+    // Menghapus produk (varian produk akan otomatis terhapus jika diatur Cascade Delete di schema)
     await prisma.product.delete({
       where: { id },
     });
@@ -183,6 +221,9 @@ export class ProductService {
     return { message: 'Produk berhasil dihapus' };
   }
 
+  /**
+   * Fungsi pembantu untuk mem-parsing input varian dan mengonversi tipe data string ke number yang valid.
+   */
   private parseVariants(variants: any[]) {
     return variants.map((variant: any) => {
       let price: number | null = null;

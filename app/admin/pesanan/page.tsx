@@ -67,6 +67,7 @@ export default function ManajemenPesananPage() {
   const [totalOrders, setTotalOrders] = useState(0);
   const ITEMS_PER_PAGE = 10;
 
+  // Mengambil daftar pesanan dari API dengan paginasi, pencarian, dan filter status
   const fetchOrders = useCallback(async (page?: number, search?: string, status?: string) => {
     try {
       setLoading(true);
@@ -115,12 +116,14 @@ export default function ManajemenPesananPage() {
     }
   }, [currentPage, searchQuery, statusFilter]);
 
+  // Saat komponen dimuat pertama kali, ambil data pesanan dan daftar kurir
   useEffect(() => {
     fetchOrders();
     fetchCouriers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Mengambil daftar kurir aktif dari API untuk keperluan penugasan pengiriman
   const fetchCouriers = async () => {
     try {
       const res = await fetch('/api/delivery/couriers');
@@ -133,6 +136,7 @@ export default function ManajemenPesananPage() {
     }
   };
 
+  // Memperbarui status pesanan melalui API PUT, lalu refresh data pesanan
   const updateOrderStatus = async (orderId: number, newStatus: string, courierId?: number) => {
     try {
       const body: Record<string, any> = { status: newStatus };
@@ -145,6 +149,7 @@ export default function ManajemenPesananPage() {
 
       if (res.ok) {
         await fetchOrders();
+        // Ambil data terbaru untuk memperbarui detail modal yang sedang terbuka
         const params = new URLSearchParams({
           page: String(currentPage),
           limit: String(ITEMS_PER_PAGE),
@@ -167,10 +172,12 @@ export default function ManajemenPesananPage() {
     }
   };
 
+  // Mengecek apakah pesanan ini adalah transaksi offline (pickup + tunai + tanpa ongkir)
   const isOfflineOrder = (order: Order) => {
     return order.deliveryMethod === 'pickup' && (!order.shippingFee || order.shippingFee === 0) && order.paymentMethod === 'tunai';
   };
 
+  // Menerjemahkan status bahasa Inggris ke bahasa Indonesia untuk ditampilkan di UI
   const getStatusIndonesian = (status: string) => {
     const statusMap: { [key: string]: string } = {
       'pending': 'Menunggu Pembayaran',
@@ -184,6 +191,7 @@ export default function ManajemenPesananPage() {
     return statusMap[status] || status;
   };
 
+  // Mengembalikan class CSS warna badge sesuai status pesanan
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
@@ -197,6 +205,7 @@ export default function ManajemenPesananPage() {
     }
   };
 
+  // Mengembalikan class CSS warna pill sesuai status pesanan
   const getStatusPill = (status: string) => {
     if (status === 'pending') return 'bg-yellow-100 text-yellow-700 border-yellow-300';
     if (status === 'paid') return 'bg-green-100 text-green-700 border-green-300';
@@ -207,6 +216,7 @@ export default function ManajemenPesananPage() {
     return 'bg-gray-100 text-gray-700 border-gray-300';
   };
 
+  // Mencetak struk pesanan. Jika pesanan online berstatus 'paid', otomatis update ke 'processing' terlebih dahulu.
   const handlePrintOrder = async (order: Order) => {
     if (['cancelled', 'expired'].includes(order.status)) {
       toast.error('Tidak Dapat Mencetak Struk', {
@@ -245,7 +255,7 @@ export default function ManajemenPesananPage() {
       }
     }
 
-    // Build receipt items HTML
+    // Menyusun HTML struk belanja dari data item pesanan
     const itemsHtml = order.items.map(item => `
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
         <div style="flex:1;padding-right:4px;">

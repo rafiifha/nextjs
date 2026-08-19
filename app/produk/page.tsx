@@ -86,6 +86,7 @@ export default function ProdukPage() {
     fetchProducts(1, searchQuery, selectedCategory);
   }, [searchQuery, selectedCategory]);
 
+  // Mengambil daftar kategori produk dari API
   const fetchCategories = async () => {
     try {
       const res = await fetch('/api/kategori');
@@ -98,12 +99,15 @@ export default function ProdukPage() {
     }
   };
 
+  // Sinkronisasi data keranjang belanja lokal
   const loadCart = () => {
     const cartData = cartService.getCart();
     setCart(cartData);
   };
 
+  // Menambahkan produk terpilih dengan tipe varian tertentu ke keranjang belanja local storage
   const handleAddToCart = async (product: Product, variant: ProductVariant) => {
+    // Validasi harga
     if (!variant.price) {
       toast.error('Harga Belum Tersedia', { description: 'Produk ini belum memiliki harga. Silakan hubungi admin.' });
       return;
@@ -120,10 +124,11 @@ export default function ProdukPage() {
           const user = JSON.parse(userStr);
           userId = user?.id || null;
         } catch (e) {
-          // ignore
+          // abaikan
         }
       }
 
+      // Masukkan item ke local storage cart
       cartService.addToCart(
         product.id,
         product,
@@ -135,11 +140,12 @@ export default function ProdukPage() {
       );
       loadCart();
 
-      // Show success notification
+      // Kirim event update ke navbar agar jumlah cart ter-update secara real-time
+      window.dispatchEvent(new Event('cartUpdated'));
+
       const priceTypeLabel = variant.priceType.charAt(0).toUpperCase() + variant.priceType.slice(1);
       toast.success('Produk Ditambahkan', { description: `${product.name} (${priceTypeLabel}) berhasil ditambahkan ke keranjang` });
 
-      // Show success feedback
       setTimeout(() => {
         setAddingToCart({ ...addingToCart, [key]: false });
       }, 1000);
@@ -150,10 +156,12 @@ export default function ProdukPage() {
     }
   };
 
+  // Memeriksa apakah suatu item dengan varian tertentu sudah ada di keranjang belanja
   const isInCart = (productId: number, priceType: string) => {
     return cart.some(item => item.productId === productId && item.priceType === priceType);
   };
 
+  // Mengambil daftar produk dari API server dengan query params (page, search, category)
   const fetchProducts = async (page: number, search: string, categoryId?: number | null) => {
     setLoading(true);
     try {
@@ -167,6 +175,8 @@ export default function ProdukPage() {
         setProducts(productsData);
         setTotalPages(data.totalPages || 1);
         setTotalProducts(data.total || 0);
+        
+        // Inisialisasi varian aktif pertama yang memiliki stok online & harga untuk setiap produk
         setSelectedVariantByProduct((prev) => {
           const next = { ...prev };
           for (const product of productsData) {

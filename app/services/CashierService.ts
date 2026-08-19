@@ -76,7 +76,7 @@ export class CashierService {
       throw error;
     }
 
-    // 5. Kalkulasi finansial (Subtotal, Diskon, Total Bayar, dan Uang Kembalian Tunai)
+    // 5. Kalkulasi (Subtotal, Diskon, Total Bayar, dan Uang Kembalian Tunai)
     const subtotal = normalizedItems.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
     const discountAmount = discount && !isNaN(parseFloat(discount)) ? Math.max(0, parseFloat(discount)) : 0;
     const totalHarga = Math.max(0, subtotal - discountAmount);

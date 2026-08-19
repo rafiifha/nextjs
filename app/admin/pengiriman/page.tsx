@@ -24,6 +24,11 @@ interface DeliveryOrder {
   courier: Courier | null;
 }
 
+/**
+ * Halaman Manajemen Pengiriman.
+ * Menampilkan daftar pesanan yang perlu dikirim, sedang dalam pengiriman, dan yang sudah selesai.
+ * Admin dapat menugaskan kurir dan mengubah status pengiriman dari halaman ini.
+ */
 export default function PengirimanPage() {
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const [couriers, setCouriers] = useState<Courier[]>([]);
@@ -31,7 +36,7 @@ export default function PengirimanPage() {
   const [selectedCourier, setSelectedCourier] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
 
-
+  // Mengambil data pesanan delivery dan daftar kurir secara paralel dari API
   const fetchData = async () => {
     try {
       const [orderRes, courierRes] = await Promise.all([
@@ -45,14 +50,17 @@ export default function PengirimanPage() {
     }
   };
 
+  // Saat komponen dimuat, ambil data pengiriman
   useEffect(() => {
     fetchData();
   }, []);
 
+  // Memperbarui status pengiriman pesanan (shipped = mulai kirim, delivered = selesai)
   const updateStatus = async (orderId: number, status: 'shipped' | 'delivered') => {
     const courierId = selectedCourier[orderId];
     const body: Record<string, any> = { status };
     if (status === 'shipped') {
+      // Validasi: kurir wajib dipilih sebelum mengirim pesanan
       if (!courierId) {
         toast.warning('Kurir belum dipilih', { description: 'Pilih kurir dulu sebelum kirim.' });
         return;
@@ -74,12 +82,14 @@ export default function PengirimanPage() {
     toast.success('Status diperbarui', { description: status === 'shipped' ? 'Pesanan masuk dalam pengiriman.' : 'Pesanan ditandai selesai.' });
   };
 
+  // Filter pesanan berdasarkan tab yang aktif (siap kirim / dalam pengiriman / selesai)
   const filteredOrders = orders.filter((order) => {
     if (tab === 'siap') return order.status === 'paid' || order.status === 'processing';
     if (tab === 'jalan') return order.status === 'shipped';
     return order.status === 'delivered';
   });
 
+  // Styling tab yang aktif vs tidak aktif
   const tabStyle = (key: 'siap' | 'jalan' | 'selesai') =>
     `rounded-full px-4 py-2 text-sm font-medium transition ${
       tab === key
@@ -87,6 +97,7 @@ export default function PengirimanPage() {
         : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
     }`;
 
+  // Mengembalikan badge/pill status pengiriman yang sesuai
   const getStatusPill = (status: string) => {
     if (status === 'paid' || status === 'processing') {
       return <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">Siap Kirim</span>;

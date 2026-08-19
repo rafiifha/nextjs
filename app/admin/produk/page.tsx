@@ -54,11 +54,13 @@ export default function ManajemenProdukPage() {
     }>,
   });
 
+  // Saat komponen dimuat pertama kali, ambil data kategori dan produk dari server
   useEffect(() => {
     fetchCategories();
     fetchProducts();
   }, []);
 
+  // Mengambil daftar kategori produk dari API
   const fetchCategories = async () => {
     try {
       const res = await fetch('/api/kategori');
@@ -71,6 +73,7 @@ export default function ManajemenProdukPage() {
     }
   };
 
+  // Mengambil daftar semua produk beserta varian dari API
   const fetchProducts = async () => {
     try {
       const res = await fetch('/api/produk');
@@ -85,10 +88,11 @@ export default function ManajemenProdukPage() {
     }
   };
 
+  // Saat kategori dipilih, otomatis membuat varian harga sesuai priceTypes kategori tersebut
   const handleCategoryChange = (categoryId: string) => {
     const category = categories.find(c => c.id === parseInt(categoryId));
     if (category) {
-      // Initialize variants based on category price types
+      // Membuat varian kosong berdasarkan tipe harga kategori (misal: dus, bal, pcs)
       const newVariants = category.priceTypes.map(priceType => ({
         priceType,
         price: '',
@@ -99,12 +103,14 @@ export default function ManajemenProdukPage() {
     }
   };
 
+  // Memperbarui data varian tertentu (harga/stok) berdasarkan index
   const updateVariant = (index: number, field: string, value: string) => {
     const newVariants = [...formData.variants];
     newVariants[index] = { ...newVariants[index], [field]: value };
     setFormData({ ...formData, variants: newVariants });
   };
 
+  // Mengunggah gambar produk ke server via endpoint /api/upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -140,15 +146,17 @@ export default function ManajemenProdukPage() {
     }
   };
 
+  // Menyimpan data produk (tambah baru atau update) ke server via API
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validasi: nama, kategori, dan minimal satu varian harus ada
     if (!formData.name || !formData.categoryId || formData.variants.length === 0) {
       toast.error('Error', { description: 'Semua field harus diisi' });
       return;
     }
 
-    // Price is optional, no validation needed
+    // Harga bersifat opsional (bisa null jika belum ditentukan)
 
     const productData = {
       name: formData.name,
@@ -214,6 +222,7 @@ export default function ManajemenProdukPage() {
     }
   };
 
+  // Mengisi form dengan data produk yang akan diedit
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
     setFormData({
@@ -230,6 +239,7 @@ export default function ManajemenProdukPage() {
     setShowForm(true);
   };
 
+  // Menghapus produk setelah konfirmasi dari admin
   const handleDelete = (id: number) => {
     toast('Yakin ingin menghapus produk ini?', {
       action: {
@@ -261,6 +271,7 @@ export default function ManajemenProdukPage() {
     });
   };
 
+  // Mereset form produk ke kondisi awal
   const resetForm = () => {
     setFormData({
       name: '',
@@ -277,11 +288,12 @@ export default function ManajemenProdukPage() {
     setShowForm(false);
   };
 
+  // Mengambil nama kategori berdasarkan ID
   const getCategoryName = (categoryId: number) => {
     return categories.find(c => c.id === categoryId)?.name || 'Unknown';
   };
 
-  // Filter products based on search query and category
+  // Filter produk berdasarkan kata kunci pencarian dan kategori yang dipilih
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !selectedCategoryId || product.categoryId === parseInt(selectedCategoryId);

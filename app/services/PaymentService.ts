@@ -4,31 +4,31 @@ import { triggerOrderEvent } from '@/services/pusherService';
 import { sendReceipt } from '@/services/whatsappService';
 
 /**
- * Service untuk memproses pembayaran dan integrasi dengan Payment Gateway (Pakasir).
+ * Service untuk memproses konfirmasi pembayaran dan integrasi dengan Payment Gateway (Pakasir).
  */
 export class PaymentService {
   /**
-   * Webhook handler untuk menerima notifikasi pembayaran sukses dari Pakasir.
-   * Webhook ini dipanggil secara asinkron oleh server Pakasir setelah pembeli menyelesaikan transfer.
+   * Webhook handler untuk menerima notifikasi pembayaran sukses dari server Pakasir.
+   * Webhook ini dipanggil secara asinkron (callback) oleh server Pakasir setelah pembeli menyelesaikan transfer.
    */
   async handlePakasirWebhook(data: any) {
     console.log('📩 Webhook Pakasir diterima:', data);
 
     const { amount, order_id, project, status, payment_method } = data;
 
-    // 1. Validasi keamanan: memastikan request berasal dari project yang sesuai di konfigurasi .env
+    // 1. Validasi Keamanan: memastikan request webhook berasal dari project merchant yang sesuai di konfigurasi .env kita
     if (project !== env.PAKASIR_PROJECT) {
       console.warn('Webhook ditolak: Project tidak cocok', { received: project, expected: env.PAKASIR_PROJECT });
       throw new Error('Project tidak valid');
     }
 
-    // 2. Membatasi pemrosesan hanya jika status transaksi bernilai 'completed' (sukses dibayar)
+    // 2. Filter Status: Batasi pemrosesan hanya jika status transaksi bernilai 'completed' (sukses dibayar)
     if (status !== 'completed') {
       console.log(`Status transaksi ${order_id} adalah ${status}, diabaikan.`);
       return { success: true, message: 'Status diabaikan' };
     }
 
-    // 3. Normalisasi ID Pesanan (contoh: mengambil angka "123" dari format string "INV-123")
+    // 3. Normalisasi ID Pesanan: Mengambil angka ID database murni (contoh: mengambil angka "123" dari format string "INV-123")
     let numericId = 0;
     if (order_id.startsWith('INV-')) {
       numericId = parseInt(order_id.substring(4), 10);
@@ -40,7 +40,7 @@ export class PaymentService {
       throw new Error('Format order_id tidak valid');
     }
 
-    // 4. Mencari data pesanan di database berdasarkan ID pesanan hasil normalisasi
+    // 4. Cari Pesanan: Mengambil data pesanan dari database berdasarkan ID pesanan hasil normalisasi
     const order = await prisma.order.findUnique({
       where: { id: numericId },
       include: {
@@ -54,7 +54,7 @@ export class PaymentService {
       throw new Error('Pesanan tidak ditemukan');
     }
 
-    // 5. Mencegah pemrosesan ulang jika pesanan di database sudah berstatus 'paid' (idempotensi)
+    // 5. Idempotensi: Cegah pemrosesan ulang jika pesanan di database sudah berstatus 'paid' (lunas)
     if (order.status === 'paid') {
       console.log(`Pesanan ${numericId} sudah berstatus paid, skip update.`);
       return { success: true, message: 'Pesanan sudah dibayar' };
@@ -62,7 +62,7 @@ export class PaymentService {
 
     console.log(`Verifikasi amount: webhook=${amount}, db=${order.totalHarga + (order.shippingFee || 0)}`);
 
-    // 6. Mengupdate status pesanan di database menjadi 'paid'
+    // 6. Update Status Lunas: Mengubah status pesanan di database menjadi 'paid' (Sudah Dibayar)
     const updatedOrder = await prisma.order.update({
       where: { id: numericId },
       data: { status: 'paid' },
@@ -74,17 +74,17 @@ export class PaymentService {
     });
 
     console.log(`✅ Pesanan ${numericId} berhasil diupdate menjadi paid via Pakasir.`);
-    // Catatan Skripsi: Stok barang sudah dipotong saat pesanan pertama kali dibuat (checkout),
+    // Catatan Skripsi: Stok barang sudah dipotong saat pesanan pertama kali dibuat (checkout/createOrder),
     // sehingga tidak perlu dipotong lagi di sini untuk menghindari pengurangan stok ganda.
 
-    // 7. Memicu event real-time menggunakan Pusher untuk memperbarui antarmuka Admin & Kurir secara instan
+    // 7. Update Real-time: Memicu event WebSocket Pusher agar antarmuka admin/kasir langsung terupdate otomatis
     try {
       await triggerOrderEvent('order-updated', updatedOrder);
     } catch (pusherErr) {
       console.error('Pusher error:', pusherErr);
     }
 
-    // 8. Mengirimkan Struk / Bukti Transaksi secara asinkron ke WhatsApp pelanggan menggunakan Fonnte
+    // 8. Kirim WhatsApp Struk Belanja: Mengirimkan struk pembelian otomatis ke nomor WhatsApp customer menggunakan gateway Fonnte
     sendReceipt(order.customerPhone, {
       orderId: order.id,
       customerName: order.customerName,
