@@ -410,6 +410,14 @@ export class OrderService {
     const expiredAt = new Date();
     if (paymentMethod === 'tunai') {
       expiredAt.setHours(expiredAt.getHours() + 1);
+      
+      // Waktu kadaluarsa tidak boleh melebihi batas operasional jam 18:00 hari ini
+      const batasWaktu = new Date();
+      batasWaktu.setHours(18, 0, 0, 0);
+      
+      if (expiredAt > batasWaktu) {
+        throw new Error('Pemesanan dengan pembayaran tunai tidak dapat dilakukan karena batas waktu bayar melewati jam tutup toko (18:00)');
+      }
     } else {
       expiredAt.setMinutes(expiredAt.getMinutes() + 15);
     }

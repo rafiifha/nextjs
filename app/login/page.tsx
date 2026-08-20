@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import { cartService } from '@/lib/cart';
 import { toast } from 'sonner';
+import { isTokenValid } from '@/lib/utils';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,6 +37,26 @@ export default function LoginPage() {
       });
     }
   }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    
+    if (token && isTokenValid(token) && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.role === 'admin') {
+          router.push('/admin/dashboard');
+        } else if (user.role === 'kasir') {
+          router.push('/admin/kasir');
+        } else {
+          router.push('/produk');
+        }
+      } catch (e) {
+        // abaikan error parsing
+      }
+    }
+  }, [router]);
 
   // Menangani pengiriman data login (email/phone & password) ke server API /api/auth/login
   const handleSubmit = async (e: React.FormEvent) => {

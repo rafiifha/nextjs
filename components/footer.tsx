@@ -30,17 +30,6 @@ export default function Footer() {
             <p className="text-sm text-slate-400 leading-relaxed">
               Toko sembako terpercaya dengan kualitas terbaik dan harga terjangkau untuk memenuhi seluruh kebutuhan usaha serta harian Anda.
             </p>
-            <div className="flex items-center gap-3 pt-2">
-              <a href="#" className="p-2 rounded-lg bg-slate-800/50 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300">
-                <Facebook className="h-4 w-4" />
-              </a>
-              <a href="#" className="p-2 rounded-lg bg-slate-800/50 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300">
-                <Instagram className="h-4 w-4" />
-              </a>
-              <a href="#" className="p-2 rounded-lg bg-slate-800/50 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300">
-                <Twitter className="h-4 w-4" />
-              </a>
-            </div>
           </div>
 
           {/* Column 2: Quick Links */}
@@ -71,7 +60,7 @@ export default function Footer() {
                 <div className="p-1.5 bg-slate-800/80 rounded-md text-amber-400">
                   <Phone className="h-4 w-4" />
                 </div>
-                <span className="text-slate-300 hover:text-white transition-colors cursor-pointer">0857 3246 3329</span>
+                <span className="text-slate-300 hover:text-white transition-colors">0857 3246 3329</span>
               </li>
               <li className="flex items-start gap-3 text-sm">
                 <div className="p-1.5 bg-slate-800/80 rounded-md text-amber-400 mt-0.5">

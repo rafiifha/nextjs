@@ -24,6 +24,27 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
 
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    
+    // We will do a simple check without isTokenValid here since we can't easily import it, or wait we can import it.
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.role === 'admin') {
+          router.push('/admin/dashboard');
+        } else if (user.role === 'kasir') {
+          router.push('/admin/kasir');
+        } else {
+          router.push('/produk');
+        }
+      } catch (e) {
+        // abaikan error parsing
+      }
+    }
+  }, [router]);
+
   // Meng-update hitung mundur waktu tunggu kirim ulang OTP
   useEffect(() => {
     if (countdown > 0) {

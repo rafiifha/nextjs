@@ -62,6 +62,7 @@ export default function ManajemenPesananPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
@@ -138,6 +139,7 @@ export default function ManajemenPesananPage() {
 
   // Memperbarui status pesanan melalui API PUT, lalu refresh data pesanan
   const updateOrderStatus = async (orderId: number, newStatus: string, courierId?: number) => {
+    setActionLoading(newStatus);
     try {
       const body: Record<string, any> = { status: newStatus };
       if (courierId) body.courierId = courierId;
@@ -169,6 +171,8 @@ export default function ManajemenPesananPage() {
       }
     } catch (error: any) {
       toast.error('Gagal update status', { description: error.message || 'Gagal mengupdate status pesanan' });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -225,12 +229,24 @@ export default function ManajemenPesananPage() {
       return;
     }
 
-    if (!isOfflineOrder(order) && order.status === 'paid') {
+    setActionLoading('print');
+    let newStatus: string | null = null;
+    
+    // 1. Ambil di tempat (pickup) & bayar di tempat (tunai) -> otomatis jadi 'paid'
+    if (order.deliveryMethod === 'pickup' && order.paymentMethod === 'tunai' && order.status === 'pending') {
+      newStatus = 'paid';
+    } 
+    // 2. Pesanan lainnya yang sudah dibayar -> otomatis 'processing' (Diproses)
+    else if (!isOfflineOrder(order) && order.status === 'paid') {
+      newStatus = 'processing';
+    }
+
+    if (newStatus) {
       try {
         const res = await fetch(`/api/pesanan/${order.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'processing' }),
+          body: JSON.stringify({ status: newStatus }),
         });
 
         if (res.ok) {
@@ -247,7 +263,7 @@ export default function ManajemenPesananPage() {
           const updatedOrder = updatedOrders.find((o: Order) => o.id === order.id);
           if (updatedOrder) {
             setSelectedOrder(updatedOrder);
-            order = updatedOrder;
+            order = updatedOrder; // Memperbarui data untuk struk jika diperlukan
           }
         }
       } catch (error) {
@@ -257,25 +273,25 @@ export default function ManajemenPesananPage() {
 
     // Menyusun HTML struk belanja dari data item pesanan
     const itemsHtml = order.items.map(item => `
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-        <div style="flex:1;padding-right:4px;">
-          <div style="font-weight:600;">${item.product.name}</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;width:100%;gap:4px;">
+        <div style="flex:1;">
+          <div style="font-weight:600;word-break:break-word;">${item.product.name}</div>
           <div style="font-size:8px;color:#555;">${item.priceType.charAt(0).toUpperCase() + item.priceType.slice(1)} x ${item.quantity}</div>
         </div>
-        <div style="text-align:right;font-weight:600;white-space:nowrap;align-self:flex-end;">Rp ${(item.price * item.quantity).toLocaleString('id-ID')}</div>
+        <div style="text-align:right;font-weight:600;white-space:nowrap;align-self:flex-end;flex:0 0 auto;">Rp ${(item.price * item.quantity).toLocaleString('id-ID')}</div>
       </div>
     `).join('');
 
     const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
     const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const discountHtml = order.discount && order.discount > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Diskon:</span><span style="color:red;">-Rp ${order.discount.toLocaleString('id-ID')}</span></div>` : '';
-    const shippingHtml = order.shippingFee && order.shippingFee > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Ongkir:</span><span>Rp ${order.shippingFee.toLocaleString('id-ID')}</span></div>` : '';
+    const discountHtml = order.discount && order.discount > 0 ? `<div class="row"><span>Diskon:</span><span style="color:red;">-Rp ${order.discount.toLocaleString('id-ID')}</span></div>` : '';
+    const shippingHtml = order.shippingFee && order.shippingFee > 0 ? `<div class="row"><span>Ongkir:</span><span>Rp ${order.shippingFee.toLocaleString('id-ID')}</span></div>` : '';
     const cashHtml = order.cashReceived && order.cashReceived > 0 ? `
-      <div style="display:flex;justify-content:space-between;"><span>Uang Diterima:</span><span>Rp ${order.cashReceived.toLocaleString('id-ID')}</span></div>
-      ${order.change && order.change > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Kembalian:</span><span style="color:green;">Rp ${order.change.toLocaleString('id-ID')}</span></div>` : ''}
+      <div class="row"><span>Uang Diterima:</span><span>Rp ${order.cashReceived.toLocaleString('id-ID')}</span></div>
+      ${order.change && order.change > 0 ? `<div class="row"><span>Kembalian:</span><span style="color:green;">Rp ${order.change.toLocaleString('id-ID')}</span></div>` : ''}
     ` : '';
-    const deliveryHtml = order.deliveryMethod === 'delivery' ? `<div style="display:flex;justify-content:space-between;"><span>Pengiriman:</span><span style="font-weight:600;">Delivery</span></div>` : '';
-    const addressHtml = order.shippingAddress ? `<div style="display:flex;justify-content:space-between;"><span>Alamat:</span><span style="font-weight:600;text-align:right;max-width:55%;font-size:8px;">${order.shippingAddress}</span></div>` : '';
+    const deliveryHtml = order.deliveryMethod === 'delivery' ? `<div class="row"><span>Pengiriman:</span><span style="font-weight:600;">Delivery</span></div>` : '';
+    const addressHtml = order.shippingAddress ? `<div class="row"><span>Alamat:</span><span style="font-weight:600;font-size:8px;">${order.shippingAddress}</span></div>` : '';
 
     const html = `
       <!DOCTYPE html>
@@ -284,16 +300,19 @@ export default function ManajemenPesananPage() {
         <title>Struk</title>
         <style>
           @page { size: 58mm auto; margin: 0; }
-          html, body { margin: 0; padding: 0; height: auto; overflow: hidden; }
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { width: 48mm; font-family: 'Arial', sans-serif; font-size: 9px; padding: 1mm; color: #000; }
+          html, body { margin: 0; padding: 0; width: 58mm; background: #fff; }
+          * { box-sizing: border-box; font-family: 'Arial', sans-serif; }
+          body { font-size: 9px; padding: 2mm 4mm; color: #000; }
           .center { text-align: center; }
           .bold { font-weight: bold; }
-          .divider { border-top: 1px dashed #000; margin: 4px 0; }
-          .row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+          .divider { border-top: 1px dashed #000; margin: 4px 0; width: 100%; }
+          .row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; width: 100%; gap: 2px; }
+          .row > span:first-child { flex: 0 0 auto; }
+          .row > span:last-child { flex: 1 1 auto; text-align: right; word-break: break-word; }
           .title { font-size: 13px; font-weight: bold; margin-bottom: 2px; }
           .small { font-size: 8px; color: #555; }
-          .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 11px; padding-top: 4px; border-top: 1px dashed #000; }
+          .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 11px; padding-top: 4px; border-top: 1px dashed #000; width: 100%; }
+          .total-row > span:last-child { text-align: right; }
         </style>
       </head>
       <body>
@@ -343,17 +362,20 @@ export default function ManajemenPesananPage() {
 
     const iframeDoc = iframe.contentWindow?.document;
     if (iframeDoc) {
-      iframeDoc.open();
-      iframeDoc.write(html);
-      iframeDoc.close();
+        iframeDoc.open();
+        iframeDoc.write(html);
+        iframeDoc.close();
 
-      setTimeout(() => {
-        iframe.contentWindow?.print();
         setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 1000);
-      }, 300);
-    }
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+            setActionLoading(null);
+          }, 1000);
+        }, 300);
+      } else {
+        setActionLoading(null);
+      }
   };
 
   const handleSearchChange = (value: string) => {
@@ -578,14 +600,56 @@ export default function ManajemenPesananPage() {
                 {!isOfflineOrder(selectedOrder) && (
                   <div className="mb-6">
                     <h3 className="font-semibold text-gray-900 mb-3 text-lg">Informasi Pengiriman & Pembayaran Online</h3>
-                    <div className="rounded-xl border border-green-100 bg-green-50 p-4 space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-gray-600">Metode Pembayaran:</span><span className="font-medium text-gray-900 uppercase flex items-center gap-2"><CreditCard className="h-4 w-4 text-gray-500" />{selectedOrder.paymentMethod ? selectedOrder.paymentMethod.replace('_va', ' Virtual Account') : '-'}</span></div>
-                      {selectedOrder.paymentNumber && <div className="flex justify-between"><span className="text-gray-600">Nomor Pembayaran (VA/QRIS):</span><span className="font-medium text-gray-900">{selectedOrder.paymentNumber}</span></div>}
-                      {selectedOrder.shippingFee && selectedOrder.shippingFee > 0 && <div className="flex justify-between"><span className="text-gray-600">Ongkir:</span><span className="font-medium text-gray-900">{formatRupiah(selectedOrder.shippingFee)}</span></div>}
-                      {selectedOrder.deliveryMethod === 'delivery' && <div className="flex justify-between"><span className="text-gray-600">Alamat Pengiriman:</span><span className="font-medium text-gray-900">{selectedOrder.shippingAddress || '-'}</span></div>}
-                      {selectedOrder.deliveryMethod === 'delivery' && <div className="flex justify-between"><span className="text-gray-600">Zona:</span><span className="font-medium text-gray-900">{selectedOrder.shippingZone || '-'}</span></div>}
-                      {selectedOrder.deliveryMethod === 'delivery' && <div className="flex justify-between"><span className="text-gray-600">Catatan Kurir:</span><span className="font-medium text-gray-900">{selectedOrder.shippingNotes || '-'}</span></div>}
-                      {selectedOrder.expiredAt && <div className="flex justify-between"><span className="text-gray-600">Batas Pembayaran:</span><span className="font-medium text-gray-900">{new Date(selectedOrder.expiredAt).toLocaleString('id-ID')}</span></div>}
+                    <div className="rounded-xl border border-green-200 bg-green-50/50 overflow-hidden text-sm">
+                      <div className="divide-y divide-green-200/60">
+                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 p-4">
+                          <span className="text-gray-600 whitespace-nowrap">Metode Pembayaran</span>
+                          <span className="font-medium text-gray-900 uppercase flex items-center gap-2 sm:text-right">
+                            <CreditCard className="h-4 w-4 text-gray-500" />
+                            {selectedOrder.paymentMethod ? selectedOrder.paymentMethod.replace('_va', ' Virtual Account') : '-'}
+                          </span>
+                        </div>
+
+                        {selectedOrder.paymentNumber && (
+                          <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-2 sm:gap-4 p-4 bg-green-100/40">
+                            <span className="text-gray-700 whitespace-nowrap font-medium">Nomor Pembayaran</span>
+                            <div className="font-mono text-sm sm:text-base font-bold text-green-800 bg-white px-3 py-1.5 rounded-md border border-green-300 shadow-sm break-all sm:text-right max-w-full">
+                              {selectedOrder.paymentNumber}
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedOrder.shippingFee !== null && selectedOrder.shippingFee > 0 && (
+                          <div className="flex justify-between gap-4 p-4">
+                            <span className="text-gray-600">Ongkir</span>
+                            <span className="font-medium text-gray-900 text-right">{formatRupiah(selectedOrder.shippingFee)}</span>
+                          </div>
+                        )}
+
+                        {selectedOrder.deliveryMethod === 'delivery' && (
+                          <>
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 p-4">
+                              <span className="text-gray-600 whitespace-nowrap">Alamat Pengiriman</span>
+                              <span className="font-medium text-gray-900 sm:text-right break-words">{selectedOrder.shippingAddress || '-'}</span>
+                            </div>
+                            <div className="flex justify-between gap-4 p-4">
+                              <span className="text-gray-600">Zona</span>
+                              <span className="font-medium text-gray-900 text-right">{selectedOrder.shippingZone || '-'}</span>
+                            </div>
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 p-4">
+                              <span className="text-gray-600 whitespace-nowrap">Catatan Kurir</span>
+                              <span className="font-medium text-gray-900 sm:text-right break-words">{selectedOrder.shippingNotes || '-'}</span>
+                            </div>
+                          </>
+                        )}
+
+                        {selectedOrder.expiredAt && (
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 p-4">
+                            <span className="text-gray-600 whitespace-nowrap">Batas Pembayaran</span>
+                            <span className="font-medium text-red-600 sm:text-right">{new Date(selectedOrder.expiredAt).toLocaleString('id-ID')}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -645,24 +709,44 @@ export default function ManajemenPesananPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-4 border-t">
-                  <Button className="flex-1 bg-gray-900 text-white" onClick={() => handlePrintOrder(selectedOrder)}><Printer className="h-4 w-4 mr-2" />Cetak Struk</Button>
+                  {( (isOfflineOrder(selectedOrder) && selectedOrder.status === 'pending') || (!isOfflineOrder(selectedOrder) && selectedOrder.status === 'paid') ) && (
+                    <Button 
+                      className="flex-1 bg-gray-900 text-white" 
+                      onClick={() => handlePrintOrder(selectedOrder)}
+                      disabled={actionLoading === 'print'}
+                    >
+                      {actionLoading === 'print' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Printer className="h-4 w-4 mr-2" />}
+                      {actionLoading === 'print' ? 'Mencetak...' : 'Cetak Struk'}
+                    </Button>
+                  )}
                   
-                  {['pending', 'expired', 'cancelled'].includes(selectedOrder.status) && (
+                  {['pending', 'expired', 'cancelled'].includes(selectedOrder.status) && !isOfflineOrder(selectedOrder) && (
                     <Button
                       className={`flex-1 bg-green-600 text-white ${['expired', 'cancelled'].includes(selectedOrder.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      disabled={['expired', 'cancelled'].includes(selectedOrder.status)}
+                      disabled={['expired', 'cancelled'].includes(selectedOrder.status) || actionLoading === 'paid'}
                       onClick={() => updateOrderStatus(selectedOrder.id, 'paid')}
                     >
+                      {actionLoading === 'paid' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       Set Sudah Dibayar
                     </Button>
                   )}
-                  {selectedOrder.status === 'paid' && !isOfflineOrder(selectedOrder) && <Button className="flex-1 bg-blue-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}>Set Diproses</Button>}
+                  {selectedOrder.status === 'paid' && !isOfflineOrder(selectedOrder) && selectedOrder.deliveryMethod !== 'delivery' && (
+                    <Button 
+                      className="flex-1 bg-blue-600 text-white" 
+                      onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}
+                      disabled={actionLoading === 'processing'}
+                    >
+                      {actionLoading === 'processing' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Set Diproses
+                    </Button>
+                  )}
                   {selectedOrder.status === 'processing' && selectedOrder.deliveryMethod === 'delivery' && (
                     <div className="w-full space-y-2">
                       <select
                         className="w-full h-10 rounded-md border border-gray-300 bg-white px-3 text-sm"
                         value={selectedCourierId}
                         onChange={(e) => setSelectedCourierId(e.target.value)}
+                        disabled={actionLoading === 'shipped'}
                       >
                         <option value="">Pilih kurir pengiriman</option>
                         {couriers.map((courier) => (
@@ -673,6 +757,7 @@ export default function ManajemenPesananPage() {
                       </select>
                       <Button
                         className="w-full bg-orange-600 text-white"
+                        disabled={actionLoading === 'shipped'}
                         onClick={() => {
                           const courierId = Number(selectedCourierId || selectedOrder.courierId || 0);
                           if (!courierId) {
@@ -682,16 +767,31 @@ export default function ManajemenPesananPage() {
                           updateOrderStatus(selectedOrder.id, 'shipped', courierId);
                         }}
                       >
+                        {actionLoading === 'shipped' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                         Set Dalam Pengiriman
                       </Button>
                     </div>
                   )}
                   {selectedOrder.status === 'processing' && selectedOrder.deliveryMethod !== 'delivery' && !isOfflineOrder(selectedOrder) && (
-                    <Button className="flex-1 bg-purple-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}>
+                    <Button 
+                      className="flex-1 bg-purple-600 text-white" 
+                      onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
+                      disabled={actionLoading === 'delivered'}
+                    >
+                      {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       Set Terkirim
                     </Button>
                   )}
-                  {selectedOrder.status === 'shipped' && !isOfflineOrder(selectedOrder) && <Button className="flex-1 bg-purple-600 text-white" onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}>Set Terkirim</Button>}
+                  {selectedOrder.status === 'shipped' && !isOfflineOrder(selectedOrder) && (
+                    <Button 
+                      className="flex-1 bg-purple-600 text-white" 
+                      onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
+                      disabled={actionLoading === 'delivered'}
+                    >
+                      {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Set Terkirim
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

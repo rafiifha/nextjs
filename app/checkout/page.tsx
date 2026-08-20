@@ -415,7 +415,14 @@ export default function CheckoutPage() {
                     <div className="flex items-center gap-3">
                       <Button variant="outline" size="sm" onClick={() => updateCartQuantity(item.productId, item.priceType, item.quantity - 1)}><Minus className="h-4 w-4" /></Button>
                       <span className="font-medium w-6 text-center">{item.quantity}</span>
-                      <Button variant="outline" size="sm" onClick={() => updateCartQuantity(item.productId, item.priceType, item.quantity + 1)}><Plus className="h-4 w-4" /></Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => updateCartQuantity(item.productId, item.priceType, item.quantity + 1)}
+                        disabled={item.product.variants && item.variantId ? item.quantity >= (item.product.variants.find((v: any) => v.id === item.variantId)?.stockOnline || 0) : false}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => removeFromCart(item.productId, item.priceType)} className="text-red-500"><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   </div>
@@ -532,7 +539,7 @@ export default function CheckoutPage() {
                     ))}
                   </select>
                   {deliveryMethod === 'delivery' && (
-                    <p className="mt-1 text-xs text-amber-700">Pesanan antar hanya menerima pembayaran non-tunai.</p>
+                    <p className="mt-1 text-xs text-amber-700">Pesanan antar hanya menerima pembayaran digital.</p>
                   )}
                 </div>
 

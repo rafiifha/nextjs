@@ -131,8 +131,11 @@ export class OrderController {
     } catch (error: any) {
       console.error('Create order error:', error);
       
-      // Menangani error validasi data masukan dari client
-      if (error.message === 'Data pelanggan dan items harus diisi' || error.message === 'Pesanan antar wajib menggunakan pembayaran non-tunai') {
+      if (
+        error.message === 'Data pelanggan dan items harus diisi' || 
+        error.message === 'Pesanan antar wajib menggunakan pembayaran non-tunai' ||
+        error.message === 'Pemesanan dengan pembayaran tunai tidak dapat dilakukan karena batas waktu bayar melewati jam tutup toko (18:00)'
+      ) {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
       

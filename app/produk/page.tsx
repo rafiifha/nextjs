@@ -113,6 +113,13 @@ export default function ProdukPage() {
       return;
     }
 
+    // Validasi stok
+    const currentQtyInCart = cart.find(item => item.productId === product.id && item.priceType === variant.priceType)?.quantity || 0;
+    if (currentQtyInCart >= (variant.stockOnline ?? 0)) {
+      toast.error('Stok Tidak Cukup', { description: 'Jumlah di keranjang sudah mencapai batas stok yang tersedia.' });
+      return;
+    }
+
     const key = `${product.id}-${variant.priceType}`;
     setAddingToCart({ ...addingToCart, [key]: true });
 
@@ -310,9 +317,12 @@ export default function ProdukPage() {
                     const selectedVariantId = selectedVariantByProduct[product.id];
                     const selectedVariant = availableVariants.find((v) => v.id === selectedVariantId) || availableVariants[0];
                     const key = selectedVariant ? `${product.id}-${selectedVariant.priceType}` : `${product.id}-none`;
-                    const inCart = selectedVariant ? isInCart(product.id, selectedVariant.priceType) : false;
+                    const currentCartItem = selectedVariant ? cart.find(item => item.productId === product.id && item.priceType === selectedVariant.priceType) : undefined;
+                    const qtyInCart = currentCartItem ? currentCartItem.quantity : 0;
+                    const stockLimit = selectedVariant?.stockOnline ?? 0;
+                    const inCart = qtyInCart > 0;
                     const isAdding = addingToCart[key];
-                    const disabledAdd = !selectedVariant || isAdding || !selectedVariant.price;
+                    const disabledAdd = !selectedVariant || isAdding || !selectedVariant.price || qtyInCart >= stockLimit;
 
                     return (
                       <div className="mb-4 space-y-2">
@@ -337,24 +347,26 @@ export default function ProdukPage() {
                             ))
                           )}
                         </select>
-                        <Button
-                          size="sm"
-                          variant={inCart ? 'default' : 'outline'}
-                          onClick={() => selectedVariant && handleAddToCart(product, selectedVariant)}
-                          disabled={disabledAdd}
-                          className="h-8 w-full text-xs"
-                        >
-                          {isAdding ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : inCart ? (
-                            <>
-                              <Check className="h-3 w-3 mr-1" />
-                              Di Keranjang
-                            </>
-                          ) : (
-                            '+ Tambah ke Keranjang'
-                          )}
-                        </Button>
+                        {user && (
+                          <Button
+                            size="sm"
+                            variant={inCart ? 'default' : 'outline'}
+                            onClick={() => selectedVariant && handleAddToCart(product, selectedVariant)}
+                            disabled={disabledAdd}
+                            className="h-8 w-full text-xs"
+                          >
+                            {isAdding ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : inCart ? (
+                              <>
+                                <Check className="h-3 w-3 mr-1" />
+                                Di Keranjang
+                              </>
+                            ) : (
+                              '+ Tambah ke Keranjang'
+                            )}
+                          </Button>
+                        )}
                       </div>
                     );
                   })()}
