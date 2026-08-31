@@ -233,9 +233,9 @@ export default function PengirimanPage() {
                 )}
 
                 {order.status === 'shipped' && (
-                  <Button onClick={() => updateStatus(order.id, 'delivered')} className="sm:w-fit">
-                    Tandai Terkirim
-                  </Button>
+                  <p className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
+                    Pesanan sedang dalam proses pengantaran oleh kurir. Status otomatis terkirim setelah kurir mengunggah foto bukti.
+                  </p>
                 )}
               </CardContent>
             </Card>

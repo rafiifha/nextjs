@@ -894,24 +894,19 @@ export default function ManajemenPesananPage() {
 
                   {/* Status: Shipped (Dalam Pengiriman) */}
                   {!isOfflineOrder(selectedOrder) && selectedOrder.deliveryMethod === 'delivery' && selectedOrder.status === 'shipped' && (
-                    <div className="w-full flex gap-2">
+                    <div className="w-full space-y-2">
+                      <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-900 flex items-center gap-2">
+                        <Truck className="h-4 w-4 text-orange-600 shrink-0" />
+                        <span>Pesanan sedang diantar oleh kurir (status otomatis selesai setelah kurir mengambil foto bukti).</span>
+                      </div>
                       <Button
                         variant="outline"
-                        size="sm"
-                        className="border-gray-300 text-gray-700"
+                        className="w-full border-gray-300 text-gray-700"
                         onClick={() => handlePrintOrder(selectedOrder)}
                         disabled={actionLoading === 'print'}
                       >
                         <Printer className="h-4 w-4 mr-1.5" />
                         Cetak Struk
-                      </Button>
-                      <Button 
-                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 shadow-sm" 
-                        onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
-                        disabled={actionLoading === 'delivered'}
-                      >
-                        {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Set Terkirim Manual
                       </Button>
                     </div>
                   )}

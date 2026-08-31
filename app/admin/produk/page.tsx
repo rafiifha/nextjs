@@ -30,6 +30,9 @@ interface Product {
   categoryId: number;
   category: Category;
   variants: ProductVariant[];
+  hasTransactions?: boolean;
+  transactionCount?: number;
+  salesCount?: number;
 }
 
 export default function ManajemenProdukPage() {
@@ -524,9 +527,16 @@ export default function ManajemenProdukPage() {
                       <CardTitle className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">
                         {product.name}
                       </CardTitle>
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                        <Box className="h-3 w-3" />
-                        {getCategoryName(product.categoryId)}
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                          <Box className="h-3 w-3" />
+                          {getCategoryName(product.categoryId)}
+                        </div>
+                        {product.hasTransactions && (
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-semibold">
+                            Ada Transaksi ({product.salesCount ?? 0} item)
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="ml-2 flex-shrink-0">
@@ -602,15 +612,17 @@ export default function ManajemenProdukPage() {
                       <Edit className="h-4 w-4 mr-1.5" />
                       Edit
                     </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDelete(product.id)}
-                      className="flex-1 hover:bg-red-600 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1.5" />
-                      Hapus
-                    </Button>
+                    {!product.hasTransactions && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(product.id)}
+                        className="flex-1 hover:bg-red-600 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1.5" />
+                        Hapus
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

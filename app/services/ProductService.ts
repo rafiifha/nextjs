@@ -20,18 +20,21 @@ export class ProductService {
         },
         items: {
           select: {
+            id: true,
             quantity: true, // Ambil qty penjualan untuk hitung penjualan terlaris
           },
         },
       },
     });
 
-    // 2. Memetakan salesCount (menghitung total item yang terjual) secara fungsional
+    // 2. Memetakan salesCount dan cek riwayat transaksi
     return products
       .map((p) => {
         const salesCount = p.items.reduce((sum, item) => sum + item.quantity, 0);
+        const hasTransactions = p.items.length > 0;
+        const transactionCount = p.items.length;
         const { items, ...rest } = p;
-        return { ...rest, salesCount };
+        return { ...rest, salesCount, hasTransactions, transactionCount };
       })
       .sort((a, b) => b.salesCount - a.salesCount); // Diurutkan dari yang paling laris (descending)
   }
@@ -60,6 +63,12 @@ export class ProductService {
           variants: {
             orderBy: { priceType: 'asc' },
           },
+          items: {
+            select: {
+              id: true,
+              quantity: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' }, // Produk terbaru tampil di depan
         skip: (page - 1) * limit, // Skip record untuk paginasi
@@ -68,8 +77,16 @@ export class ProductService {
       prisma.product.count({ where }), // Hitung total record untuk kalkulasi total halaman
     ]);
 
+    const mappedData = products.map((p) => {
+      const salesCount = p.items.reduce((sum, item) => sum + item.quantity, 0);
+      const hasTransactions = p.items.length > 0;
+      const transactionCount = p.items.length;
+      const { items, ...rest } = p;
+      return { ...rest, salesCount, hasTransactions, transactionCount };
+    });
+
     return {
-      data: products,
+      data: mappedData,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -207,13 +224,24 @@ export class ProductService {
   async deleteProduct(id: number) {
     const product = await prisma.product.findUnique({
       where: { id },
+      include: {
+        items: { select: { id: true } },
+      },
     });
 
     if (!product) {
       throw new Error('Produk tidak ditemukan');
     }
 
-    // Menghapus produk (varian produk akan otomatis terhapus jika diatur Cascade Delete di schema)
+    if (product.items && product.items.length > 0) {
+      throw new Error('Produk tidak dapat dihapus karena sudah memiliki riwayat transaksi/pesanan.');
+    }
+
+    // Menghapus produk (varian produk akan otomatis terhapus)
+    await prisma.productVariant.deleteMany({
+      where: { productId: id },
+    });
+
     await prisma.product.delete({
       where: { id },
     });
