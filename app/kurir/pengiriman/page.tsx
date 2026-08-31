@@ -118,9 +118,10 @@ export default function KurirPengirimanPage() {
     setUpdatingId(orderId);
 
     try {
-      // 1. Upload foto bukti ke server (/api/upload)
+      // 1. Upload foto bukti ke server (/api/upload -> Vercel Blob)
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
+      uploadFormData.append('folder', 'proof-of-delivery');
 
       const uploadRes = await fetch('/api/upload', {
         method: 'POST',

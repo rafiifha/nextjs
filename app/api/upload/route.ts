@@ -3,21 +3,27 @@ import { put } from '@vercel/blob';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 
+/**
+ * API Upload Handler (Vercel Blob Storage).
+ * Menyimpan file foto bukti pengiriman dan gambar produk ke Vercel Blob.
+ * Dilengkapi fallback penyimpanan lokal saat pengembangan di local environment.
+ */
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
+    const folder = (formData.get('folder') as string) || 'proof-of-delivery';
 
     if (!file) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 });
     }
 
-    // Validate type
+    // Validasi format file gambar
     if (!file.type.startsWith('image/')) {
       return NextResponse.json({ error: 'File harus berupa gambar' }, { status: 400 });
     }
 
-    // Validate size (max 5MB)
+    // Validasi ukuran maksimal (5MB)
     const MAX_SIZE = 5 * 1024 * 1024; // 5MB
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
@@ -26,36 +32,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate unique filename
+    // Generate path nama file yang unik
     const ext = file.name.split('.').pop() || 'jpg';
-    const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const cleanFilename = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const blobPath = `${folder}/${cleanFilename}`;
 
-    // Try Vercel Blob first if token is configured
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    // 1. Prioritas Utama: Simpan ke Vercel Blob Storage
+    if (process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL) {
       try {
-        const blob = await put(filename, file, {
+        const blob = await put(blobPath, file, {
           access: 'public',
+          contentType: file.type || 'image/jpeg',
         });
-        console.log(`📁 File uploaded to Blob: ${blob.url}`);
+        console.log(`📁 Foto tersimpan di Vercel Blob: ${blob.url}`);
         return NextResponse.json({ url: blob.url });
-      } catch (blobErr) {
-        console.warn('Vercel Blob upload failed, falling back to local storage:', blobErr);
+      } catch (blobErr: any) {
+        console.error('Gagal upload ke Vercel Blob:', blobErr);
+        if (!process.env.BLOB_READ_WRITE_TOKEN) {
+          console.warn(
+            'Peringatan: BLOB_READ_WRITE_TOKEN belum diset di Environment Variables Vercel.'
+          );
+        }
       }
     }
 
-    // Fallback: Save file to local public/uploads directory
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    
-    await mkdir(uploadsDir, { recursive: true });
-    const filePath = path.join(uploadsDir, filename);
-    await writeFile(filePath, buffer);
+    // 2. Fallback Lokal (untuk pengujian dev offline tanpa token blob)
+    try {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads', folder);
 
-    const localUrl = `/uploads/${filename}`;
-    console.log(`📁 File saved locally: ${localUrl}`);
+      await mkdir(uploadsDir, { recursive: true });
+      const filePath = path.join(uploadsDir, cleanFilename);
+      await writeFile(filePath, buffer);
 
-    return NextResponse.json({ url: localUrl });
+      const localUrl = `/uploads/${folder}/${cleanFilename}`;
+      console.log(`📁 Foto tersimpan di Local Storage: ${localUrl}`);
+
+      return NextResponse.json({ url: localUrl });
+    } catch (localErr: any) {
+      throw new Error(
+        'Penyimpanan lokal gagal. Pastikan Environment Variable BLOB_READ_WRITE_TOKEN sudah dikonfigurasi di dashboard Vercel.'
+      );
+    }
   } catch (error: any) {
     console.error('Upload API error:', error);
     return NextResponse.json(
