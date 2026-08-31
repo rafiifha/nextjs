@@ -23,6 +23,12 @@ interface OrderItem {
   } | null;
 }
 
+interface Courier {
+  id: number;
+  name: string;
+  phone: string | null;
+}
+
 interface Order {
   id: number;
   customerName: string;
@@ -41,15 +47,11 @@ interface Order {
   shippingZone?: number | null;
   shippingNotes?: string | null;
   courierId?: number | null;
+  courier?: Courier | null;
+  proofOfDelivery?: string | null;
   createdAt: string;
   updatedAt: string;
   items: OrderItem[];
-}
-
-interface Courier {
-  id: number;
-  name: string;
-  phone: string;
 }
 
 export default function ManajemenPesananPage() {
@@ -171,6 +173,39 @@ export default function ManajemenPesananPage() {
       }
     } catch (error: any) {
       toast.error('Gagal update status', { description: error.message || 'Gagal mengupdate status pesanan' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Menugaskan / mengubah kurir pesanan tanpa mengubah status
+  const assignCourier = async (orderId: number, courierId: number) => {
+    if (!courierId) {
+      toast.warning('Pilih kurir terlebih dahulu');
+      return;
+    }
+    setActionLoading('assign-courier');
+    try {
+      const res = await fetch(`/api/pesanan/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courierId }),
+      });
+      if (res.ok) {
+        toast.success('Kurir berhasil ditugaskan');
+        await fetchOrders();
+        if (selectedOrder && selectedOrder.id === orderId) {
+          const matchedCourier = couriers.find((c) => c.id === courierId);
+          setSelectedOrder((prev) =>
+            prev ? { ...prev, courierId, courier: matchedCourier ? { id: matchedCourier.id, name: matchedCourier.name, phone: matchedCourier.phone } : null } : null
+          );
+        }
+      } else {
+        const err = await res.json();
+        throw new Error(err.error || 'Gagal menugaskan kurir');
+      }
+    } catch (error: any) {
+      toast.error('Gagal', { description: error.message });
     } finally {
       setActionLoading(null);
     }
@@ -349,33 +384,63 @@ export default function ManajemenPesananPage() {
       </html>
     `;
 
-    // Print via hidden iframe
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    iframe.style.overflow = 'hidden';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow?.document;
-    if (iframeDoc) {
-        iframeDoc.open();
-        iframeDoc.write(html);
-        iframeDoc.close();
-
+    try {
+      const printWindow = window.open('', '_blank', 'width=400,height=600');
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
         setTimeout(() => {
-          iframe.contentWindow?.print();
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-            setActionLoading(null);
-          }, 1000);
-        }, 300);
+          try {
+            printWindow.print();
+            printWindow.close();
+          } catch (e) {
+            console.error('Print error:', e);
+          }
+          setActionLoading(null);
+        }, 250);
       } else {
-        setActionLoading(null);
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        iframe.style.overflow = 'hidden';
+        document.body.appendChild(iframe);
+
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (iframeDoc) {
+          iframeDoc.open();
+          iframeDoc.write(html);
+          iframeDoc.close();
+
+          setTimeout(() => {
+            try {
+              iframe.contentWindow?.focus();
+              iframe.contentWindow?.print();
+            } catch (e) {
+              console.error('Iframe print error:', e);
+            }
+            setTimeout(() => {
+              if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+              }
+              setActionLoading(null);
+            }, 1000);
+          }, 300);
+        } else {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+          setActionLoading(null);
+        }
       }
+    } catch (err) {
+      console.error('Printing failed:', err);
+      setActionLoading(null);
+    }
   };
 
   const handleSearchChange = (value: string) => {
@@ -556,7 +621,7 @@ export default function ManajemenPesananPage() {
                     <h2 className="text-2xl font-bold text-gray-900">Detail Pesanan</h2>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <p className="text-sm text-gray-600">Pesanan #{selectedOrder.id}</p>
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusPill(selectedOrder.status)}`}>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusColor(selectedOrder.status)}`}>
                         {getStatusIndonesian(selectedOrder.status)}
                       </span>
                       {isOfflineOrder(selectedOrder) && (
@@ -634,12 +699,36 @@ export default function ManajemenPesananPage() {
                             </div>
                             <div className="flex justify-between gap-4 p-4">
                               <span className="text-gray-600">Zona</span>
-                              <span className="font-medium text-gray-900 text-right">{selectedOrder.shippingZone || '-'}</span>
+                              <span className="font-medium text-gray-900 text-right">{selectedOrder.shippingZone ? `Zona ${selectedOrder.shippingZone}` : '-'}</span>
                             </div>
-                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 p-4">
-                              <span className="text-gray-600 whitespace-nowrap">Catatan Kurir</span>
-                              <span className="font-medium text-gray-900 sm:text-right break-words">{selectedOrder.shippingNotes || '-'}</span>
+                            {selectedOrder.shippingNotes && (
+                              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 p-4">
+                                <span className="text-gray-600 whitespace-nowrap">Catatan Kurir</span>
+                                <span className="font-medium text-gray-900 sm:text-right break-words">{selectedOrder.shippingNotes}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between gap-4 p-4">
+                              <span className="text-gray-600">Kurir Ditugaskan</span>
+                              <span className="font-semibold text-gray-900 text-right">
+                                {selectedOrder.courier ? `${selectedOrder.courier.name} (${selectedOrder.courier.phone || '-'})` : 'Belum Ditugaskan'}
+                              </span>
                             </div>
+
+                            {selectedOrder.proofOfDelivery && (
+                              <div className="flex flex-col gap-2 p-4 bg-green-50/60">
+                                <span className="text-sm font-semibold text-green-800 flex items-center gap-1.5">
+                                  Bukti Foto Pengiriman Kurir
+                                </span>
+                                <div className="relative h-44 w-full max-w-sm overflow-hidden rounded-lg border border-green-200">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={selectedOrder.proofOfDelivery}
+                                    alt="Bukti Pengiriman"
+                                    className="h-full w-full object-cover"
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </>
                         )}
 
@@ -709,6 +798,7 @@ export default function ManajemenPesananPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-4 border-t">
+                  {/* Cetak Struk */}
                   {( (isOfflineOrder(selectedOrder) && selectedOrder.status === 'pending') || (!isOfflineOrder(selectedOrder) && selectedOrder.status === 'paid') ) && (
                     <Button 
                       className="flex-1 bg-gray-900 text-white" 
@@ -720,6 +810,7 @@ export default function ManajemenPesananPage() {
                     </Button>
                   )}
                   
+                  {/* Set Sudah Dibayar untuk pesanan pending */}
                   {['pending', 'expired', 'cancelled'].includes(selectedOrder.status) && !isOfflineOrder(selectedOrder) && (
                     <Button
                       className={`flex-1 bg-green-600 text-white ${['expired', 'cancelled'].includes(selectedOrder.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -730,67 +821,74 @@ export default function ManajemenPesananPage() {
                       Set Sudah Dibayar
                     </Button>
                   )}
-                  {selectedOrder.status === 'paid' && !isOfflineOrder(selectedOrder) && selectedOrder.deliveryMethod !== 'delivery' && (
-                    <Button 
-                      className="flex-1 bg-blue-600 text-white" 
-                      onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}
-                      disabled={actionLoading === 'processing'}
-                    >
-                      {actionLoading === 'processing' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Set Diproses
-                    </Button>
+
+                  {/* Pesanan Ambil di Toko (Pickup) */}
+                  {!isOfflineOrder(selectedOrder) && selectedOrder.deliveryMethod !== 'delivery' && (
+                    <>
+                      {selectedOrder.status === 'paid' && (
+                        <Button 
+                          className="flex-1 bg-purple-600 text-white font-medium" 
+                          onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
+                          disabled={actionLoading === 'delivered'}
+                        >
+                          {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Set Selesai / Diambil
+                        </Button>
+                      )}
+                    </>
                   )}
-                  {selectedOrder.status === 'processing' && selectedOrder.deliveryMethod === 'delivery' && (
-                    <div className="w-full space-y-2">
-                      <select
-                        className="w-full h-10 rounded-md border border-gray-300 bg-white px-3 text-sm"
-                        value={selectedCourierId}
-                        onChange={(e) => setSelectedCourierId(e.target.value)}
-                        disabled={actionLoading === 'shipped'}
-                      >
-                        <option value="">Pilih kurir pengiriman</option>
-                        {couriers.map((courier) => (
-                          <option key={courier.id} value={courier.id}>
-                            {courier.name} - {courier.phone}
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        className="w-full bg-orange-600 text-white"
-                        disabled={actionLoading === 'shipped'}
-                        onClick={() => {
-                          const courierId = Number(selectedCourierId || selectedOrder.courierId || 0);
-                          if (!courierId) {
-                            toast.warning('Kurir belum dipilih', { description: 'Pilih kurir sebelum ubah status pengiriman.' });
-                            return;
-                          }
-                          updateOrderStatus(selectedOrder.id, 'shipped', courierId);
-                        }}
-                      >
-                        {actionLoading === 'shipped' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Set Dalam Pengiriman
-                      </Button>
+
+                  {/* Pesanan Antar Kurir (Delivery) */}
+                  {!isOfflineOrder(selectedOrder) && selectedOrder.deliveryMethod === 'delivery' && (
+                    <div className="w-full space-y-3">
+                      {selectedOrder.status === 'paid' && (
+                        <div className="w-full space-y-2">
+                          <label className="block text-xs font-semibold text-gray-700">Tugaskan Kurir Pengiriman:</label>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <select
+                              className="flex-1 h-10 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium focus:ring-2 focus:ring-orange-400"
+                              value={selectedCourierId}
+                              onChange={(e) => setSelectedCourierId(e.target.value)}
+                              disabled={actionLoading === 'shipped'}
+                            >
+                              <option value="">-- Pilih Kurir Pengiriman --</option>
+                              {couriers.map((courier) => (
+                                <option key={courier.id} value={courier.id}>
+                                  {courier.name} {courier.phone ? `(${courier.phone})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                            <Button
+                              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold whitespace-nowrap shadow-sm"
+                              disabled={actionLoading === 'shipped'}
+                              onClick={() => {
+                                const courierId = Number(selectedCourierId || selectedOrder.courierId || 0);
+                                if (!courierId) {
+                                  toast.warning('Kurir belum dipilih', { description: 'Pilih kurir sebelum kirim pesanan.' });
+                                  return;
+                                }
+                                updateOrderStatus(selectedOrder.id, 'shipped', courierId);
+                              }}
+                            >
+                              {actionLoading === 'shipped' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              <Truck className="h-4 w-4 mr-2" />
+                              Kirim Pesanan (Set Dalam Pengiriman)
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedOrder.status === 'shipped' && (
+                        <Button 
+                          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 shadow-sm" 
+                          onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
+                          disabled={actionLoading === 'delivered'}
+                        >
+                          {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Set Terkirim
+                        </Button>
+                      )}
                     </div>
-                  )}
-                  {selectedOrder.status === 'processing' && selectedOrder.deliveryMethod !== 'delivery' && !isOfflineOrder(selectedOrder) && (
-                    <Button 
-                      className="flex-1 bg-purple-600 text-white" 
-                      onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
-                      disabled={actionLoading === 'delivered'}
-                    >
-                      {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Set Terkirim
-                    </Button>
-                  )}
-                  {selectedOrder.status === 'shipped' && !isOfflineOrder(selectedOrder) && (
-                    <Button 
-                      className="flex-1 bg-purple-600 text-white" 
-                      onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
-                      disabled={actionLoading === 'delivered'}
-                    >
-                      {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Set Terkirim
-                    </Button>
                   )}
                 </div>
               </div>

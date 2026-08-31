@@ -24,7 +24,9 @@ export class DeliveryService {
         },
       },
       include: {
-        courier: true, // Sertakan info kurir yang ditugaskan
+        courier: {
+          select: { id: true, name: true, phone: true, isActive: true },
+        }, // Sertakan info kurir yang ditugaskan (tanpa password)
         items: {
           include: { product: true },
         },
@@ -105,29 +107,50 @@ export class DeliveryService {
   }
 
   /**
-   * Mengambil daftar kurir yang terdaftar di sistem.
+   * Mengambil daftar kurir yang terdaftar di sistem (dari tabel User, role 'kurir').
    * @param includeAll Jika true, tampilkan semua kurir. Jika false, hanya tampilkan yang berstatus aktif.
    */
   async getCouriers(includeAll: boolean = false) {
-    return await prisma.courier.findMany({
-      where: includeAll ? {} : { isActive: true },
+    const where: any = { role: 'kurir' };
+    if (!includeAll) {
+      where.isActive = true;
+    }
+
+    return await prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        isActive: true,
+        createdAt: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   /**
-   * Mendaftarkan kurir baru ke database.
+   * Mengambil daftar pesanan yang ditugaskan ke kurir tertentu.
    */
-  async createCourier(data: any) {
-    const name = String(data?.name || '').trim();
-    const phone = String(data?.phone || '').trim();
-
-    if (!name || !phone) {
-      throw new Error('Nama dan nomor whatsapp wajib diisi');
-    }
-
-    return await prisma.courier.create({
-      data: { name, phone },
+  async getCourierOrders(courierId: number) {
+    return await prisma.order.findMany({
+      where: {
+        courierId,
+        deliveryMethod: 'delivery',
+        status: {
+          in: ['paid', 'processing', 'shipped', 'delivered'],
+        },
+      },
+      include: {
+        courier: {
+          select: { id: true, name: true, phone: true },
+        },
+        items: {
+          include: { product: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 }
+

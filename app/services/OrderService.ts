@@ -144,6 +144,7 @@ export class OrderService {
           courierId: order.courierId ?? null,
           shippedAt: order.shippedAt ? order.shippedAt.toISOString() : null,
           deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
+          proofOfDelivery: (order as any).proofOfDelivery ?? null,
           paymentMethod: order.paymentMethod ?? null,
           paymentNumber: order.paymentNumber ?? null,
           paymentFee: order.paymentFee ?? null,
@@ -217,6 +218,9 @@ export class OrderService {
       prisma.order.findMany({
         where,
         include: {
+          courier: {
+            select: { id: true, name: true, phone: true },
+          },
           items: {
             include: {
               product: {
@@ -255,8 +259,14 @@ export class OrderService {
           shippingZone: order.shippingZone ?? null,
           shippingNotes: order.shippingNotes ?? null,
           courierId: order.courierId ?? null,
+          courier: order.courier ? {
+            id: order.courier.id,
+            name: order.courier.name,
+            phone: order.courier.phone ?? null,
+          } : null,
           shippedAt: order.shippedAt ? order.shippedAt.toISOString() : null,
           deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
+          proofOfDelivery: (order as any).proofOfDelivery ?? null,
           paymentMethod: order.paymentMethod ?? null,
           paymentNumber: order.paymentNumber ?? null,
           paymentFee: order.paymentFee ?? null,
@@ -375,12 +385,15 @@ export class OrderService {
     // 3. Validasi Stok Online: memastikan stok online mencukupi untuk setiap produk yang dipesan
     const stockErrors: string[] = [];
     for (const item of items) {
-      const product = products.find(p => p.id === item.productId);
-      if (!product) continue;
+      const product = products.find(p => p.id === Number(item.productId));
+      if (!product) {
+        stockErrors.push(`Produk tidak ditemukan`);
+        continue;
+      }
 
       let variant;
       if (item.variantId) {
-        variant = product.variants.find((v: any) => v.id === parseInt(item.variantId));
+        variant = product.variants.find((v: any) => v.id === Number(item.variantId));
       } else if (item.priceType) {
         variant = product.variants.find((v: any) => v.priceType === item.priceType);
       }
@@ -391,7 +404,7 @@ export class OrderService {
       }
 
       const availableStock = variant.stockOnline ?? 0;
-      if (availableStock < item.quantity) {
+      if (availableStock < Number(item.quantity)) {
         stockErrors.push(`${product.name} (${variant.priceType}): stok tersedia ${availableStock}, diminta ${item.quantity}`);
       }
     }
@@ -403,7 +416,7 @@ export class OrderService {
     }
 
     // 4. Menghitung total harga (harga item + ongkir)
-    const totalHarga = items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) + (shippingFee || 0);
+    const totalHarga = items.reduce((sum: number, item: any) => sum + Number(item.price) * Number(item.quantity), 0) + (Number(shippingFee) || 0);
 
     // 5. Menetapkan batas waktu pembayaran (Expired Time)
     // Tunai diberikan waktu 1 jam (karena harus ke kasir/COD), non-tunai (digital) diberikan waktu 15 menit
@@ -427,10 +440,10 @@ export class OrderService {
       data: {
         customerName,
         customerPhone,
-        userId: userId || null,
+        userId: userId ? Number(userId) : null,
         totalHarga,
         deliveryMethod: deliveryMethod || null,
-        shippingFee: shippingFee || null,
+        shippingFee: shippingFee ? Number(shippingFee) : null,
         shippingAddress: shippingAddress || null,
         shippingLat: typeof shippingLat === 'number' ? shippingLat : null,
         shippingLng: typeof shippingLng === 'number' ? shippingLng : null,
@@ -441,17 +454,21 @@ export class OrderService {
         expiredAt,
         items: {
           create: items.map((item: any) => {
-            const product = products.find(p => p.id === item.productId);
+            const product = products.find(p => p.id === Number(item.productId));
             const variant = item.variantId 
-              ? product?.variants.find((v: any) => v.id === item.variantId)
+              ? product?.variants.find((v: any) => v.id === Number(item.variantId))
               : product?.variants.find((v: any) => v.priceType === item.priceType);
 
+            if (!product || !variant) {
+              throw new Error(`Produk atau varian tidak valid: ${item.productId}`);
+            }
+
             return {
-              productId: item.productId,
-              variantId: variant!.id,
-              priceType: variant!.priceType,
-              quantity: item.quantity,
-              price: item.price,
+              productId: Number(item.productId),
+              variantId: variant.id,
+              priceType: variant.priceType,
+              quantity: Number(item.quantity),
+              price: Number(item.price),
             };
           }),
         },
@@ -625,11 +642,11 @@ export class OrderService {
         throw new Error('Kurir wajib dipilih sebelum kirim pesanan');
       }
 
-      const courier = await prisma.courier.findUnique({
+      const courier = await prisma.user.findUnique({
         where: { id: Number(courierId) },
       });
 
-      if (!courier || !courier.isActive) {
+      if (!courier || courier.role !== 'kurir' || !courier.isActive) {
         throw new Error('Kurir tidak valid atau tidak aktif');
       }
 
@@ -647,7 +664,9 @@ export class OrderService {
       where: { id },
       data: updateData,
       include: {
-        courier: true,
+        courier: {
+          select: { id: true, name: true, phone: true, isActive: true },
+        },
         items: {
           include: { product: true },
         },
@@ -664,19 +683,21 @@ export class OrderService {
     // 7. Mengirimkan notifikasi WhatsApp secara asinkron setelah barang dikirim (shipped)
     if (status === 'shipped' && order.courier) {
       // 7a. Mengirimkan rincian tugas pengiriman ke WhatsApp Kurir
-      sendCourierDeliveryNotification(order.courier.phone, {
-        orderId: order.id,
-        customerName: order.customerName,
-        customerPhone: order.customerPhone,
-        shippingAddress: order.shippingAddress || '-',
-        shippingNotes: order.shippingNotes || '-',
-        items: order.items.map((item) => ({
-          name: item.product.name,
-          quantity: item.quantity,
-        })),
-      }).catch((waError) => {
-        console.error('Courier WhatsApp error:', waError);
-      });
+      if (order.courier.phone) {
+        sendCourierDeliveryNotification(order.courier.phone, {
+          orderId: order.id,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          shippingAddress: order.shippingAddress || '-',
+          shippingNotes: order.shippingNotes || '-',
+          items: order.items.map((item) => ({
+            name: item.product.name,
+            quantity: item.quantity,
+          })),
+        }).catch((waError) => {
+          console.error('Courier WhatsApp error:', waError);
+        });
+      }
 
       // 7b. Mengirimkan info bahwa barang sedang jalan ke WhatsApp Pelanggan
       sendCustomerShippingNotification(order.customerPhone, {
@@ -684,7 +705,7 @@ export class OrderService {
         customerName: order.customerName,
         shippingAddress: order.shippingAddress || '-',
         courierName: order.courier.name,
-        courierPhone: order.courier.phone,
+        courierPhone: order.courier.phone || '-',
       }).catch((waError) => {
         console.error('Customer WhatsApp shipped error:', waError);
       });

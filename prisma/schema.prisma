@@ -39,16 +39,6 @@ model ProductVariant {
   items       OrderItem[] @relation("VariantOrderItems")
 }
 
-model Courier {
-  id        Int      @id @default(autoincrement())
-  name      String
-  phone     String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  orders    Order[]  @relation("CourierOrders")
-}
-
 model Order {
   id            Int         @id @default(autoincrement())
   customerName  String
@@ -70,10 +60,11 @@ model Order {
   shippingZone     Int?      // Zona (1, 2, 3)
 
   shippingNotes    String?   // Catatan untuk kurir
-  courierId        Int?      // FK ke Courier
-  courier          Courier?  @relation("CourierOrders", fields: [courierId], references: [id])
+  courierId        Int?      // FK ke User dengan role 'kurir'
+  courier          User?     @relation("CourierOrders", fields: [courierId], references: [id])
   shippedAt        DateTime? // Waktu mulai dikirim
   deliveredAt      DateTime? // Waktu sampai
+  proofOfDelivery  String?   // URL foto bukti pengiriman dari kurir
   paymentMethod String?     // e.g., 'qris', 'bca_va'
   paymentNumber String?     // VA number or QRIS string
   paymentFee    Int?        // Admin fee from Pakasir
@@ -102,9 +93,11 @@ model User {
   email            String?           @unique
   phone            String?           @unique
   password         String
-  role             String            @default("admin")
+  role             String            @default("admin") // admin, kasir, kurir, customer
+  isActive         Boolean           @default(true)
   createdAt        DateTime          @default(now())
   orders           Order[]
+  courierOrders    Order[]           @relation("CourierOrders")
   otpVerifications OtpVerification[]
 }
 

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,15 +30,32 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split('.').pop() || 'jpg';
     const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
 
-    // Upload to Vercel Blob Storage
-    const blob = await put(filename, file, {
-      access: 'public',
-    });
+    // Try Vercel Blob first if token is configured
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      try {
+        const blob = await put(filename, file, {
+          access: 'public',
+        });
+        console.log(`📁 File uploaded to Blob: ${blob.url}`);
+        return NextResponse.json({ url: blob.url });
+      } catch (blobErr) {
+        console.warn('Vercel Blob upload failed, falling back to local storage:', blobErr);
+      }
+    }
 
-    console.log(`📁 File uploaded to Blob: ${blob.url}`);
+    // Fallback: Save file to local public/uploads directory
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    
+    await mkdir(uploadsDir, { recursive: true });
+    const filePath = path.join(uploadsDir, filename);
+    await writeFile(filePath, buffer);
 
-    // Return the public Blob URL
-    return NextResponse.json({ url: blob.url });
+    const localUrl = `/uploads/${filename}`;
+    console.log(`📁 File saved locally: ${localUrl}`);
+
+    return NextResponse.json({ url: localUrl });
   } catch (error: any) {
     console.error('Upload API error:', error);
     return NextResponse.json(

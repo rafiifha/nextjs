@@ -23,18 +23,18 @@ interface Courier {
 
 /**
  * Halaman Manajemen Pegawai.
- * Mengelola akun kasir (tambah, hapus, reset password) dan kurir (tambah, aktifkan/nonaktifkan).
+ * Mengelola akun kasir (tambah, hapus, reset password) dan kurir (tambah, aktifkan/nonaktifkan, reset password).
  */
 export default function PegawaiPage() {
   const [activeTab, setActiveTab] = useState<'kasir' | 'kurir'>('kasir');
   const [cashiers, setCashiers] = useState<Employee[]>([]);
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [cashierForm, setCashierForm] = useState({ name: '', phone: '', password: '' });
-  const [courierForm, setCourierForm] = useState({ name: '', phone: '' });
+  const [courierForm, setCourierForm] = useState({ name: '', phone: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [resetModalOpen, setResetModalOpen] = useState(false);
-  const [resetTarget, setResetTarget] = useState<Employee | null>(null);
+  const [resetTarget, setResetTarget] = useState<{ id: number; name: string; role: 'kasir' | 'kurir' } | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -108,14 +108,14 @@ export default function PegawaiPage() {
     }
   };
 
-  // Membuka modal reset password kasir
-  const openResetPasswordModal = (cashier: Employee) => {
-    setResetTarget(cashier);
+  // Membuka modal reset password (kasir atau kurir)
+  const openResetPasswordModal = (target: { id: number; name: string; role: 'kasir' | 'kurir' }) => {
+    setResetTarget(target);
     setNewPassword('');
     setResetModalOpen(true);
   };
 
-  // Mereset password kasir melalui API
+  // Mereset password kasir/kurir melalui API
   const resetPassword = async () => {
     const token = getToken();
     if (!token || !resetTarget) return;
@@ -129,7 +129,7 @@ export default function PegawaiPage() {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ userId: resetTarget.id, newPassword }),
+        body: JSON.stringify({ userId: resetTarget.id, newPassword, role: resetTarget.role }),
       });
 
       if (!res.ok) {
@@ -139,13 +139,14 @@ export default function PegawaiPage() {
       setResetModalOpen(false);
       setResetTarget(null);
       setNewPassword('');
-      toast.success('Password direset', { description: 'Password kasir berhasil diperbarui.' });
+      const label = resetTarget.role === 'kurir' ? 'kurir' : 'kasir';
+      toast.success('Password direset', { description: `Password ${label} berhasil diperbarui.` });
     } finally {
       setResetLoading(false);
     }
   };
 
-  // Menambahkan kurir baru melalui API
+  // Menambahkan kurir baru melalui API (sekarang dengan password)
   const createCourier = async () => {
     setLoading(true);
     try {
@@ -155,9 +156,9 @@ export default function PegawaiPage() {
         body: JSON.stringify(courierForm),
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Gagal tambah kurir');
-      setCourierForm({ name: '', phone: '' });
+      setCourierForm({ name: '', phone: '', password: '' });
       await fetchData();
-      toast.success('Kurir ditambahkan', { description: 'Kurir baru berhasil masuk daftar.' });
+      toast.success('Kurir ditambahkan', { description: 'Akun kurir baru berhasil dibuat. Kurir bisa login.' });
     } catch (error: any) {
       toast.error('Gagal tambah kurir', { description: error.message });
     } finally {
@@ -212,7 +213,7 @@ export default function PegawaiPage() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Kelola Pegawai</h1>
-        <p className="text-sm text-gray-600">Manajemen akun kasir dan data kurir pengiriman.</p>
+        <p className="text-sm text-gray-600">Manajemen akun kasir dan kurir pengiriman.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -262,7 +263,7 @@ export default function PegawaiPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openResetPasswordModal(cashier)}>
+                      <Button variant="outline" size="sm" onClick={() => openResetPasswordModal({ id: cashier.id, name: cashier.name, role: 'kasir' })}>
                         <KeyRound className="mr-1 h-4 w-4" />
                         Reset Password
                       </Button>
@@ -298,7 +299,7 @@ export default function PegawaiPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 md:grid-cols-2">
+            <div className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 md:grid-cols-3">
               <div>
                 <Label>Nama</Label>
                 <Input value={courierForm.name} onChange={(e) => setCourierForm((p) => ({ ...p, name: e.target.value }))} />
@@ -306,6 +307,10 @@ export default function PegawaiPage() {
               <div>
                 <Label>No. HP</Label>
                 <Input value={courierForm.phone} onChange={(e) => setCourierForm((p) => ({ ...p, phone: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Password</Label>
+                <Input type="password" value={courierForm.password} onChange={(e) => setCourierForm((p) => ({ ...p, password: e.target.value }))} />
               </div>
             </div>
             <Button disabled={loading} onClick={createCourier}>Tambah Kurir</Button>
@@ -336,15 +341,21 @@ export default function PegawaiPage() {
                         {courier.phone}
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                      onClick={() => toggleCourierStatus(courier.id, false)}
-                    >
-                      <XCircle className="mr-1 h-4 w-4" />
-                      Nonaktifkan
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openResetPasswordModal({ id: courier.id, name: courier.name, role: 'kurir' })}>
+                        <KeyRound className="mr-1 h-4 w-4" />
+                        Reset Password
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => toggleCourierStatus(courier.id, false)}
+                      >
+                        <XCircle className="mr-1 h-4 w-4" />
+                        Nonaktifkan
+                      </Button>
+                    </div>
                   </div>
                 ))}
                 {activeCouriers.length === 0 && <p className="text-sm text-gray-500">Belum ada kurir aktif.</p>}
@@ -386,9 +397,11 @@ export default function PegawaiPage() {
       {resetModalOpen && resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-lg">
-            <h3 className="text-lg font-semibold text-gray-900">Reset Password Kasir</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Reset Password {resetTarget.role === 'kurir' ? 'Kurir' : 'Kasir'}
+            </h3>
             <p className="mt-1 text-sm text-gray-600">
-              Kasir: <span className="font-medium text-gray-900">{resetTarget.name}</span>
+              {resetTarget.role === 'kurir' ? 'Kurir' : 'Kasir'}: <span className="font-medium text-gray-900">{resetTarget.name}</span>
             </p>
             <div className="mt-4 space-y-2">
               <Label>Password Baru</Label>

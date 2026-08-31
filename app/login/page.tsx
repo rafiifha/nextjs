@@ -49,6 +49,8 @@ export default function LoginPage() {
           router.push('/admin/dashboard');
         } else if (user.role === 'kasir') {
           router.push('/admin/kasir');
+        } else if (user.role === 'kurir') {
+          router.push('/kurir/pengiriman');
         } else {
           router.push('/produk');
         }
@@ -110,6 +112,8 @@ export default function LoginPage() {
         router.push('/admin/dashboard');
       } else if (data.user.role === 'kasir') {
         router.push('/admin/kasir');
+      } else if (data.user.role === 'kurir') {
+        router.push('/kurir/pengiriman');
       } else {
         router.push(redirectUrl !== '/' ? redirectUrl : '/produk');
       }

@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db';
 import * as bcrypt from 'bcryptjs';
 
 /**
- * Service untuk memproses logika bisnis terkait profil pengguna (User) dan pegawai (kasir).
+ * Service untuk memproses logika bisnis terkait profil pengguna (User) dan pegawai (kasir/kurir).
  * Berinteraksi langsung dengan database PostgreSQL menggunakan Prisma ORM.
  */
 export class UserService {
@@ -46,6 +46,8 @@ export class UserService {
 
     return updatedUser;
   }
+
+  // ========== KASIR METHODS ==========
 
   /**
    * Mengambil semua daftar pegawai yang memiliki peran 'kasir'.
@@ -172,5 +174,136 @@ export class UserService {
     // Melakukan penghapusan data pegawai di database
     await prisma.user.delete({ where: { id: userId } });
     return { success: true, message: 'Akun kasir berhasil dihapus' };
+  }
+
+  // ========== KURIR METHODS ==========
+
+  /**
+   * Mengambil daftar kurir yang terdaftar di sistem.
+   * @param includeAll Jika true, tampilkan semua kurir (termasuk nonaktif).
+   */
+  async getCouriers(includeAll: boolean = false) {
+    const where: any = { role: 'kurir' };
+    if (!includeAll) {
+      where.isActive = true;
+    }
+
+    return await prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Mendaftarkan kurir baru ke database (oleh Admin).
+   */
+  async createCourier(data: any) {
+    const name = String(data?.name || '').trim();
+    const phone = String(data?.phone || '').trim();
+    const password = String(data?.password || '');
+
+    if (!name || !phone || !password) {
+      throw new Error('Nama, nomor HP, dan password wajib diisi');
+    }
+
+    // Mengenkripsi password kurir
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    return await prisma.user.create({
+      data: {
+        name,
+        phone,
+        password: hashedPassword,
+        role: 'kurir',
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  /**
+   * Mengupdate data kurir (nama/phone) oleh Admin.
+   */
+  async updateCourier(userId: number, data: { name?: string; phone?: string; isActive?: boolean }) {
+    if (!Number.isFinite(userId)) {
+      throw new Error('ID kurir tidak valid');
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser || targetUser.role !== 'kurir') {
+      throw new Error('User kurir tidak ditemukan');
+    }
+
+    const updateData: any = {};
+    if (data.name?.trim()) updateData.name = data.name.trim();
+    if (data.phone?.trim()) updateData.phone = data.phone.trim();
+    if (typeof data.isActive === 'boolean') updateData.isActive = data.isActive;
+
+    if (Object.keys(updateData).length === 0) {
+      throw new Error('Tidak ada data yang diubah');
+    }
+
+    return await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: { id: true, name: true, phone: true, role: true, isActive: true, createdAt: true },
+    });
+  }
+
+  /**
+   * Mengaktifkan atau menonaktifkan kurir (soft-delete).
+   */
+  async toggleCourierActive(userId: number, isActive: boolean) {
+    if (!Number.isFinite(userId)) {
+      throw new Error('ID kurir tidak valid');
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser || targetUser.role !== 'kurir') {
+      throw new Error('User kurir tidak ditemukan');
+    }
+
+    return await prisma.user.update({
+      where: { id: userId },
+      data: { isActive },
+      select: { id: true, name: true, phone: true, role: true, isActive: true, createdAt: true },
+    });
+  }
+
+  /**
+   * Mereset password kurir tertentu ke password yang baru ditentukan oleh Admin.
+   */
+  async resetCourierPassword(userId: number, newPassword: string) {
+    if (!Number.isFinite(userId) || !newPassword) {
+      throw new Error('userId dan newPassword wajib diisi');
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser || targetUser.role !== 'kurir') {
+      throw new Error('User kurir tidak ditemukan');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    return { success: true, message: 'Password kurir berhasil direset' };
   }
 }

@@ -102,9 +102,15 @@ export class UserController {
       const body = await request.json();
       const userId = Number(body?.userId);
       const newPassword = String(body?.newPassword || '');
+      const targetRole = String(body?.role || 'kasir');
 
-      // Memanggil fungsi reset password pegawai di UserService
-      const result = await this.userService.resetEmployeePassword(userId, newPassword);
+      // Memanggil fungsi reset password pegawai/kurir di UserService berdasarkan role
+      let result;
+      if (targetRole === 'kurir') {
+        result = await this.userService.resetCourierPassword(userId, newPassword);
+      } else {
+        result = await this.userService.resetEmployeePassword(userId, newPassword);
+      }
       return NextResponse.json(result);
     } catch (error: any) {
       console.error('Reset password error:', error);
@@ -113,7 +119,7 @@ export class UserController {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
 
-      if (error.message === 'User kasir tidak ditemukan') {
+      if (error.message === 'User kasir tidak ditemukan' || error.message === 'User kurir tidak ditemukan') {
         return NextResponse.json({ error: error.message }, { status: 404 });
       }
 

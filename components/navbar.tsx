@@ -116,8 +116,14 @@ export default function Navbar() {
     window.location.href = '/';
   };
 
-  // Hide navbar on login, register, admin, and payment pages
-  if (pathname?.startsWith('/login') || pathname?.startsWith('/register') || pathname?.startsWith('/admin') || pathname?.startsWith('/payment')) {
+  // Hide navbar on login, register, admin, kurir, and payment pages
+  if (
+    pathname?.startsWith('/login') ||
+    pathname?.startsWith('/register') ||
+    pathname?.startsWith('/admin') ||
+    pathname?.startsWith('/kurir') ||
+    pathname?.startsWith('/payment')
+  ) {
     return null;
   }
 
@@ -191,6 +197,22 @@ export default function Navbar() {
                     <Button variant="outline" size="sm">
                       <User className="h-4 w-4 mr-2" />
                       Admin
+                    </Button>
+                  </Link>
+                )}
+                {user.role === 'kasir' && (
+                  <Link href="/admin/kasir">
+                    <Button variant="outline" size="sm">
+                      <User className="h-4 w-4 mr-2" />
+                      Kasir
+                    </Button>
+                  </Link>
+                )}
+                {user.role === 'kurir' && (
+                  <Link href="/kurir/pengiriman">
+                    <Button variant="outline" size="sm">
+                      <User className="h-4 w-4 mr-2" />
+                      Kurir Panel
                     </Button>
                   </Link>
                 )}

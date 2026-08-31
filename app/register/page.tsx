@@ -36,6 +36,8 @@ export default function RegisterPage() {
           router.push('/admin/dashboard');
         } else if (user.role === 'kasir') {
           router.push('/admin/kasir');
+        } else if (user.role === 'kurir') {
+          router.push('/kurir/pengiriman');
         } else {
           router.push('/produk');
         }

@@ -189,31 +189,56 @@ export default function KasirPage() {
       </html>
     `;
 
-    // Membuat hidden iframe dinamis untuk mencetak struk thermal tanpa mengganggu UI utama
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    iframe.style.overflow = 'hidden';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow?.document;
-    if (iframeDoc) {
-      iframeDoc.open();
-      iframeDoc.write(html);
-      iframeDoc.close();
-
-      // Menunggu sebentar agar dokumen di iframe siap dirender, lalu jalankan print
-      setTimeout(() => {
-        iframe.contentWindow?.print();
-        // Menghapus iframe setelah print dialog ditutup
+    try {
+      const printWindow = window.open('', '_blank', 'width=400,height=600');
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
         setTimeout(() => {
+          try {
+            printWindow.print();
+            printWindow.close();
+          } catch (e) {
+            console.error('Print error:', e);
+          }
+        }, 250);
+      } else {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        iframe.style.overflow = 'hidden';
+        document.body.appendChild(iframe);
+
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (iframeDoc) {
+          iframeDoc.open();
+          iframeDoc.write(html);
+          iframeDoc.close();
+
+          setTimeout(() => {
+            try {
+              iframe.contentWindow?.focus();
+              iframe.contentWindow?.print();
+            } catch (e) {
+              console.error('Iframe print error:', e);
+            }
+            setTimeout(() => {
+              if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+              }
+            }, 1000);
+          }, 300);
+        } else if (document.body.contains(iframe)) {
           document.body.removeChild(iframe);
-        }, 1000);
-      }, 300);
+        }
+      }
+    } catch (err) {
+      console.error('Printing error:', err);
     }
   };
 

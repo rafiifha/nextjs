@@ -42,6 +42,11 @@ export class AuthService {
       throw new Error('Email/Phone atau password salah');
     }
 
+    // Memeriksa apakah akun masih aktif (terutama untuk kurir yang bisa dinonaktifkan)
+    if (!user.isActive) {
+      throw new Error('Akun Anda telah dinonaktifkan. Hubungi admin.');
+    }
+
     // Menghasilkan JWT Token berisi payload data penting (ID, email, phone, role) untuk proses otorisasi berikutnya
     const token = generateToken({
       userId: user.id,

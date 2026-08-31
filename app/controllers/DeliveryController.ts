@@ -53,7 +53,7 @@ export class DeliveryController {
   }
 
   /**
-   * Mengambil daftar kurir yang bertugas mengantar pesanan.
+   * Mengambil daftar kurir yang bertugas mengantar pesanan (dari tabel User, role 'kurir').
    * HTTP GET /api/delivery/couriers
    * @param includeAll Jika true, akan menampilkan kurir yang tidak aktif juga (berguna untuk manajemen di admin).
    */
@@ -68,26 +68,16 @@ export class DeliveryController {
   }
 
   /**
-   * Mendaftarkan kurir pengiriman baru ke sistem.
-   * HTTP POST /api/delivery/couriers
+   * Mengambil daftar pesanan yang ditugaskan ke kurir tertentu.
+   * HTTP GET /api/kurir/orders
    */
-  async createCourier(request: NextRequest) {
+  async getCourierOrders(courierId: number) {
     try {
-      const body = await request.json();
-      // Memproses pembuatan akun kurir baru
-      const courier = await this.deliveryService.createCourier(body);
-      return NextResponse.json(courier, { status: 201 });
-    } catch (error: any) {
-      console.error('Create courier error:', error);
-      // Menangani error validasi data wajib (status 400 Bad Request)
-      if (error.message === 'Nama dan nomor whatsapp wajib diisi') {
-        return NextResponse.json({ error: error.message }, { status: 400 });
-      }
-      // Menangani error jika nomor whatsapp kurir sudah terdaftar (Prisma unique constraint error P2002) (status 409 Conflict)
-      if (error?.code === 'P2002') {
-        return NextResponse.json({ error: 'Nomor whatsapp kurir sudah terdaftar' }, { status: 409 });
-      }
-      return NextResponse.json({ error: 'Gagal menambah kurir' }, { status: 500 });
+      const orders = await this.deliveryService.getCourierOrders(courierId);
+      return NextResponse.json(orders);
+    } catch (error) {
+      console.error('Get courier orders error:', error);
+      return NextResponse.json({ error: 'Gagal mengambil data pesanan kurir' }, { status: 500 });
     }
   }
 }
