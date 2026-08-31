@@ -270,8 +270,8 @@ export default function ManajemenPesananPage() {
     // 1. Ambil di tempat (pickup) & bayar di tempat (tunai) -> otomatis jadi 'paid'
     if (order.deliveryMethod === 'pickup' && order.paymentMethod === 'tunai' && order.status === 'pending') {
       newStatus = 'paid';
-    } 
-    // 2. Pesanan lainnya yang sudah dibayar -> otomatis 'processing' (Diproses)
+    }
+    // 2. Pesanan online yang sudah dibayar -> otomatis menjadi 'processing' (Diproses) saat dicetak struknya
     else if (!isOfflineOrder(order) && order.status === 'paid') {
       newStatus = 'processing';
     }
@@ -797,98 +797,160 @@ export default function ManajemenPesananPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 pt-4 border-t">
-                  {/* Cetak Struk */}
-                  {( (isOfflineOrder(selectedOrder) && selectedOrder.status === 'pending') || (!isOfflineOrder(selectedOrder) && selectedOrder.status === 'paid') ) && (
-                    <Button 
-                      className="flex-1 bg-gray-900 text-white" 
-                      onClick={() => handlePrintOrder(selectedOrder)}
-                      disabled={actionLoading === 'print'}
-                    >
-                      {actionLoading === 'print' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Printer className="h-4 w-4 mr-2" />}
-                      {actionLoading === 'print' ? 'Mencetak...' : 'Cetak Struk'}
-                    </Button>
-                  )}
-                  
-                  {/* Set Sudah Dibayar untuk pesanan pending */}
-                  {['pending', 'expired', 'cancelled'].includes(selectedOrder.status) && !isOfflineOrder(selectedOrder) && (
-                    <Button
-                      className={`flex-1 bg-green-600 text-white ${['expired', 'cancelled'].includes(selectedOrder.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      disabled={['expired', 'cancelled'].includes(selectedOrder.status) || actionLoading === 'paid'}
-                      onClick={() => updateOrderStatus(selectedOrder.id, 'paid')}
-                    >
-                      {actionLoading === 'paid' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Set Sudah Dibayar
-                    </Button>
+                <div className="flex flex-col gap-3 pt-4 border-t">
+                  {/* Status: Paid (Online Delivery) -> Tindakan: Cetak Struk (otomatis mengubah status ke Diproses) */}
+                  {!isOfflineOrder(selectedOrder) && selectedOrder.status === 'paid' && (
+                    <div className="w-full space-y-2">
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center justify-between">
+                        <span>Pesanan sudah dibayar. Silakan <strong>Cetak Struk</strong> untuk memproses dan menugaskan kurir.</span>
+                      </div>
+                      <Button 
+                        className="w-full h-11 bg-gray-950 hover:bg-gray-800 text-white font-bold text-sm shadow-sm" 
+                        onClick={() => handlePrintOrder(selectedOrder)}
+                        disabled={actionLoading === 'print'}
+                      >
+                        {actionLoading === 'print' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Printer className="h-4 w-4 mr-2" />}
+                        {actionLoading === 'print' ? 'Mencetak Struk...' : 'Cetak Struk (Set Diproses)'}
+                      </Button>
+                    </div>
                   )}
 
-                  {/* Pesanan Ambil di Toko (Pickup) */}
-                  {!isOfflineOrder(selectedOrder) && selectedOrder.deliveryMethod !== 'delivery' && (
-                    <>
-                      {selectedOrder.status === 'paid' && (
+                  {/* Status: Pending (Offline Cash / Transfer) */}
+                  {['pending', 'expired', 'cancelled'].includes(selectedOrder.status) && (
+                    <div className="flex gap-2">
+                      {isOfflineOrder(selectedOrder) && selectedOrder.status === 'pending' ? (
                         <Button 
-                          className="flex-1 bg-purple-600 text-white font-medium" 
-                          onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
-                          disabled={actionLoading === 'delivered'}
+                          className="flex-1 bg-gray-900 hover:bg-gray-800 text-white" 
+                          onClick={() => handlePrintOrder(selectedOrder)}
+                          disabled={actionLoading === 'print'}
                         >
-                          {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          Set Selesai / Diambil
+                          {actionLoading === 'print' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Printer className="h-4 w-4 mr-2" />}
+                          Cetak Struk (Set Dibayar)
                         </Button>
-                      )}
-                    </>
-                  )}
-
-                  {/* Pesanan Antar Kurir (Delivery) */}
-                  {!isOfflineOrder(selectedOrder) && selectedOrder.deliveryMethod === 'delivery' && (
-                    <div className="w-full space-y-3">
-                      {selectedOrder.status === 'paid' && (
-                        <div className="w-full space-y-2">
-                          <label className="block text-xs font-semibold text-gray-700">Tugaskan Kurir Pengiriman:</label>
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <select
-                              className="flex-1 h-10 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium focus:ring-2 focus:ring-orange-400"
-                              value={selectedCourierId}
-                              onChange={(e) => setSelectedCourierId(e.target.value)}
-                              disabled={actionLoading === 'shipped'}
-                            >
-                              <option value="">-- Pilih Kurir Pengiriman --</option>
-                              {couriers.map((courier) => (
-                                <option key={courier.id} value={courier.id}>
-                                  {courier.name} {courier.phone ? `(${courier.phone})` : ''}
-                                </option>
-                              ))}
-                            </select>
-                            <Button
-                              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold whitespace-nowrap shadow-sm"
-                              disabled={actionLoading === 'shipped'}
-                              onClick={() => {
-                                const courierId = Number(selectedCourierId || selectedOrder.courierId || 0);
-                                if (!courierId) {
-                                  toast.warning('Kurir belum dipilih', { description: 'Pilih kurir sebelum kirim pesanan.' });
-                                  return;
-                                }
-                                updateOrderStatus(selectedOrder.id, 'shipped', courierId);
-                              }}
-                            >
-                              {actionLoading === 'shipped' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                              <Truck className="h-4 w-4 mr-2" />
-                              Kirim Pesanan (Set Dalam Pengiriman)
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-
-                      {selectedOrder.status === 'shipped' && (
-                        <Button 
-                          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 shadow-sm" 
-                          onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
-                          disabled={actionLoading === 'delivered'}
+                      ) : (
+                        <Button
+                          className={`flex-1 bg-green-600 text-white ${['expired', 'cancelled'].includes(selectedOrder.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          disabled={['expired', 'cancelled'].includes(selectedOrder.status) || actionLoading === 'paid'}
+                          onClick={() => updateOrderStatus(selectedOrder.id, 'paid')}
                         >
-                          {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          Set Terkirim
+                          {actionLoading === 'paid' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Set Sudah Dibayar
                         </Button>
                       )}
                     </div>
+                  )}
+
+                  {/* Status: Processing (Delivery Method = Delivery) -> Pilihan Kurir Muncul Setelah Cetak Struk */}
+                  {!isOfflineOrder(selectedOrder) && selectedOrder.deliveryMethod === 'delivery' && selectedOrder.status === 'processing' && (
+                    <div className="w-full space-y-2.5 bg-orange-50/80 p-3.5 rounded-xl border border-orange-200">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-orange-950">
+                          Struk Telah Dicetak (Diproses). Pilih Kurir Pengiriman:
+                        </label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-gray-700 hover:text-gray-900"
+                          onClick={() => handlePrintOrder(selectedOrder)}
+                          disabled={actionLoading === 'print'}
+                        >
+                          <Printer className="h-3.5 w-3.5 mr-1" />
+                          Cetak Ulang
+                        </Button>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <select
+                          className="flex-1 h-10 rounded-lg border border-orange-300 bg-white px-3 text-sm font-semibold focus:ring-2 focus:ring-orange-400"
+                          value={selectedCourierId}
+                          onChange={(e) => setSelectedCourierId(e.target.value)}
+                          disabled={actionLoading === 'shipped'}
+                        >
+                          <option value="">-- Pilih Kurir Pengiriman --</option>
+                          {couriers.map((courier) => (
+                            <option key={courier.id} value={courier.id}>
+                              {courier.name} {courier.phone ? `(${courier.phone})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          className="bg-orange-600 hover:bg-orange-700 text-white font-bold whitespace-nowrap shadow-sm h-10 px-4 rounded-lg"
+                          disabled={actionLoading === 'shipped'}
+                          onClick={() => {
+                            const courierId = Number(selectedCourierId || selectedOrder.courierId || 0);
+                            if (!courierId) {
+                              toast.warning('Kurir belum dipilih', { description: 'Pilih kurir sebelum kirim pesanan.' });
+                              return;
+                            }
+                            updateOrderStatus(selectedOrder.id, 'shipped', courierId);
+                          }}
+                        >
+                          {actionLoading === 'shipped' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          <Truck className="h-4 w-4 mr-2" />
+                          Kirim Pesanan (Set Dalam Pengiriman)
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status: Shipped (Dalam Pengiriman) */}
+                  {!isOfflineOrder(selectedOrder) && selectedOrder.deliveryMethod === 'delivery' && selectedOrder.status === 'shipped' && (
+                    <div className="w-full flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-gray-300 text-gray-700"
+                        onClick={() => handlePrintOrder(selectedOrder)}
+                        disabled={actionLoading === 'print'}
+                      >
+                        <Printer className="h-4 w-4 mr-1.5" />
+                        Cetak Struk
+                      </Button>
+                      <Button 
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 shadow-sm" 
+                        onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
+                        disabled={actionLoading === 'delivered'}
+                      >
+                        {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Set Terkirim Manual
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Status: Pickup Selesai / Diambil */}
+                  {!isOfflineOrder(selectedOrder) && selectedOrder.deliveryMethod !== 'delivery' && (selectedOrder.status === 'paid' || selectedOrder.status === 'processing') && (
+                    <div className="w-full flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-gray-300 text-gray-700"
+                        onClick={() => handlePrintOrder(selectedOrder)}
+                        disabled={actionLoading === 'print'}
+                      >
+                        <Printer className="h-4 w-4 mr-1.5" />
+                        Cetak Struk
+                      </Button>
+                      <Button 
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium" 
+                        onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
+                        disabled={actionLoading === 'delivered'}
+                      >
+                        {actionLoading === 'delivered' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Set Selesai / Diambil
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Status: Delivered (Sudah Terkirim) */}
+                  {selectedOrder.status === 'delivered' && (
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-300 text-gray-700"
+                      onClick={() => handlePrintOrder(selectedOrder)}
+                      disabled={actionLoading === 'print'}
+                    >
+                      <Printer className="h-4 w-4 mr-2" />
+                      Cetak Struk
+                    </Button>
                   )}
                 </div>
               </div>
