@@ -267,4 +267,22 @@ export class OrderController {
       return NextResponse.json({ error: 'Gagal mengirim e-receipt' }, { status: 500 });
     }
   }
+
+  /**
+   * Mengambil data tingkat kepadatan toko saat ini.
+   * HTTP GET /api/pesanan/kepadatan
+   */
+  async getStoreDensity() {
+    try {
+      const density = await this.orderService.getStoreDensity();
+      return NextResponse.json(density);
+    } catch (error: any) {
+      console.error('Get store density error:', error);
+      return NextResponse.json(
+        { error: 'Gagal mengambil data kepadatan toko' },
+        { status: 500 }
+      );
+    }
+  }
 }
+

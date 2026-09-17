@@ -839,4 +839,33 @@ export class OrderService {
 
     return true;
   }
+
+  /**
+   * Mengambil informasi kepadatan toko berdasarkan jumlah pesanan yang sedang diproses (status 'paid' atau 'processing').
+   * Aturan Indikator:
+   * - 0 s.d 6 pesanan (< 7): Sepi
+   * - 7 pesanan ke atas (>= 7): Ramai
+   */
+  async getStoreDensity() {
+    const count = await prisma.order.count({
+      where: {
+        status: { in: ['paid', 'processing'] },
+      },
+    });
+
+    const isRamai = count >= 7;
+    const status: 'sepi' | 'ramai' = isRamai ? 'ramai' : 'sepi';
+    const label = isRamai ? 'Ramai' : 'Sepi';
+
+    return {
+      count,
+      status,
+      label,
+      threshold: 7,
+      description: isRamai
+        ? 'Toko sedang ramai pesanan. Pemrosesan dan pengiriman mungkin membutuhkan sedikit waktu tambahan.'
+        : 'Antrean toko lancar. Pesanan Anda dapat segera diproses.',
+    };
+  }
 }
+
