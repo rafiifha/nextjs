@@ -260,23 +260,24 @@ export class ProductService {
         price = isNaN(parsed) ? null : parsed;
       }
       
-      let stockOnline: number | null = null;
-      if (variant.stockOnline !== undefined && variant.stockOnline !== null && variant.stockOnline !== '') {
-        const parsed = typeof variant.stockOnline === 'string' ? parseInt(variant.stockOnline) : variant.stockOnline;
-        stockOnline = isNaN(parsed) ? null : parsed;
-      }
+      // Ambil nilai stok tunggal (prioritas dari stock, stockOffline, atau stockOnline)
+      const rawStock = variant.stock !== undefined && variant.stock !== null && variant.stock !== ''
+        ? variant.stock
+        : (variant.stockOffline !== undefined && variant.stockOffline !== null && variant.stockOffline !== ''
+            ? variant.stockOffline
+            : variant.stockOnline);
 
-      let stockOffline: number | null = null;
-      if (variant.stockOffline !== undefined && variant.stockOffline !== null && variant.stockOffline !== '') {
-        const parsed = typeof variant.stockOffline === 'string' ? parseInt(variant.stockOffline) : variant.stockOffline;
-        stockOffline = isNaN(parsed) ? null : parsed;
+      let stock: number | null = null;
+      if (rawStock !== undefined && rawStock !== null && rawStock !== '') {
+        const parsed = typeof rawStock === 'string' ? parseInt(rawStock) : rawStock;
+        stock = isNaN(parsed) ? null : parsed;
       }
       
       return {
         priceType: variant.priceType,
         price: price ?? null,
-        stockOnline: stockOnline ?? null,
-        stockOffline: stockOffline ?? null,
+        stockOnline: stock ?? null,
+        stockOffline: stock ?? null,
       };
     });
   }

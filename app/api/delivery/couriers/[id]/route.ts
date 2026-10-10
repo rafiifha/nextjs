@@ -12,11 +12,13 @@ export async function PUT(
     const body = await request.json();
     const name = String(body?.name || '').trim();
     const phone = String(body?.phone || '').trim();
+    const email = body?.email !== undefined ? (body.email ? String(body.email).trim().toLowerCase() : null) : undefined;
     const isActive = typeof body?.isActive === 'boolean' ? body.isActive : undefined;
 
     const courier = await userService.updateCourier(Number(id), {
       ...(name && { name }),
       ...(phone && { phone }),
+      ...(email !== undefined && { email }),
       ...(isActive !== undefined && { isActive }),
     });
 
@@ -27,7 +29,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Kurir tidak ditemukan' }, { status: 404 });
     }
     if (error?.code === 'P2002') {
-      return NextResponse.json({ error: 'Nomor HP kurir sudah dipakai' }, { status: 409 });
+      const target = error?.meta?.target;
+      if (Array.isArray(target) && target.includes('email')) {
+        return NextResponse.json({ error: 'Email kurir sudah dipakai' }, { status: 409 });
+      }
+      return NextResponse.json({ error: 'Nomor HP atau email kurir sudah dipakai' }, { status: 409 });
     }
     return NextResponse.json({ error: 'Gagal update kurir' }, { status: 500 });
   }

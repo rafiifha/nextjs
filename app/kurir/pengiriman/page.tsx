@@ -273,7 +273,7 @@ export default function KurirPengirimanPage() {
       cleanPhone = '62' + cleanPhone;
     }
     const text = encodeURIComponent(
-      `Hallo Bapak/Ibu ${customerName}, saya kurir dari Toko Naning mau mengantarkan pesanan #${orderId}, Boleh Shareloc alamat lebih jelasnya`
+      `Hallo Bapak/Ibu ${customerName}, saya kurir dari Toko Imas mau mengantarkan pesanan #${orderId}, Boleh Shareloc alamat lebih jelasnya`
     );
     return `https://wa.me/${cleanPhone}?text=${text}`;
   };

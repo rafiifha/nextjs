@@ -5,18 +5,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, Truck, KeyRound, Phone, User, Trash2, RotateCcw, XCircle } from 'lucide-react';
+import { ShieldCheck, Truck, KeyRound, Phone, User, Trash2, RotateCcw, XCircle, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Employee {
   id: number;
   name: string;
+  email: string | null;
   phone: string | null;
 }
 
 interface Courier {
   id: number;
   name: string;
+  email: string | null;
   phone: string;
   isActive: boolean;
 }
@@ -29,8 +31,8 @@ export default function PegawaiPage() {
   const [activeTab, setActiveTab] = useState<'kasir' | 'kurir'>('kasir');
   const [cashiers, setCashiers] = useState<Employee[]>([]);
   const [couriers, setCouriers] = useState<Courier[]>([]);
-  const [cashierForm, setCashierForm] = useState({ name: '', phone: '', password: '' });
-  const [courierForm, setCourierForm] = useState({ name: '', phone: '', password: '' });
+  const [cashierForm, setCashierForm] = useState({ name: '', phone: '', email: '', password: '' });
+  const [courierForm, setCourierForm] = useState({ name: '', phone: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -78,7 +80,7 @@ export default function PegawaiPage() {
         body: JSON.stringify(cashierForm),
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Gagal tambah kasir');
-      setCashierForm({ name: '', phone: '', password: '' });
+      setCashierForm({ name: '', phone: '', email: '', password: '' });
       await fetchData();
       toast.success('Kasir ditambahkan', { description: 'Akun kasir baru berhasil dibuat.' });
     } catch (error: any) {
@@ -156,7 +158,7 @@ export default function PegawaiPage() {
         body: JSON.stringify(courierForm),
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Gagal tambah kurir');
-      setCourierForm({ name: '', phone: '', password: '' });
+      setCourierForm({ name: '', phone: '', email: '', password: '' });
       await fetchData();
       toast.success('Kurir ditambahkan', { description: 'Akun kurir baru berhasil dibuat. Kurir bisa login.' });
     } catch (error: any) {
@@ -230,18 +232,22 @@ export default function PegawaiPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 md:grid-cols-3">
+            <div className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 md:grid-cols-4">
               <div>
                 <Label>Nama</Label>
-                <Input value={cashierForm.name} onChange={(e) => setCashierForm((p) => ({ ...p, name: e.target.value }))} />
+                <Input placeholder="Nama kasir" value={cashierForm.name} onChange={(e) => setCashierForm((p) => ({ ...p, name: e.target.value }))} />
               </div>
               <div>
-                <Label>No. HP</Label>
-                <Input value={cashierForm.phone} onChange={(e) => setCashierForm((p) => ({ ...p, phone: e.target.value }))} />
+                <Label>No. HP / WA</Label>
+                <Input placeholder="08xxxxxxxxxx" value={cashierForm.phone} onChange={(e) => setCashierForm((p) => ({ ...p, phone: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Email (Opsional)</Label>
+                <Input type="email" placeholder="kasir@email.com" value={cashierForm.email} onChange={(e) => setCashierForm((p) => ({ ...p, email: e.target.value }))} />
               </div>
               <div>
                 <Label>Password</Label>
-                <Input type="password" value={cashierForm.password} onChange={(e) => setCashierForm((p) => ({ ...p, password: e.target.value }))} />
+                <Input type="password" placeholder="Password kasir" value={cashierForm.password} onChange={(e) => setCashierForm((p) => ({ ...p, password: e.target.value }))} />
               </div>
             </div>
             <Button disabled={loading} onClick={createCashier}>Tambah Kasir</Button>
@@ -257,10 +263,18 @@ export default function PegawaiPage() {
                         <User className="h-4 w-4 text-gray-500" />
                         {cashier.name}
                       </p>
-                      <p className="mt-1 flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="h-4 w-4 text-gray-500" />
-                        {cashier.phone || '-'}
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
+                        <span className="flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5 text-gray-400" />
+                          {cashier.phone || '-'}
+                        </span>
+                        {cashier.email && (
+                          <span className="flex items-center gap-1.5 text-gray-500">
+                            <Mail className="h-3.5 w-3.5 text-gray-400" />
+                            {cashier.email}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={() => openResetPasswordModal({ id: cashier.id, name: cashier.name, role: 'kasir' })}>
@@ -299,20 +313,30 @@ export default function PegawaiPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 md:grid-cols-3">
+            <div className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 md:grid-cols-4">
               <div>
                 <Label>Nama</Label>
-                <Input value={courierForm.name} onChange={(e) => setCourierForm((p) => ({ ...p, name: e.target.value }))} />
+                <Input placeholder="Nama kurir" value={courierForm.name} onChange={(e) => setCourierForm((p) => ({ ...p, name: e.target.value }))} />
               </div>
               <div>
-                <Label>No. HP</Label>
-                <Input value={courierForm.phone} onChange={(e) => setCourierForm((p) => ({ ...p, phone: e.target.value }))} />
+                <Label>No. HP / WA</Label>
+                <Input placeholder="08xxxxxxxxxx" value={courierForm.phone} onChange={(e) => setCourierForm((p) => ({ ...p, phone: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="flex items-center gap-1.5">
+                  Email
+                  <span className="text-[10px] text-amber-700 bg-amber-100 font-semibold px-1.5 py-0.2 rounded">Tugas Kirim</span>
+                </Label>
+                <Input type="email" placeholder="kurir@gmail.com" value={courierForm.email} onChange={(e) => setCourierForm((p) => ({ ...p, email: e.target.value }))} />
               </div>
               <div>
                 <Label>Password</Label>
-                <Input type="password" value={courierForm.password} onChange={(e) => setCourierForm((p) => ({ ...p, password: e.target.value }))} />
+                <Input type="password" placeholder="Password kurir" value={courierForm.password} onChange={(e) => setCourierForm((p) => ({ ...p, password: e.target.value }))} />
               </div>
             </div>
+            <p className="text-xs text-gray-500 italic">
+              * Email kurir digunakan sistem untuk mengirimkan rincian tugas pengiriman barang secara otomatis saat pesanan dikirim.
+            </p>
             <Button disabled={loading} onClick={createCourier}>Tambah Kurir</Button>
 
             {/* Sub-tabs: Aktif / Nonaktif */}
@@ -336,10 +360,20 @@ export default function PegawaiPage() {
                         <User className="h-4 w-4 text-gray-500" />
                         {courier.name}
                       </p>
-                      <p className="mt-1 flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="h-4 w-4 text-gray-500" />
-                        {courier.phone}
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
+                        <span className="flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5 text-gray-400" />
+                          {courier.phone}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5 text-gray-400" />
+                          {courier.email ? (
+                            <span className="text-gray-700">{courier.email}</span>
+                          ) : (
+                            <span className="text-xs italic text-amber-600">Email belum diset</span>
+                          )}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={() => openResetPasswordModal({ id: courier.id, name: courier.name, role: 'kurir' })}>
@@ -370,10 +404,18 @@ export default function PegawaiPage() {
                         {courier.name}
                         <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-600">Nonaktif</span>
                       </p>
-                      <p className="mt-1 flex items-center gap-2 text-sm text-gray-400">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        {courier.phone}
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-400">
+                        <span className="flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5 text-gray-400" />
+                          {courier.phone}
+                        </span>
+                        {courier.email && (
+                          <span className="flex items-center gap-1.5">
+                            <Mail className="h-3.5 w-3.5 text-gray-400" />
+                            {courier.email}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <Button
                       variant="outline"

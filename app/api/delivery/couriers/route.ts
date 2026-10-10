@@ -22,7 +22,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     if (error?.code === 'P2002') {
-      return NextResponse.json({ error: 'Nomor HP kurir sudah terdaftar' }, { status: 409 });
+      const target = error?.meta?.target;
+      if (Array.isArray(target) && target.includes('email')) {
+        return NextResponse.json({ error: 'Email kurir sudah terdaftar' }, { status: 409 });
+      }
+      return NextResponse.json({ error: 'Nomor HP atau email kurir sudah terdaftar' }, { status: 409 });
     }
     return NextResponse.json({ error: 'Gagal menambah kurir' }, { status: 500 });
   }

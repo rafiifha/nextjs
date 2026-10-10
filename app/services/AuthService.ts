@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { generateToken } from '@/lib/auth';
-import { sendWhatsAppMessage } from '@/services/whatsappService';
+import { sendOtpEmail } from '@/services/emailService';
 
 /**
  * Service untuk menangani proses Otentikasi (Authentication) dan Otorisasi (Authorization).
@@ -78,34 +78,57 @@ export class AuthService {
    * Mengirimkan kode OTP ke WhatsApp pengguna via Fonnte.
    * Fungsi ini digunakan untuk proses 'register' (pendaftaran) dan 'forgot_password' (lupa password).
    */
-  async sendOtp(phone: string, type: 'register' | 'forgot_password') {
-    if (!phone) {
-      throw new Error('Nomor WhatsApp harus diisi');
+  /**
+   * Mengirimkan kode OTP verifikasi akun atau reset password via Gmail.
+   */
+  async sendOtp(identifier: string, type: 'register' | 'forgot_password', emailParam?: string) {
+    if (!identifier) {
+      throw new Error('Email atau nomor WhatsApp harus diisi');
     }
 
-    // Memvalidasi: Jika registrasi, pastikan nomor telepon belum terdaftar di DB
+    // Tentukan alamat email tujuan pengiriman OTP
+    let targetEmail = emailParam || (identifier.includes('@') ? identifier : null);
+
+    // Memvalidasi: Jika registrasi, pastikan email atau nomor belum terdaftar di DB
     if (type === 'register') {
       const existingUser = await prisma.user.findFirst({
-        where: { phone },
+        where: {
+          OR: [
+            { phone: identifier },
+            ...(targetEmail ? [{ email: targetEmail }] : []),
+          ],
+        },
       });
       if (existingUser) {
-        throw new Error('Nomor WhatsApp sudah terdaftar');
+        throw new Error('Email atau nomor telepon sudah terdaftar');
       }
     }
 
-    // Memvalidasi: Jika lupa password, pastikan nomor telepon sudah terdaftar di DB
+    // Memvalidasi: Jika lupa password, pastikan nomor telepon/email sudah terdaftar di DB
     if (type === 'forgot_password') {
       const existingUser = await prisma.user.findFirst({
-        where: { phone },
+        where: {
+          OR: [
+            { phone: identifier },
+            { email: identifier },
+          ],
+        },
       });
       if (!existingUser) {
-        throw new Error('Nomor WhatsApp tidak terdaftar');
+        throw new Error('Email atau nomor akun tidak terdaftar');
       }
+      if (!targetEmail && existingUser.email) {
+        targetEmail = existingUser.email;
+      }
+    }
+
+    if (!targetEmail) {
+      targetEmail = identifier;
     }
 
     // Menghapus record OTP lama yang belum diverifikasi pada nomor & jenis yang sama agar menghemat kapasitas DB
     await prisma.otpVerification.deleteMany({
-      where: { phone, type, verified: false },
+      where: { phone: identifier, type, verified: false },
     });
 
     // Membuat kode baru dan menetapkan masa aktifnya selama 5 menit
@@ -115,35 +138,35 @@ export class AuthService {
 
     // Menyimpan data verifikasi OTP baru ke database
     await prisma.otpVerification.create({
-      data: { phone, code, type, expiresAt },
+      data: { phone: identifier, code, type, expiresAt },
     });
 
-    // Menyusun template pesan WhatsApp OTP
-    const typeLabel = type === 'register' ? 'Registrasi' : 'Reset Password';
-    const message = `🔐 *Kode OTP ${typeLabel} - Toko Naning*\n\nKode verifikasi Anda:\n\n*${code}*\n\nKode berlaku 5 menit. Jangan bagikan kode ini kepada siapapun.`;
-
     try {
-      // Memanggil WhatsApp Service (Fonnte) untuk mengirimkan pesan ke HP pengguna
-      await sendWhatsAppMessage(phone, message);
+      // Mengirimkan kode OTP ke Gmail pengguna
+      await sendOtpEmail(targetEmail, code, type);
     } catch (error) {
-      console.error('Failed to send OTP via WhatsApp:', error);
-      throw new Error('Gagal mengirim OTP. Pastikan nomor WhatsApp aktif.');
+      console.error('Failed to send OTP via Gmail:', error);
+      throw new Error('Gagal mengirim OTP ke Gmail. Silakan coba lagi.');
     }
 
-    return { success: true, message: 'Kode OTP berhasil dikirim ke WhatsApp Anda' };
+    return { 
+      success: true, 
+      message: `Kode OTP berhasil dikirim ke Gmail (${targetEmail})`,
+      targetEmail,
+    };
   }
 
   /**
    * Memverifikasi kesesuaian kode OTP yang diinput oleh pengguna.
    */
-  async verifyOtp(phone: string, code: string, type: 'register' | 'forgot_password') {
-    if (!phone || !code) {
-      throw new Error('Nomor WhatsApp dan kode OTP harus diisi');
+  async verifyOtp(identifier: string, code: string, type: 'register' | 'forgot_password') {
+    if (!identifier || !code) {
+      throw new Error('Email/nomor dan kode OTP harus diisi');
     }
 
     // Mengambil data OTP terakhir yang belum diverifikasi dari DB
     const otp = await prisma.otpVerification.findFirst({
-      where: { phone, type, verified: false },
+      where: { phone: identifier, type, verified: false },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -184,24 +207,31 @@ export class AuthService {
       throw new Error('Nama, nomor WhatsApp, dan password harus diisi');
     }
 
-    // 1. Memastikan nomor telepon telah memverifikasi OTP registrasi dengan sukses
+    // 1. Memastikan nomor telepon atau email telah memverifikasi OTP registrasi dengan sukses
     const verifiedOtp = await prisma.otpVerification.findFirst({
-      where: { phone, type: 'register', verified: true },
+      where: {
+        OR: [
+          { phone },
+          ...(email ? [{ phone: email }] : []),
+        ],
+        type: 'register',
+        verified: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
 
     if (!verifiedOtp) {
-      throw new Error('Nomor WhatsApp belum diverifikasi. Silakan verifikasi OTP terlebih dahulu.');
+      throw new Error('Email atau nomor belum diverifikasi. Silakan verifikasi OTP terlebih dahulu.');
     }
 
-    // 2. Memeriksa duplikasi alamat email atau nomor WhatsApp di database
+    // 2. Memeriksa duplikasi alamat email atau nomor telepon di database
     const whereClause: any = { OR: [{ phone }] };
     if (email) whereClause.OR.push({ email });
 
     const existingUser = await prisma.user.findFirst({ where: whereClause });
 
     if (existingUser) {
-      throw new Error('Email atau nomor WhatsApp sudah terdaftar');
+      throw new Error('Email atau nomor telepon sudah terdaftar');
     }
 
     // 3. Mengenkripsi (hash) password menggunakan bcrypt sebelum disimpan demi keamanan data kredensial
@@ -218,9 +248,15 @@ export class AuthService {
       },
     });
 
-    // 5. Membersihkan data verifikasi OTP pendaftaran yang telah selesai digunakan agar DB bersih
+    // 5. Membersihkan data verifikasi OTP pendaftaran yang telah selesai digunakan agar DB bersih dan tidak bisa dipakai ulang
     await prisma.otpVerification.deleteMany({
-      where: { phone, type: 'register' },
+      where: {
+        OR: [
+          { phone },
+          ...(email ? [{ phone: email }] : []),
+        ],
+        type: 'register',
+      },
     });
 
     // 6. Membuat JWT Token agar pengguna otomatis login setelah berhasil registrasi
@@ -248,7 +284,7 @@ export class AuthService {
    */
   async forgotPassword(identifier: string, newPassword: string) {
     if (!identifier) {
-      throw new Error('Nomor WhatsApp harus diisi');
+      throw new Error('Email atau nomor telepon harus diisi');
     }
 
     if (!newPassword || newPassword.length < 6) {
@@ -256,7 +292,12 @@ export class AuthService {
     }
 
     const user = await prisma.user.findFirst({
-      where: { phone: identifier },
+      where: {
+        OR: [
+          { phone: identifier },
+          { email: identifier },
+        ],
+      },
     });
 
     if (!user) {
@@ -270,7 +311,7 @@ export class AuthService {
     });
 
     if (!verifiedOtp) {
-      throw new Error('Nomor WhatsApp belum diverifikasi. Silakan verifikasi OTP terlebih dahulu.');
+      throw new Error('Akun belum diverifikasi. Silakan verifikasi OTP terlebih dahulu.');
     }
 
     // 2. Mengenkripsi password baru menggunakan bcrypt

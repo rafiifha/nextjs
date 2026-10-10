@@ -65,7 +65,7 @@ export default function KurirLayout({
             </div>
             <div>
               <div className="font-bold text-gray-900 text-sm sm:text-base leading-tight">
-                Toko Naning
+                Toko Imas
               </div>
               <div className="text-xs text-gray-500 font-medium">Panel Kurir</div>
             </div>

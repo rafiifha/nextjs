@@ -20,7 +20,7 @@ import { StoreDensityCard } from '@/components/store-density-card';
 import { formatRupiah } from '@/lib/utils';
 
 /**
- * Halaman Utama (Landing Page / Home) Toko Naning.
+ * Halaman Utama (Landing Page / Home) Toko Imas.
  * Menggunakan tema warna khas kuning emas (#ffd700 & #d4a800), clean & modern,
  * dengan indikator kepadatan toko real-time (1-7 sepi, 7+ ramai) dan katalog produk terlaris.
  */
@@ -28,8 +28,26 @@ export default async function Home() {
   const productService = new ProductService();
   const orderService = new OrderService();
 
-  const allProducts = await productService.getAllProducts();
-  const initialDensity = await orderService.getStoreDensity();
+  let allProducts: any[] = [];
+  let initialDensity: any = {
+    count: 0,
+    status: 'sepi',
+    label: 'Sepi',
+    threshold: 7,
+    description: 'Antrean toko lancar. Pesanan Anda dapat segera diproses.',
+  };
+
+  try {
+    allProducts = await productService.getAllProducts();
+  } catch (err) {
+    console.error('⚠️ Gagal mengambil data produk (Home):', err);
+  }
+
+  try {
+    initialDensity = await orderService.getStoreDensity();
+  } catch (err) {
+    console.error('⚠️ Gagal mengambil data kepadatan toko (Home):', err);
+  }
 
   // Mengambil 4 produk terlaris
   const topProducts = allProducts.slice(0, 4);
@@ -37,7 +55,7 @@ export default async function Home() {
   return (
     <div className="flex flex-col bg-slate-50/50 min-h-screen text-slate-800">
       
-      {/* 1. HERO SECTION (Warna Kuning Khas Toko Naning: #fff8d6 -> white) */}
+      {/* 1. HERO SECTION (Warna Kuning Khas Toko Imas: #fff8d6 -> white) */}
       <section className="relative overflow-hidden bg-gradient-to-b from-[#fff8d6] via-[#fffdf0] to-white pt-10 pb-16 lg:pt-16 lg:pb-24 border-b border-yellow-100/60">
         {/* Subtle Ambient Background Decorative Glows */}
         <div className="absolute -top-24 -left-20 w-96 h-96 bg-[#ffd700]/25 rounded-full blur-3xl pointer-events-none" />
@@ -50,13 +68,13 @@ export default async function Home() {
             <div className="lg:col-span-7 space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#ffd700]/60 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-sm">
                 <Sparkles className="h-3.5 w-3.5 text-[#d4a800] animate-pulse" />
-                <span>Toko sembako terpercaya • Toko Naning</span>
+                <span>Toko sembako terpercaya • Toko Imas</span>
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
                 Belanja sembako mudah di{' '}
                 <span className="text-[#d4a800]">
-                  Toko Naning
+                  Toko Imas
                 </span>
               </h1>
 
@@ -213,7 +231,7 @@ export default async function Home() {
                   Produk Paling Banyak Dibeli
                 </h2>
                 <p className="mt-1.5 text-sm text-slate-600">
-                  Pilihan favorit pelanggan Toko Naning untuk kebutuhan sehari-hari
+                  Pilihan favorit pelanggan Toko Imas untuk kebutuhan sehari-hari
                 </p>
               </div>
 
@@ -296,7 +314,7 @@ export default async function Home() {
         </section>
       )}
 
-      {/* 4. CALL-TO-ACTION (CTA) BANNER (Kuning Khas Toko Naning) */}
+      {/* 4. CALL-TO-ACTION (CTA) BANNER (Kuning Khas Toko Imas) */}
       <section className="py-16 bg-slate-50/50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative rounded-3xl bg-gradient-to-br from-[#ffd700] via-[#e6c200] to-[#d4a800] text-slate-950 p-8 sm:p-12 shadow-xl overflow-hidden border border-yellow-400">
@@ -314,7 +332,7 @@ export default async function Home() {
               </h2>
 
               <p className="text-slate-900/90 text-sm sm:text-base leading-relaxed max-w-xl mx-auto font-medium">
-                Nikmati kemudahan belanja kebutuhan sembako online langsung dari Toko Naning dengan pengantaran cepat dan pembayaran fleksibel.
+                Nikmati kemudahan belanja kebutuhan sembako online langsung dari Toko Imas dengan pengantaran cepat dan pembayaran fleksibel.
               </p>
 
               <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3.5">

@@ -14,6 +14,7 @@ interface ProductVariant {
   id: number;
   priceType: string;
   price: number | null;
+  stock?: number | null;
   stockOnline: number | null;
   stockOffline: number | null;
 }
@@ -64,7 +65,39 @@ export default function KasirPage() {
   const [showDigitalPaymentModal, setShowDigitalPaymentModal] = useState(false);
   const [digitalPaymentData, setDigitalPaymentData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [isValidatingPayment, setIsValidatingPayment] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Fungsi validasi manual pembayaran digital oleh kasir (menandai lunas & kirim bukti pembayaran via email)
+  const handleManualValidation = async (orderId: number) => {
+    setIsValidatingPayment(true);
+    try {
+      const res = await fetch(`/api/pesanan/${orderId}/pay`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDigitalPaymentData((prev: any) => ({
+          ...prev,
+          status: 'paid',
+          items: data.items || prev?.items,
+          createdAt: data.createdAt || prev?.createdAt,
+        }));
+        toast.success('Pembayaran Divalidasi!', {
+          description: 'Pesanan ditandai lunas dan bukti pembayaran dikirim ke email pelanggan.',
+        });
+      } else {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Gagal memvalidasi pembayaran');
+      }
+    } catch (err: any) {
+      toast.error('Gagal Validasi', {
+        description: err.message || 'Terjadi kesalahan saat memvalidasi pembayaran',
+      });
+    } finally {
+      setIsValidatingPayment(false);
+    }
+  };
 
   // Meng-update waktu real-time setiap detik untuk keperluan tampilan jam di kasir
   useEffect(() => {
@@ -161,7 +194,7 @@ export default function KasirPage() {
       </head>
       <body>
         <div class="center">
-          <div class="title" style="font-size:14px;letter-spacing:0.5px;">TOKO NANING</div>
+          <div class="title" style="font-size:14px;letter-spacing:0.5px;">TOKO IMAS</div>
           <div class="small" style="margin-bottom:2px;font-size:7.5px;line-height:1.2;">Jl. Raya Cicalengka - Majalaya KM 1, Cikuya, Cicalengka</div>
           <div class="divider"></div>
           <div class="bold" style="font-size:10px;margin-bottom:2px;letter-spacing:0.5px;">STRUK PEMBELIAN</div>
@@ -281,7 +314,7 @@ export default function KasirPage() {
           for (const product of productsData) {
             if (next[product.id]) continue;
             const firstAvailable = product.variants.find(
-              (v: ProductVariant) => (v.stockOffline ?? 0) > 0 && v.price !== null && v.price !== undefined
+              (v: ProductVariant) => ((v.stock ?? v.stockOffline ?? v.stockOnline ?? 0) > 0) && v.price !== null && v.price !== undefined
             );
             if (firstAvailable) next[product.id] = firstAvailable.id;
           }
@@ -333,7 +366,7 @@ export default function KasirPage() {
       return;
     }
 
-    const stockAvailable = variant.stockOffline ?? 0;
+    const stockAvailable = variant.stock ?? variant.stockOffline ?? variant.stockOnline ?? 0;
     if (stockAvailable <= 0) {
       toast.error('Error', { description: 'Stok tidak tersedia' });
       return;
@@ -394,7 +427,7 @@ export default function KasirPage() {
       if (product) {
         const variant = product.variants.find(v => v.priceType === priceType);
         if (variant) {
-          const stockAvailable = variant.stockOffline ?? 0;
+          const stockAvailable = variant.stock ?? variant.stockOffline ?? variant.stockOnline ?? 0;
           if (quantity > stockAvailable) {
             toast.error('Error', { description: `Stok tersedia hanya ${stockAvailable} unit` });
             return prev;
@@ -694,7 +727,7 @@ export default function KasirPage() {
                   <div className="text-center py-4 text-gray-500 text-xs"><Loader2 className="h-4 w-4 animate-spin mx-auto mb-1" />Memuat...</div>
                 ) : filteredProducts.length > 0 ? (
                   filteredProducts.map((product) => {
-                    const availableVariants = product.variants.filter(v => (v.stockOffline ?? 0) > 0 && v.price !== null && v.price !== undefined);
+                    const availableVariants = product.variants.filter(v => ((v.stock ?? v.stockOffline ?? v.stockOnline ?? 0) > 0) && v.price !== null && v.price !== undefined);
                     return (
                       <div key={product.id} className="border-b border-gray-100 last:border-b-0">
                         <div className="px-3 py-1.5 bg-gray-50 flex items-center gap-2">
@@ -717,7 +750,7 @@ export default function KasirPage() {
                               >
                                 <span className="font-bold uppercase text-[10px] bg-gray-100 text-gray-700 px-1 py-0.5 rounded">{variant.priceType}</span>
                                 <span className="font-semibold text-gray-900">{formatRupiah(variant.price || 0)}</span>
-                                <span className="text-[9px] text-gray-400">stk:{variant.stockOffline ?? 0}</span>
+                                <span className="text-[9px] text-gray-400">stk:{variant.stock ?? variant.stockOffline ?? variant.stockOnline ?? 0}</span>
                               </button>
                             ))}
                           </div>
@@ -1031,8 +1064,20 @@ export default function KasirPage() {
                 ) : (
                   <>
                     <Button
+                      className="flex-1 text-xs h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                      disabled={isValidatingPayment}
+                      onClick={() => handleManualValidation(digitalPaymentData.orderId)}
+                    >
+                      {isValidatingPayment ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Validasi Manual (Lunas)
+                    </Button>
+                    <Button
                       variant="outline"
-                      className="flex-1 text-xs h-9"
+                      className="text-xs h-9"
                       onClick={async () => {
                         try {
                           const res = await fetch(`/api/pesanan/${digitalPaymentData.orderId}?t=${Date.now()}`, {
@@ -1057,7 +1102,7 @@ export default function KasirPage() {
                         }
                       }}
                     >
-                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" strokeWidth={2.5} /> Cek Status
+                      <RefreshCw className="h-3.5 w-3.5 mr-1" strokeWidth={2.5} /> Cek
                     </Button>
                     <Button
                       variant="ghost"
@@ -1065,9 +1110,9 @@ export default function KasirPage() {
                         setShowDigitalPaymentModal(false);
                         setDigitalPaymentData(null);
                       }}
-                      className="flex-1 text-xs h-9 text-gray-500 hover:text-gray-700"
+                      className="text-xs h-9 text-gray-500 hover:text-gray-700"
                     >
-                      Batal / Tutup
+                      Batal
                     </Button>
                   </>
                 )}

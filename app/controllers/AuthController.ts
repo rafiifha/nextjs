@@ -31,12 +31,12 @@ export class AuthController {
       
       const errorMessage = error.message;
       // Validasi input kosong (status 400 Bad Request)
-      if (errorMessage === 'Email/Phone dan password harus diisi' || errorMessage === 'Email atau nomor whatsapp harus diisi') {
+      if (errorMessage === 'Email/Nomor Whatsapp dan password harus diisi' || errorMessage === 'Email atau nomor whatsapp harus diisi') {
         return NextResponse.json({ error: errorMessage }, { status: 400 });
       }
       
       // Kredensial salah (status 401 Unauthorized)
-      if (errorMessage === 'Email/Phone atau password salah') {
+      if (errorMessage === 'Email/Nomor Whatsapp atau password salah') {
         return NextResponse.json({ error: errorMessage }, { status: 401 });
       }
       
@@ -87,33 +87,21 @@ export class AuthController {
   }
 
   /**
-   * Mengirim kode OTP ke WhatsApp pengguna via gateway.
+   * Mengirim kode OTP ke Gmail / email pengguna.
    * HTTP POST /api/auth/otp/send
    */
   async sendOtp(request: NextRequest) {
     try {
-      const { phone, type } = await request.json();
+      const { phone, email, type } = await request.json();
+      const identifier = email || phone;
       // Memproses pengiriman OTP melalui AuthService
-      const result = await this.authService.sendOtp(phone, type);
+      const result = await this.authService.sendOtp(identifier, type, email);
       return NextResponse.json(result);
     } catch (error: any) {
       console.error('Send OTP error:', error);
 
       const errorMessage = error.message;
-      // Menangani kesalahan input nomor WhatsApp atau kegagalan API Gateway
-      if (
-        errorMessage === 'Nomor WhatsApp harus diisi' ||
-        errorMessage === 'Nomor WhatsApp sudah terdaftar' ||
-        errorMessage === 'Nomor WhatsApp tidak terdaftar' ||
-        errorMessage === 'Gagal mengirim OTP. Pastikan nomor WhatsApp aktif.'
-      ) {
-        return NextResponse.json({ error: errorMessage }, { status: 400 });
-      }
-
-      return NextResponse.json(
-        { error: errorMessage || 'Terjadi kesalahan saat mengirim OTP' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
   }
 
@@ -123,28 +111,16 @@ export class AuthController {
    */
   async verifyOtp(request: NextRequest) {
     try {
-      const { phone, code, type } = await request.json();
+      const { phone, email, code, type } = await request.json();
+      const identifier = email || phone;
       // Memverifikasi kode OTP melalui AuthService
-      const result = await this.authService.verifyOtp(phone, code, type);
+      const result = await this.authService.verifyOtp(identifier, code, type);
       return NextResponse.json(result);
     } catch (error: any) {
       console.error('Verify OTP error:', error);
 
       const errorMessage = error.message;
-      // Menangani OTP salah, kedaluwarsa, atau tidak ditemukan
-      if (
-        errorMessage === 'Nomor WhatsApp dan kode OTP harus diisi' ||
-        errorMessage === 'Kode OTP tidak ditemukan. Silakan minta kode baru.' ||
-        errorMessage === 'Kode OTP sudah kadaluarsa. Silakan minta kode baru.' ||
-        errorMessage === 'Kode OTP salah'
-      ) {
-        return NextResponse.json({ error: errorMessage }, { status: 400 });
-      }
-
-      return NextResponse.json(
-        { error: errorMessage || 'Terjadi kesalahan saat verifikasi OTP' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
   }
 

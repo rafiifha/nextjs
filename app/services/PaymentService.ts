@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { env } from '@/lib/env';
 import { triggerOrderEvent } from '@/services/pusherService';
-import { sendReceipt } from '@/services/whatsappService';
+import { sendReceiptEmail } from '@/services/emailService';
 
 /**
  * Service untuk memproses konfirmasi pembayaran dan integrasi dengan Payment Gateway (Pakasir).
@@ -84,22 +84,34 @@ export class PaymentService {
       console.error('Pusher error:', pusherErr);
     }
 
-    // 8. Kirim WhatsApp Struk Belanja: Mengirimkan struk pembelian otomatis ke nomor WhatsApp customer menggunakan gateway Fonnte
-    sendReceipt(order.customerPhone, {
-      orderId: order.id,
-      customerName: order.customerName,
-      totalHarga: order.totalHarga,
-      shippingFee: order.shippingFee,
-      status: 'paid',
-      items: order.items.map(item => ({
-        name: item.product.name,
-        quantity: item.quantity,
-        price: item.price * item.quantity,
-      })),
-      createdAt: order.createdAt.toISOString(),
-    })
-      .then(() => console.log(`📱 Invoice WhatsApp berhasil dikirim ke ${order.customerPhone}`))
-      .catch((waErr) => console.error('❌ Gagal kirim WhatsApp invoice:', waErr));
+    // 8. Kirim Struk Belanja via Gmail: Mengirimkan struk pembelian otomatis ke Gmail customer
+    (async () => {
+      try {
+        const customerUser = order.userId
+          ? await prisma.user.findUnique({ where: { id: order.userId } })
+          : await prisma.user.findFirst({ where: { phone: order.customerPhone } });
+        const customerEmail = customerUser?.email || (order.customerPhone.includes('@') ? order.customerPhone : null);
+
+        if (customerEmail) {
+          await sendReceiptEmail(customerEmail, {
+            orderId: order.id,
+            customerName: order.customerName,
+            totalHarga: order.totalHarga,
+            shippingFee: order.shippingFee,
+            status: 'paid',
+            items: order.items.map(item => ({
+              name: item.product.name,
+              quantity: item.quantity,
+              price: item.price * item.quantity,
+            })),
+            createdAt: order.createdAt.toISOString(),
+          });
+          console.log(`📧 Invoice Gmail berhasil dikirim ke ${customerEmail}`);
+        }
+      } catch (err) {
+        console.error('❌ Gagal kirim Gmail invoice:', err);
+      }
+    })();
 
     return { success: true, message: 'Pesanan berhasil diupdate dan invoice dikirim' };
   }

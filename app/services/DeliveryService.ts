@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 
-// Titik koordinat GPS Toko Naning sebagai titik acuan (Store Latitude dan Longitude)
+// Titik koordinat GPS Toko Imas sebagai titik acuan (Store Latitude dan Longitude)
 const STORE_LAT = -6.98680382532075;
 const STORE_LNG = 107.82755858678257;
 // Batas radius pengantaran maksimal (10 kilometer)
@@ -121,6 +121,7 @@ export class DeliveryService {
       select: {
         id: true,
         name: true,
+        email: true,
         phone: true,
         isActive: true,
         createdAt: true,

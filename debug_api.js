@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 // Generate an admin token
 const token = jwt.sign(
   { userId: 1, email: 'admin@toko.com', role: 'admin' },
-  process.env.JWT_SECRET || 'toko-naning-secret-key-2024-change-in-production',
+  process.env.JWT_SECRET || 'toko-imas-secret-key-2024-change-in-production',
   { expiresIn: '1d' }
 );
 

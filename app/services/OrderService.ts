@@ -1,6 +1,11 @@
 import { prisma } from '@/lib/db';
 import { triggerOrderEvent } from '@/services/pusherService';
-import { sendOrderNotification, sendCourierDeliveryNotification, sendCustomerShippingNotification } from '@/services/whatsappService';
+import { 
+  sendOrderNotificationEmail, 
+  sendCourierDeliveryEmail, 
+  sendCustomerShippingEmail, 
+  sendReceiptEmail 
+} from '@/services/emailService';
 import { pakasirService } from '@/services/pakasirService';
 
 /**
@@ -403,7 +408,7 @@ export class OrderService {
         continue;
       }
 
-      const availableStock = variant.stockOnline ?? 0;
+      const availableStock = variant.stockOffline ?? variant.stockOnline ?? 0;
       if (availableStock < Number(item.quantity)) {
         stockErrors.push(`${product.name} (${variant.priceType}): stok tersedia ${availableStock}, diminta ${item.quantity}`);
       }
@@ -482,12 +487,15 @@ export class OrderService {
 
     let updatedOrder = order;
 
-    // 7. Mengurangi stok online (Reserve Stock): langsung memotong stok online di database agar barang tidak dibeli orang lain
+    // 7. Mengurangi stok (Reserve Stock): langsung memotong stok di database agar barang tidak dibeli orang lain
     for (const item of order.items) {
       if (item.variantId) {
         await prisma.productVariant.update({
           where: { id: item.variantId },
-          data: { stockOnline: { decrement: item.quantity } },
+          data: {
+            stockOnline: { decrement: item.quantity },
+            stockOffline: { decrement: item.quantity },
+          },
         });
         console.log(`📦 Stok reserved: variant ${item.variantId} dikurangi ${item.quantity}`);
       }
@@ -523,13 +531,16 @@ export class OrderService {
           },
         });
       } catch (pakasirErr: any) {
-        // ROLLBACK STOK: Jika integrasi Pakasir gagal, mengembalikan stok online dan menghapus pesanan gagal tersebut
+        // ROLLBACK STOK: Jika integrasi Pakasir gagal, mengembalikan stok dan menghapus pesanan gagal tersebut
         console.error('Pakasir error during checkout:', pakasirErr);
         for (const item of order.items) {
           if (item.variantId) {
             await prisma.productVariant.update({
               where: { id: item.variantId },
-              data: { stockOnline: { increment: item.quantity } },
+              data: {
+                stockOnline: { increment: item.quantity },
+                stockOffline: { increment: item.quantity },
+              },
             });
             console.log(`↩️ Stok restored: variant ${item.variantId} dikembalikan ${item.quantity}`);
           }
@@ -546,20 +557,39 @@ export class OrderService {
       console.error('Pusher error:', error);
     }
 
-    // 10. Mengirimkan notifikasi pesanan baru secara asinkron ke WhatsApp Pelanggan
-    sendOrderNotification(customerPhone, {
-      orderId: order.id,
-      customerName,
-      totalHarga,
-      shippingFee: shippingFee || null,
-      items: order.items.map(item => ({
-        name: item.product.name,
-        quantity: item.quantity,
-        price: item.price * item.quantity,
-      })),
-    }).catch((error) => {
-      console.error('WhatsApp error:', error);
-    });
+    // 10. Mengirimkan notifikasi pesanan baru secara asinkron via Gmail ke Pelanggan
+    (async () => {
+      try {
+        let recipientEmail: string | null = null;
+        if (userId) {
+          const user = await prisma.user.findUnique({ where: { id: userId } });
+          if (user?.email) recipientEmail = user.email;
+        }
+        if (!recipientEmail) {
+          const userByPhone = await prisma.user.findFirst({ where: { phone: customerPhone } });
+          if (userByPhone?.email) recipientEmail = userByPhone.email;
+        }
+        if (!recipientEmail && customerPhone.includes('@')) {
+          recipientEmail = customerPhone;
+        }
+
+        if (recipientEmail) {
+          await sendOrderNotificationEmail(recipientEmail, {
+            orderId: order.id,
+            customerName,
+            totalHarga,
+            shippingFee: shippingFee || null,
+            items: order.items.map(item => ({
+              name: item.product.name,
+              quantity: item.quantity,
+              price: item.price * item.quantity,
+            })),
+          });
+        }
+      } catch (error) {
+        console.error('Email order notification error:', error);
+      }
+    })();
 
     return updatedOrder;
   }
@@ -597,7 +627,10 @@ export class OrderService {
         if (item.variantId) {
           await prisma.productVariant.update({
             where: { id: item.variantId },
-            data: { stockOnline: { increment: item.quantity } },
+            data: {
+              stockOnline: { increment: item.quantity },
+              stockOffline: { increment: item.quantity },
+            },
           });
           console.log(`↩️ Cancel: stok variant ${item.variantId} dikembalikan ${item.quantity}`);
         }
@@ -665,7 +698,7 @@ export class OrderService {
       data: updateData,
       include: {
         courier: {
-          select: { id: true, name: true, phone: true, isActive: true },
+          select: { id: true, name: true, email: true, phone: true, isActive: true },
         },
         items: {
           include: { product: true },
@@ -680,11 +713,11 @@ export class OrderService {
       console.error('Pusher error:', error);
     }
 
-    // 7. Mengirimkan notifikasi WhatsApp secara asinkron setelah barang dikirim (shipped)
+    // 7. Mengirimkan notifikasi pengiriman via Gmail secara asinkron setelah barang dikirim (shipped)
     if (status === 'shipped' && order.courier) {
-      // 7a. Mengirimkan rincian tugas pengiriman ke WhatsApp Kurir
-      if (order.courier.phone) {
-        sendCourierDeliveryNotification(order.courier.phone, {
+      // 7a. Mengirimkan rincian tugas pengiriman ke Gmail Kurir
+      if (order.courier.email) {
+        sendCourierDeliveryEmail(order.courier.email, {
           orderId: order.id,
           customerName: order.customerName,
           customerPhone: order.customerPhone,
@@ -694,21 +727,63 @@ export class OrderService {
             name: item.product.name,
             quantity: item.quantity,
           })),
-        }).catch((waError) => {
-          console.error('Courier WhatsApp error:', waError);
+        }).catch((err) => {
+          console.error('Courier email error:', err);
         });
       }
 
-      // 7b. Mengirimkan info bahwa barang sedang jalan ke WhatsApp Pelanggan
-      sendCustomerShippingNotification(order.customerPhone, {
-        orderId: order.id,
-        customerName: order.customerName,
-        shippingAddress: order.shippingAddress || '-',
-        courierName: order.courier.name,
-        courierPhone: order.courier.phone || '-',
-      }).catch((waError) => {
-        console.error('Customer WhatsApp shipped error:', waError);
-      });
+      // 7b. Mengirimkan info bahwa barang sedang jalan ke Gmail Pelanggan
+      (async () => {
+        try {
+          const customerUser = order.userId 
+            ? await prisma.user.findUnique({ where: { id: order.userId } })
+            : await prisma.user.findFirst({ where: { phone: order.customerPhone } });
+          const customerEmail = customerUser?.email || (order.customerPhone.includes('@') ? order.customerPhone : null);
+
+          if (customerEmail) {
+            await sendCustomerShippingEmail(customerEmail, {
+              orderId: order.id,
+              customerName: order.customerName,
+              shippingAddress: order.shippingAddress || '-',
+              courierName: order.courier!.name,
+              courierPhone: order.courier!.phone || '-',
+            });
+          }
+        } catch (err) {
+          console.error('Customer shipping email error:', err);
+        }
+      })();
+    }
+
+    // 8. Mengirimkan bukti pembayaran/lunas via Gmail jika pesanan diset 'paid' (Validasi manual kasir/admin)
+    if (status === 'paid' && existingOrder.status !== 'paid') {
+      (async () => {
+        try {
+          const customerUser = order.userId 
+            ? await prisma.user.findUnique({ where: { id: order.userId } })
+            : await prisma.user.findFirst({ where: { phone: order.customerPhone } });
+          const customerEmail = customerUser?.email || (order.customerPhone?.includes('@') ? order.customerPhone : null);
+
+          if (customerEmail) {
+            await sendReceiptEmail(customerEmail, {
+              orderId: order.id,
+              customerName: order.customerName,
+              totalHarga: order.totalHarga,
+              shippingFee: order.shippingFee,
+              status: 'paid',
+              items: order.items.map((item) => ({
+                name: item.product.name,
+                quantity: item.quantity,
+                price: item.price * item.quantity,
+              })),
+              createdAt: order.createdAt.toISOString(),
+            });
+            console.log(`📧 Bukti pembayaran lunas via Gmail berhasil dikirim ke ${customerEmail} (Order #${order.id})`);
+          }
+        } catch (err) {
+          console.error('❌ Gagal mengirim Gmail bukti pembayaran lunas:', err);
+        }
+      })();
     }
 
     return order;
@@ -737,12 +812,15 @@ export class OrderService {
 
     for (const order of expiredOrders) {
       // 2. Mengembalikan stok barang (Rollback Stock):
-      // Karena pesanan kadaluarsa/tidak dibayar, mengembalikan stok online agar bisa dibeli orang lain lagi
+      // Karena pesanan kadaluarsa/tidak dibayar, mengembalikan stok agar bisa dibeli orang lain lagi
       for (const item of order.items) {
         if (item.variantId) {
           await prisma.productVariant.update({
             where: { id: item.variantId },
-            data: { stockOnline: { increment: item.quantity } },
+            data: {
+              stockOnline: { increment: item.quantity },
+              stockOffline: { increment: item.quantity },
+            },
           });
           console.log(`↩️ Expired: stok variant ${item.variantId} dikembalikan ${item.quantity}`);
         }
@@ -803,12 +881,13 @@ export class OrderService {
   }
 
   /**
-   * Mengirim e-receipt transaksi ke WhatsApp pelanggan.
+   * Mengirim e-receipt transaksi ke Gmail pelanggan.
    */
   async sendReceipt(orderId: number) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
+        user: true,
         items: {
           include: { product: true },
         },
@@ -819,23 +898,23 @@ export class OrderService {
       throw new Error('Pesanan tidak ditemukan');
     }
 
-    // Dynamic import layanan WhatsApp untuk mencegah circular dependencies jika ada
-    const { sendReceipt: sendWaReceipt } = await import('@/services/whatsappService');
-    
-    // Kirim pesan WhatsApp struk belanja
-    await sendWaReceipt(order.customerPhone, {
-      orderId: order.id,
-      customerName: order.customerName,
-      totalHarga: order.totalHarga,
-      shippingFee: order.shippingFee,
-      status: order.status,
-      items: order.items.map(item => ({
-        name: item.product.name,
-        quantity: item.quantity,
-        price: item.price * item.quantity,
-      })),
-      createdAt: order.createdAt.toISOString(),
-    });
+    const customerEmail = order.user?.email || (await prisma.user.findFirst({ where: { phone: order.customerPhone } }))?.email || (order.customerPhone.includes('@') ? order.customerPhone : null);
+
+    if (customerEmail) {
+      await sendReceiptEmail(customerEmail, {
+        orderId: order.id,
+        customerName: order.customerName,
+        totalHarga: order.totalHarga,
+        shippingFee: order.shippingFee,
+        status: order.status,
+        items: order.items.map(item => ({
+          name: item.product.name,
+          quantity: item.quantity,
+          price: item.price * item.quantity,
+        })),
+        createdAt: order.createdAt.toISOString(),
+      });
+    }
 
     return true;
   }

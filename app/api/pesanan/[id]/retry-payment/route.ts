@@ -95,7 +95,7 @@ export async function POST(
         }
       }
 
-      const availableStock = variant.stockOnline ?? 0;
+      const availableStock = variant.stockOffline ?? variant.stockOnline ?? 0;
       if (availableStock < item.quantity) {
         stockErrors.push(`${item.product.name} (${variant.priceType}): stok tersedia ${availableStock}, diminta ${item.quantity}`);
       }
@@ -140,7 +140,10 @@ export async function POST(
         if (item.variantId) {
           await prisma.productVariant.update({
             where: { id: item.variantId },
-            data: { stockOnline: { decrement: item.quantity } },
+            data: {
+              stockOnline: { decrement: item.quantity },
+              stockOffline: { decrement: item.quantity },
+            },
           });
           console.log(`📦 Retry: stok re-reserved variant ${item.variantId} dikurangi ${item.quantity}`);
         }

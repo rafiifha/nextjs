@@ -33,6 +33,7 @@ interface Product {
     id: number;
     priceType: string;
     price: number | null;
+    stock?: number | null;
     stockOnline: number | null;
     stockOffline: number | null;
   }>;
@@ -250,7 +251,8 @@ export default function CheckoutPage() {
           const product = data.find((p: Product) => p.id === Number(productId));
           if (product && product.variants) {
             const variantDus = product.variants.find((v: any) => v.priceType === 'dus');
-            if (variantDus && (variantDus.stockOnline ?? 0) > 0) {
+            const availDus = variantDus ? (variantDus.stock ?? variantDus.stockOffline ?? variantDus.stockOnline ?? 0) : 0;
+            if (variantDus && availDus > 0) {
               setCart(cartService.addToCart(product.id, product, variantDus.id, 'dus', variantDus.price, 1));
             }
           }
@@ -281,6 +283,7 @@ export default function CheckoutPage() {
 
   // Kirim data pesanan ke server API (POST /api/pesanan)
   const handleCheckout = async () => {
+    if (submitting) return;
     // Validasi form awal
     if (!customerName || !customerPhone) {
       toast.warning('Data Belum Lengkap', { description: 'Nama dan nomor whatsapp harus diisi' });
@@ -419,7 +422,11 @@ export default function CheckoutPage() {
                         variant="outline" 
                         size="sm" 
                         onClick={() => updateCartQuantity(item.productId, item.priceType, item.quantity + 1)}
-                        disabled={item.product.variants && item.variantId ? item.quantity >= (item.product.variants.find((v: any) => v.id === item.variantId)?.stockOnline || 0) : false}
+                        disabled={item.product.variants && item.variantId ? (() => {
+                          const v = item.product.variants.find((v: any) => v.id === item.variantId);
+                          const avail = v ? (v.stock ?? v.stockOffline ?? v.stockOnline ?? 0) : 0;
+                          return item.quantity >= avail;
+                        })() : false}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
@@ -440,7 +447,7 @@ export default function CheckoutPage() {
                   <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
                 </div>
                 <div>
-                  <Label>Nomor WhatsApp</Label>
+                  <Label>Nomor Telepon</Label>
                   <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required />
                 </div>
                 <div>

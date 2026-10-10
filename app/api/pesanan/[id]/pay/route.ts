@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { triggerOrderEvent } from '@/services/pusherService';
-import { sendReceipt } from '@/services/whatsappService';
+import { sendReceiptEmail } from '@/services/emailService';
 
 // Endpoint to manually mark order as paid (stock already reserved at order creation)
 // Used as fallback when Pakasir callback is not received
@@ -85,22 +85,34 @@ export async function POST(
       console.error('Pusher error:', error);
     }
 
-    // Kirim invoice/receipt via WhatsApp secara async agar tidak menghambat response
-    sendReceipt(order.customerPhone, {
-      orderId: order.id,
-      customerName: order.customerName,
-      totalHarga: order.totalHarga,
-      shippingFee: order.shippingFee,
-      status: 'paid',
-      items: order.items.map(item => ({
-        name: item.product.name,
-        quantity: item.quantity,
-        price: item.price * item.quantity,
-      })),
-      createdAt: order.createdAt.toISOString(),
-    })
-      .then(() => console.log(`📱 Invoice WhatsApp berhasil dikirim ke ${order.customerPhone}`))
-      .catch((waErr) => console.error('❌ Gagal kirim WhatsApp invoice:', waErr));
+    // Kirim invoice/receipt via Gmail secara async agar tidak menghambat response
+    (async () => {
+      try {
+        const customerUser = order.userId
+          ? await prisma.user.findUnique({ where: { id: order.userId } })
+          : await prisma.user.findFirst({ where: { phone: order.customerPhone } });
+        const customerEmail = customerUser?.email || (order.customerPhone.includes('@') ? order.customerPhone : null);
+
+        if (customerEmail) {
+          await sendReceiptEmail(customerEmail, {
+            orderId: order.id,
+            customerName: order.customerName,
+            totalHarga: order.totalHarga,
+            shippingFee: order.shippingFee,
+            status: 'paid',
+            items: order.items.map(item => ({
+              name: item.product.name,
+              quantity: item.quantity,
+              price: item.price * item.quantity,
+            })),
+            createdAt: order.createdAt.toISOString(),
+          });
+          console.log(`📧 Invoice Gmail berhasil dikirim ke ${customerEmail}`);
+        }
+      } catch (err) {
+        console.error('❌ Gagal kirim Gmail invoice:', err);
+      }
+    })();
 
     return NextResponse.json(updatedOrder);
   } catch (error: any) {

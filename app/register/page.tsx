@@ -58,11 +58,13 @@ export default function RegisterPage() {
   // Langkah 1: Kirim kode OTP WhatsApp ke nomor pembeli untuk divalidasi
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
 
     // Validasi form awal
     if (!name) { setError('Nama harus diisi'); return; }
-    if (!phone) { setError('Nomor WhatsApp harus diisi'); return; }
+    if (!email) { setError('Email Gmail harus diisi untuk menerima kode OTP'); return; }
+    if (!phone) { setError('Nomor Telepon harus diisi'); return; }
     if (password.length < 6) { setError('Password minimal 6 karakter'); return; }
     if (password !== confirmPassword) { setError('Password tidak cocok'); return; }
 
@@ -72,7 +74,7 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, type: 'register' }),
+        body: JSON.stringify({ email, phone, type: 'register' }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Gagal mengirim OTP'); return; }
@@ -91,6 +93,7 @@ export default function RegisterPage() {
   // Langkah 2: Verifikasi kode OTP WhatsApp dan lakukan registrasi akun ke database
   const handleVerifyAndRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
     if (otpCode.length !== 6) { setError('Masukkan 6 digit kode OTP'); return; }
 
@@ -100,7 +103,7 @@ export default function RegisterPage() {
       const verifyRes = await fetch('/api/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code: otpCode, type: 'register' }),
+        body: JSON.stringify({ email, phone, code: otpCode, type: 'register' }),
       });
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok) { setError(verifyData.error || 'Verifikasi gagal'); return; }
@@ -125,14 +128,14 @@ export default function RegisterPage() {
 
   // Mengirim ulang kode OTP WhatsApp jika waktu hitung mundur telah habis
   const handleResendOtp = async () => {
-    if (countdown > 0) return;
+    if (loading || countdown > 0) return;
     setError('');
     setLoading(true);
     try {
       const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, type: 'register' }),
+        body: JSON.stringify({ email, phone, type: 'register' }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Gagal mengirim ulang'); return; }
@@ -160,7 +163,7 @@ export default function RegisterPage() {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-gray-900">Daftar Akun Baru</CardTitle>
             <CardDescription className="text-gray-600">
-              Buat akun untuk mulai berbelanja di Toko Naning
+              Buat akun untuk mulai berbelanja di Toko Imas
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -173,13 +176,13 @@ export default function RegisterPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="phone">Nomor WhatsApp</Label>
-                  <Input id="phone" type="tel" placeholder="081234567890" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" type="email" placeholder="nama@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
 
                 <div>
-                  <Label htmlFor="email">Email <span className="text-gray-400 font-normal text-xs">(opsional)</span></Label>
-                  <Input id="email" type="email" placeholder="nama@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <Label htmlFor="phone">Nomor Telepon</Label>
+                  <Input id="phone" type="tel" placeholder="081234567890" value={phone} onChange={(e) => setPhone(e.target.value)} required />
                 </div>
 
                 <div>
@@ -246,7 +249,7 @@ export default function RegisterPage() {
               /* Verifikasi OTP */
               <form onSubmit={handleVerifyAndRegister} className="space-y-4">
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-700 text-sm text-center">
-                  Kode verifikasi telah dikirim ke WhatsApp <strong>{phone}</strong>
+                  Kode verifikasi OTP telah dikirim ke email <strong>{email}</strong>
                 </div>
 
                 <div>

@@ -73,6 +73,7 @@ export class UserService {
   async createEmployee(data: any) {
     const name = String(data?.name || '').trim();
     const phone = String(data?.phone || '').trim();
+    const email = data?.email ? String(data.email).trim().toLowerCase() : null;
     const password = String(data?.password || '');
 
     // Validasi masukan wajib
@@ -88,6 +89,7 @@ export class UserService {
       data: {
         name,
         phone,
+        email,
         password: hashedPassword,
         role: 'kasir',
       },
@@ -146,6 +148,7 @@ export class UserService {
     const updateData: any = {};
     if (data.name?.trim()) updateData.name = data.name.trim();
     if (data.phone?.trim()) updateData.phone = data.phone.trim();
+    if ((data as any).email !== undefined) updateData.email = (data as any).email ? String((data as any).email).trim().toLowerCase() : null;
 
     if (Object.keys(updateData).length === 0) {
       throw new Error('Tidak ada data yang diubah');
@@ -193,6 +196,7 @@ export class UserService {
       select: {
         id: true,
         name: true,
+        email: true,
         phone: true,
         role: true,
         isActive: true,
@@ -208,6 +212,7 @@ export class UserService {
   async createCourier(data: any) {
     const name = String(data?.name || '').trim();
     const phone = String(data?.phone || '').trim();
+    const email = data?.email ? String(data.email).trim().toLowerCase() : null;
     const password = String(data?.password || '');
 
     if (!name || !phone || !password) {
@@ -221,12 +226,14 @@ export class UserService {
       data: {
         name,
         phone,
+        email,
         password: hashedPassword,
         role: 'kurir',
       },
       select: {
         id: true,
         name: true,
+        email: true,
         phone: true,
         role: true,
         isActive: true,
@@ -238,7 +245,7 @@ export class UserService {
   /**
    * Mengupdate data kurir (nama/phone) oleh Admin.
    */
-  async updateCourier(userId: number, data: { name?: string; phone?: string; isActive?: boolean }) {
+  async updateCourier(userId: number, data: { name?: string; phone?: string; email?: string | null; isActive?: boolean }) {
     if (!Number.isFinite(userId)) {
       throw new Error('ID kurir tidak valid');
     }
@@ -251,6 +258,7 @@ export class UserService {
     const updateData: any = {};
     if (data.name?.trim()) updateData.name = data.name.trim();
     if (data.phone?.trim()) updateData.phone = data.phone.trim();
+    if (data.email !== undefined) updateData.email = data.email ? String(data.email).trim().toLowerCase() : null;
     if (typeof data.isActive === 'boolean') updateData.isActive = data.isActive;
 
     if (Object.keys(updateData).length === 0) {
@@ -260,7 +268,7 @@ export class UserService {
     return await prisma.user.update({
       where: { id: userId },
       data: updateData,
-      select: { id: true, name: true, phone: true, role: true, isActive: true, createdAt: true },
+      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, createdAt: true },
     });
   }
 
@@ -280,7 +288,7 @@ export class UserService {
     return await prisma.user.update({
       where: { id: userId },
       data: { isActive },
-      select: { id: true, name: true, phone: true, role: true, isActive: true, createdAt: true },
+      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, createdAt: true },
     });
   }
 

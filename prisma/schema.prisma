@@ -32,8 +32,9 @@ model ProductVariant {
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   priceType   String   // "dus", "pak", "item", "bal", "kg", etc.
   price       Int?     // Harga untuk jenis ini (bisa kosong)
-  stockOnline  Int?    // Stok online (ditampilkan ke pelanggan)
-  stockOffline Int?    // Stok offline (ditampilkan ke kasir)
+  stock       Int?     // Stok produk tunggal (terpadu online & kasir)
+  stockOnline  Int?    // (kompatibilitas)
+  stockOffline Int?    // (kompatibilitas)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   items       OrderItem[] @relation("VariantOrderItems")

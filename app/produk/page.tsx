@@ -15,6 +15,7 @@ interface ProductVariant {
   id: number;
   priceType: string;
   price: number | null;
+  stock?: number | null;
   stockOnline: number | null;
   stockOffline: number | null;
   length?: number | null;
@@ -114,8 +115,9 @@ export default function ProdukPage() {
     }
 
     // Validasi stok
+    const availStock = variant.stock ?? variant.stockOffline ?? variant.stockOnline ?? 0;
     const currentQtyInCart = cart.find(item => item.productId === product.id && item.priceType === variant.priceType)?.quantity || 0;
-    if (currentQtyInCart >= (variant.stockOnline ?? 0)) {
+    if (currentQtyInCart >= availStock) {
       toast.error('Stok Tidak Cukup', { description: 'Jumlah di keranjang sudah mencapai batas stok yang tersedia.' });
       return;
     }
@@ -183,13 +185,13 @@ export default function ProdukPage() {
         setTotalPages(data.totalPages || 1);
         setTotalProducts(data.total || 0);
         
-        // Inisialisasi varian aktif pertama yang memiliki stok online & harga untuk setiap produk
+        // Inisialisasi varian aktif pertama yang memiliki stok & harga untuk setiap produk
         setSelectedVariantByProduct((prev) => {
           const next = { ...prev };
           for (const product of productsData) {
             if (next[product.id]) continue;
             const firstAvailable = product.variants.find(
-              (v: ProductVariant) => (v.stockOnline ?? 0) > 0 && v.price !== null && v.price !== undefined
+              (v: ProductVariant) => ((v.stock ?? v.stockOffline ?? v.stockOnline ?? 0) > 0) && v.price !== null && v.price !== undefined
             );
             if (firstAvailable) {
               next[product.id] = firstAvailable.id;
@@ -299,7 +301,7 @@ export default function ProdukPage() {
                         <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           {product.category.name}
                         </span>
-                        {product.variants.some(v => (v.stockOnline ?? 0) > 0) ? (
+                        {product.variants.some(v => (v.stock ?? v.stockOffline ?? v.stockOnline ?? 0) > 0) ? (
                           <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
                             Tersedia
                           </span>
@@ -313,13 +315,13 @@ export default function ProdukPage() {
                   </div>
 
                   {(() => {
-                    const availableVariants = product.variants.filter((v) => (v.stockOnline ?? 0) > 0 && v.price !== null && v.price !== undefined);
+                    const availableVariants = product.variants.filter((v) => (v.stock ?? v.stockOffline ?? v.stockOnline ?? 0) > 0 && v.price !== null && v.price !== undefined);
                     const selectedVariantId = selectedVariantByProduct[product.id];
                     const selectedVariant = availableVariants.find((v) => v.id === selectedVariantId) || availableVariants[0];
                     const key = selectedVariant ? `${product.id}-${selectedVariant.priceType}` : `${product.id}-none`;
                     const currentCartItem = selectedVariant ? cart.find(item => item.productId === product.id && item.priceType === selectedVariant.priceType) : undefined;
                     const qtyInCart = currentCartItem ? currentCartItem.quantity : 0;
-                    const stockLimit = selectedVariant?.stockOnline ?? 0;
+                    const stockLimit = selectedVariant ? (selectedVariant.stock ?? selectedVariant.stockOffline ?? selectedVariant.stockOnline ?? 0) : 0;
                     const inCart = qtyInCart > 0;
                     const isAdding = addingToCart[key];
                     const disabledAdd = !selectedVariant || isAdding || !selectedVariant.price || qtyInCart >= stockLimit;
@@ -342,7 +344,7 @@ export default function ProdukPage() {
                           ) : (
                             availableVariants.map((variant) => (
                               <option key={variant.id} value={variant.id}>
-                                {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stockOnline ?? 0})
+                                {variant.priceType.toUpperCase()} - {formatRupiah(variant.price || 0)} (Stok: {variant.stock ?? variant.stockOffline ?? variant.stockOnline ?? 0})
                               </option>
                             ))
                           )}

@@ -19,8 +19,9 @@ interface ProductVariant {
   id: number;
   priceType: string;
   price: number | null;
-  stockOnline: number | null;
-  stockOffline: number | null;
+  stock?: number | null;
+  stockOnline?: number | null;
+  stockOffline?: number | null;
 }
 
 interface Product {
@@ -52,8 +53,7 @@ export default function ManajemenProdukPage() {
     variants: [] as Array<{
       priceType: string;
       price: string;
-      stockOnline: string;
-      stockOffline: string;
+      stock: string;
     }>,
   });
 
@@ -99,8 +99,7 @@ export default function ManajemenProdukPage() {
       const newVariants = category.priceTypes.map(priceType => ({
         priceType,
         price: '',
-        stockOnline: '',
-        stockOffline: '',
+        stock: '',
       }));
       setFormData({ ...formData, categoryId, variants: newVariants });
     }
@@ -167,14 +166,14 @@ export default function ManajemenProdukPage() {
       image: formData.image || null,
       variants: formData.variants.map(v => {
         const price = v.price && v.price !== '' ? (isNaN(parseInt(v.price)) ? null : parseInt(v.price)) : null;
-        const stockOnlineValue = v.stockOnline && v.stockOnline !== '' ? (isNaN(parseInt(v.stockOnline)) ? null : parseInt(v.stockOnline)) : null;
-        const stockOfflineValue = v.stockOffline && v.stockOffline !== '' ? (isNaN(parseInt(v.stockOffline)) ? null : parseInt(v.stockOffline)) : null;
+        const stockValue = v.stock && v.stock !== '' ? (isNaN(parseInt(v.stock)) ? null : parseInt(v.stock)) : null;
 
         return {
           priceType: v.priceType,
           price,
-          stockOnline: stockOnlineValue,
-          stockOffline: stockOfflineValue,
+          stock: stockValue,
+          stockOnline: stockValue,
+          stockOffline: stockValue,
         };
       }),
     };
@@ -232,12 +231,14 @@ export default function ManajemenProdukPage() {
       name: product.name,
       categoryId: product.categoryId.toString(),
       image: product.image || '',
-      variants: product.variants.map(v => ({
-        priceType: v.priceType,
-        price: v.price ? v.price.toString() : '',
-        stockOnline: v.stockOnline !== null && v.stockOnline !== undefined ? v.stockOnline.toString() : '',
-        stockOffline: v.stockOffline !== null && v.stockOffline !== undefined ? v.stockOffline.toString() : '',
-      })),
+      variants: product.variants.map(v => {
+        const stockVal = v.stock ?? v.stockOffline ?? v.stockOnline;
+        return {
+          priceType: v.priceType,
+          price: v.price ? v.price.toString() : '',
+          stock: stockVal !== null && stockVal !== undefined ? stockVal.toString() : '',
+        };
+      }),
     });
     setShowForm(true);
   };
@@ -283,8 +284,7 @@ export default function ManajemenProdukPage() {
       variants: [] as Array<{
         priceType: string;
         price: string;
-        stockOnline: string;
-        stockOffline: string;
+        stock: string;
       }>,
     });
     setEditingProduct(null);
@@ -416,7 +416,7 @@ export default function ManajemenProdukPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-gray-700 capitalize">{variant.priceType}</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
                             <Label htmlFor={`price-${index}`}>Harga (Opsional)</Label>
                             <Input
@@ -429,24 +429,13 @@ export default function ManajemenProdukPage() {
                             />
                           </div>
                           <div>
-                            <Label htmlFor={`stockOnline-${index}`}>Stok Online</Label>
+                            <Label htmlFor={`stock-${index}`}>Stok</Label>
                             <Input
-                              id={`stockOnline-${index}`}
+                              id={`stock-${index}`}
                               type="number"
                               min="0"
-                              value={variant.stockOnline}
-                              onChange={(e) => updateVariant(index, 'stockOnline', e.target.value)}
-                              placeholder="0"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`stockOffline-${index}`}>Stok Offline</Label>
-                            <Input
-                              id={`stockOffline-${index}`}
-                              type="number"
-                              min="0"
-                              value={variant.stockOffline}
-                              onChange={(e) => updateVariant(index, 'stockOffline', e.target.value)}
+                              value={variant.stock}
+                              onChange={(e) => updateVariant(index, 'stock', e.target.value)}
                               placeholder="0"
                             />
                           </div>
@@ -558,8 +547,8 @@ export default function ManajemenProdukPage() {
                   {/* Variants List */}
                   <div className="space-y-2.5 mb-4 max-h-64 overflow-y-auto pr-1">
                     {product.variants.map((variant) => {
-                      const hasOnline = (variant.stockOnline ?? 0) > 0;
-                      const hasOffline = (variant.stockOffline ?? 0) > 0;
+                      const stockVal = variant.stock ?? variant.stockOffline ?? variant.stockOnline;
+                      const hasStock = (stockVal ?? 0) > 0;
 
                       return (
                         <div key={variant.id} className="border border-gray-200 rounded-lg p-3 bg-white hover:border-[#ffd700]/50 transition-colors">
@@ -583,16 +572,10 @@ export default function ManajemenProdukPage() {
                             )}
                           </div>
                           <div className="flex gap-2 text-xs">
-                            <div className={`flex items-center gap-1 px-2 py-1 rounded ${hasOnline ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
-                              <Package className={`h-3 w-3 ${hasOnline ? 'text-blue-600' : 'text-red-500'}`} />
+                            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded ${hasStock ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
+                              <Package className={`h-3.5 w-3.5 ${hasStock ? 'text-blue-600' : 'text-red-500'}`} />
                               <span className="font-medium">
-                                Online: {variant.stockOnline !== null && variant.stockOnline !== undefined ? variant.stockOnline : '-'}
-                              </span>
-                            </div>
-                            <div className={`flex items-center gap-1 px-2 py-1 rounded ${hasOffline ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                              <ShoppingBag className={`h-3 w-3 ${hasOffline ? 'text-green-600' : 'text-red-500'}`} />
-                              <span className="font-medium">
-                                Offline: {variant.stockOffline !== null && variant.stockOffline !== undefined ? variant.stockOffline : '-'}
+                                Stok: {stockVal !== null && stockVal !== undefined ? stockVal : '-'}
                               </span>
                             </div>
                           </div>

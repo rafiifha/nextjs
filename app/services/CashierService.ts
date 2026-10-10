@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { triggerOrderEvent } from '@/services/pusherService';
 import { pakasirService } from '@/services/pakasirService';
+import { sendReceiptEmail } from '@/services/emailService';
 
 /**
  * Service untuk menangani transaksi Kasir Offline (Point of Sale / POS).
@@ -139,13 +140,16 @@ export class CashierService {
 
     let updatedOrder = order;
 
-    // 7. Mengurangi stok offline (stok toko fisik) secara real-time di database untuk barang yang dibeli
+    // 7. Mengurangi stok secara real-time di database untuk barang yang dibeli (stok bersatu)
     for (const item of order.items) {
       if (!item.variantId) continue;
       try {
         await prisma.productVariant.update({
           where: { id: item.variantId },
-          data: { stockOffline: { decrement: item.quantity } },
+          data: {
+            stockOffline: { decrement: item.quantity },
+            stockOnline: { decrement: item.quantity },
+          },
         });
         console.log(`📦 Kasir stok reserved: variant ${item.variantId} dikurangi ${item.quantity}`);
       } catch (error: any) {
@@ -195,12 +199,15 @@ export class CashierService {
           },
         });
       } catch (pakasirErr: any) {
-        // ROLLBACK STOK: Jika integrasi Pakasir gagal, membatalkan pesanan dan mengembalikan stok offline toko
+        // ROLLBACK STOK: Jika integrasi Pakasir gagal, membatalkan pesanan dan mengembalikan stok toko
         for (const item of order.items) {
           if (!item.variantId) continue;
           await prisma.productVariant.update({
             where: { id: item.variantId },
-            data: { stockOffline: { increment: item.quantity } },
+            data: {
+              stockOffline: { increment: item.quantity },
+              stockOnline: { increment: item.quantity },
+            },
           });
           console.log(`↩️ Kasir stok restored: variant ${item.variantId} dikembalikan ${item.quantity}`);
         }
@@ -212,6 +219,37 @@ export class CashierService {
 
     // 9. Mengirimkan event real-time via Pusher agar monitor transaksi kasir langsung memperbarui data di client browser
     await triggerOrderEvent('order-created', updatedOrder);
+
+    // 10. Mengirimkan bukti pembayaran / lunas via Gmail jika pembayaran tunai (langsung lunas)
+    if (isTunai) {
+      (async () => {
+        try {
+          const customerUser = await prisma.user.findFirst({
+            where: { phone: customerPhone },
+          });
+          const customerEmail = customerUser?.email || (customerPhone?.includes('@') ? customerPhone : null);
+
+          if (customerEmail) {
+            await sendReceiptEmail(customerEmail, {
+              orderId: updatedOrder.id,
+              customerName: updatedOrder.customerName,
+              totalHarga: updatedOrder.totalHarga,
+              shippingFee: updatedOrder.shippingFee,
+              status: 'paid',
+              items: updatedOrder.items.map((item: any) => ({
+                name: item.product.name,
+                quantity: item.quantity,
+                price: item.price * item.quantity,
+              })),
+              createdAt: updatedOrder.createdAt.toISOString(),
+            });
+            console.log(`📧 Struk kasir via Gmail berhasil dikirim ke ${customerEmail} (Order #${updatedOrder.id})`);
+          }
+        } catch (err) {
+          console.error('❌ Gagal mengirim email struk kasir offline:', err);
+        }
+      })();
+    }
 
     return updatedOrder;
   }

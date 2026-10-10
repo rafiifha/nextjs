@@ -199,7 +199,10 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       </p>
                       {item.product.variants && item.variantId && (
                         <p className="text-xs text-gray-500">
-                          Stok: {item.product.variants.find(v => v.id === item.variantId)?.stockOnline || 0}
+                          Stok: {(() => {
+                            const v = item.product.variants.find(v => v.id === item.variantId);
+                            return (v?.stock ?? v?.stockOffline ?? v?.stockOnline ?? 0);
+                          })()}
                         </p>
                       )}
                     </div>
@@ -220,7 +223,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           onClick={() => updateQuantity(item.productId, item.priceType, item.quantity + 1)}
                           disabled={
                             item.product.variants && item.variantId
-                              ? item.quantity >= (item.product.variants.find(v => v.id === item.variantId)?.stockOnline || 0)
+                              ? (() => {
+                                  const v = item.product.variants.find(v => v.id === item.variantId);
+                                  const avail = v?.stock ?? v?.stockOffline ?? v?.stockOnline ?? 0;
+                                  return item.quantity >= avail;
+                                })()
                               : false
                           }
                           className="h-8 w-8 p-0"

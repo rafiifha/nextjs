@@ -31,8 +31,9 @@ export default function LupaPasswordPage() {
   // Submit form → kirim OTP
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
-    if (!identifier) { setError('Nomor WhatsApp harus diisi'); return; }
+    if (!identifier) { setError('Email atau nomor telepon harus diisi'); return; }
     if (newPassword.length < 6) { setError('Password baru minimal 6 karakter'); return; }
     if (newPassword !== confirmPassword) { setError('Password tidak cocok'); return; }
 
@@ -59,6 +60,7 @@ export default function LupaPasswordPage() {
   // Verifikasi OTP → reset password
   const handleVerifyAndReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
     if (otpCode.length !== 6) { setError('Masukkan 6 digit kode OTP'); return; }
 
@@ -91,7 +93,7 @@ export default function LupaPasswordPage() {
   };
 
   const handleResendOtp = async () => {
-    if (countdown > 0) return;
+    if (loading || countdown > 0) return;
     setError('');
     setLoading(true);
     try {
@@ -146,11 +148,11 @@ export default function LupaPasswordPage() {
               /* Form utama */
               <form onSubmit={handleSubmitForm} className="space-y-4">
                 <div>
-                  <Label htmlFor="identifier">Nomor WhatsApp</Label>
+                  <Label htmlFor="identifier">Email Gmail / Nomor Telepon</Label>
                   <Input
                     id="identifier"
                     type="text"
-                    placeholder="081234567890"
+                    placeholder="nama@gmail.com atau 081234567890"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     required
@@ -221,7 +223,7 @@ export default function LupaPasswordPage() {
               /* Verifikasi OTP */
               <form onSubmit={handleVerifyAndReset} className="space-y-4">
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-700 text-sm text-center">
-                  Kode verifikasi telah dikirim ke WhatsApp <strong>{identifier}</strong>
+                  Kode verifikasi OTP telah dikirim ke <strong>{identifier}</strong> via Gmail
                 </div>
 
                 <div>

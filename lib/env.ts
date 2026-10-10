@@ -6,8 +6,11 @@ export const env = {
   PUSHER_KEY: process.env.PUSHER_KEY!,
   PUSHER_SECRET: process.env.PUSHER_SECRET!,
   PUSHER_CLUSTER: process.env.PUSHER_CLUSTER!,
-  FONNTE_API_KEY: process.env.FONNTE_API_KEY!,
+  FONNTE_API_KEY: process.env.FONNTE_API_KEY || '',
   FONNTE_API_URL: process.env.FONNTE_API_URL || 'https://api.fonnte.com',
+  // GMAIL SMTP Configuration
+  GMAIL_USER: process.env.GMAIL_USER || '',
+  GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD || '',
   JWT_SECRET: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
 };
 
