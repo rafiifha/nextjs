@@ -357,7 +357,7 @@ export default function ManajemenPesananPage() {
       </head>
       <body>
         <div class="center">
-          <div class="title" style="font-size:14px;letter-spacing:0.5px;">TOKO IMAS</div>
+          <div class="title" style="font-size:14px;letter-spacing:0.5px;">TOKO NANING</div>
           <div class="small" style="margin-bottom:2px;font-size:7.5px;line-height:1.2;">Jl. Raya Cicalengka - Majalaya KM 1, Cikuya, Cicalengka</div>
           <div class="divider"></div>
           <div class="bold" style="font-size:10px;margin-bottom:2px;letter-spacing:0.5px;">STRUK PEMBELIAN</div>

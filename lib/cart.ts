@@ -30,7 +30,7 @@ export interface CartItem {
   price: number | null;
 }
 
-const CART_STORAGE_PREFIX = 'tokoimas_cart_';
+const CART_STORAGE_PREFIX = 'tokonaning_cart_';
 
 // Helper function to get current user ID
 function getCurrentUserId(): number | null {
@@ -63,7 +63,7 @@ export const cartService = {
     const storageKey = getCartStorageKey(currentUserId);
 
     try {
-      const cartStr = localStorage.getItem(storageKey) || localStorage.getItem(storageKey.replace('tokoimas_', 'tokonaning_'));
+      const cartStr = localStorage.getItem(storageKey) || localStorage.getItem(storageKey.replace('tokonaning_', 'tokoimas_'));
       return cartStr ? JSON.parse(cartStr) : [];
     } catch (e) {
       return [];
@@ -148,7 +148,8 @@ export const cartService = {
     if (typeof window !== 'undefined') {
       const currentUserId = userId !== undefined ? userId : getCurrentUserId();
       const storageKey = getCartStorageKey(currentUserId);
-      localStorage.removeItem(storageKey.replace('tokoimas_', 'tokonaning_'));
+      localStorage.removeItem(storageKey);
+      localStorage.removeItem(storageKey.replace('tokonaning_', 'tokoimas_'));
     }
     this.setCart([], userId);
   },

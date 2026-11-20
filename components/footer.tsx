@@ -29,7 +29,7 @@ export default function Footer() {
                 <ShoppingBag className="h-5 w-5 text-slate-950" />
               </div>
               <div>
-                <div className="font-bold text-white text-lg tracking-wide">Toko Imas</div>
+                <div className="font-bold text-white text-lg tracking-wide">Toko Naning</div>
                 <div className="text-[10px] text-amber-400 font-medium uppercase tracking-wider">Toko Sembako Terpercaya</div>
               </div>
             </Link>
@@ -93,7 +93,7 @@ export default function Footer() {
 
         {/* Bottom Copyright Area */}
         <div className="border-t border-slate-800/80 mt-12 pt-8 flex flex-col items-center justify-center gap-3 text-xs text-slate-500 text-center">
-          <p>&copy; {new Date().getFullYear()} Toko Imas. Hak Cipta Dilindungi.</p>
+          <p>&copy; {new Date().getFullYear()} Toko Naning. Hak Cipta Dilindungi.</p>
         </div>
       </div>
     </footer>

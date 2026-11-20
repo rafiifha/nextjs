@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Toko Imas - Toko Sembako Terpercaya",
+  title: "Toko Naning - Toko Sembako Terpercaya",
   description: "Toko sembako terpercaya dengan harga terjangkau",
 };
 

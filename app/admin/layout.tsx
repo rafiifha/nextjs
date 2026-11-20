@@ -96,7 +96,7 @@ export default function AdminLayout({
           <Link href="/admin/dashboard" className="flex items-center gap-2">
             <ShoppingBag className="h-6 w-6 text-[#ffd700]" />
             <div>
-              <div className="font-bold text-gray-900 text-lg">Toko Imas</div>
+              <div className="font-bold text-gray-900 text-lg">Toko Naning</div>
               <div className="text-xs text-gray-500 font-medium">{panelText}</div>
             </div>
           </Link>
@@ -122,7 +122,7 @@ export default function AdminLayout({
             <div className="hidden lg:flex items-center gap-2 px-6 py-4 border-b border-gray-200">
               <ShoppingBag className="h-6 w-6 text-[#ffd700]" />
               <div>
-                <div className="font-bold text-gray-900 text-lg">Toko Imas</div>
+                <div className="font-bold text-gray-900 text-lg">Toko Naning</div>
                 <div className="text-xs text-gray-600 font-medium">{panelText}</div>
               </div>
             </div>

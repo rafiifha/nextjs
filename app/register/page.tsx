@@ -163,7 +163,7 @@ export default function RegisterPage() {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-gray-900">Daftar Akun Baru</CardTitle>
             <CardDescription className="text-gray-600">
-              Buat akun untuk mulai berbelanja di Toko Imas
+              Buat akun untuk mulai berbelanja di Toko Naning
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -43,7 +43,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailOptions) {
 
   try {
     const info = await transporter.sendMail({
-      from: `"Toko Imas" <${env.GMAIL_USER}>`,
+      from: `"Toko Naning" <${env.GMAIL_USER}>`,
       to,
       subject,
       text: text || '',
@@ -65,7 +65,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailOptions) {
  */
 export async function sendOtpEmail(email: string, code: string, type: 'register' | 'forgot_password') {
   const typeLabel = type === 'register' ? 'Registrasi Akun' : 'Reset Kata Sandi';
-  const subject = `🔐 Kode OTP ${typeLabel} - Toko Imas`;
+  const subject = `🔐 Kode OTP ${typeLabel} - Toko Naning`;
 
   const html = `
     <!DOCTYPE html>
@@ -89,7 +89,7 @@ export async function sendOtpEmail(email: string, code: string, type: 'register'
     <body>
       <div class="card">
         <div class="header">
-          <h1>🛒 TOKO IMAS</h1>
+          <h1>🛒 TOKO NANING</h1>
         </div>
         <div class="content">
           <div class="title">Verifikasi ${typeLabel}</div>
@@ -103,14 +103,14 @@ export async function sendOtpEmail(email: string, code: string, type: 'register'
           </p>
         </div>
         <div class="footer">
-          &copy; ${new Date().getFullYear()} Toko Imas • Toko Sembako Terpercaya
+          &copy; ${new Date().getFullYear()} Toko Naning • Toko Sembako Terpercaya
         </div>
       </div>
     </body>
     </html>
   `;
 
-  const text = `🔐 Kode OTP ${typeLabel} - Toko Imas\n\nKode verifikasi Anda: ${code}\n\nKode berlaku 5 menit. Jangan bagikan kode ini kepada siapapun.`;
+  const text = `🔐 Kode OTP ${typeLabel} - Toko Naning\n\nKode verifikasi Anda: ${code}\n\nKode berlaku 5 menit. Jangan bagikan kode ini kepada siapapun.`;
 
   return sendEmail({ to: email, subject, html, text });
 }
@@ -125,7 +125,7 @@ export async function sendOrderNotificationEmail(email: string, orderData: {
   shippingFee?: number | null;
   items: Array<{ name: string; quantity: number; price: number }>;
 }) {
-  const subject = `📦 Pesanan Baru #${orderData.orderId} - Toko Imas`;
+  const subject = `📦 Pesanan Baru #${orderData.orderId} - Toko Naning`;
 
   const itemsHtml = orderData.items.map(item => `
     <tr>
@@ -160,7 +160,7 @@ export async function sendOrderNotificationEmail(email: string, orderData: {
     <body>
       <div class="card">
         <div class="header">
-          <h1>🛒 TOKO IMAS</h1>
+          <h1>🛒 TOKO NANING</h1>
         </div>
         <div class="content">
           <span class="badge">Pesanan Diterima</span>
@@ -196,7 +196,7 @@ export async function sendOrderNotificationEmail(email: string, orderData: {
           </div>
         </div>
         <div class="footer">
-          &copy; ${new Date().getFullYear()} Toko Imas • Terima kasih telah berbelanja!
+          &copy; ${new Date().getFullYear()} Toko Naning • Terima kasih telah berbelanja!
         </div>
       </div>
     </body>
@@ -204,7 +204,7 @@ export async function sendOrderNotificationEmail(email: string, orderData: {
   `;
 
   const itemsText = orderData.items.map(item => `- ${item.name} (${item.quantity}x) = Rp ${item.price.toLocaleString('id-ID')}`).join('\n');
-  const text = `📦 Pesanan Baru #${orderData.orderId} - Toko Imas\n\nNama: ${orderData.customerName}\n\nDetail:\n${itemsText}\nTotal: Rp ${orderData.totalHarga.toLocaleString('id-ID')}\n\nTerima kasih atas pesanan Anda!`;
+  const text = `📦 Pesanan Baru #${orderData.orderId} - Toko Naning\n\nNama: ${orderData.customerName}\n\nDetail:\n${itemsText}\nTotal: Rp ${orderData.totalHarga.toLocaleString('id-ID')}\n\nTerima kasih atas pesanan Anda!`;
 
   return sendEmail({ to: email, subject, html, text });
 }
@@ -221,7 +221,7 @@ export async function sendReceiptEmail(email: string, orderData: {
   items: Array<{ name: string; quantity: number; price: number }>;
   createdAt: string;
 }) {
-  const subject = `🧾 Bukti Transaksi #${orderData.orderId} - Toko Imas`;
+  const subject = `🧾 Bukti Transaksi #${orderData.orderId} - Toko Naning`;
 
   const itemsHtml = orderData.items.map(item => `
     <tr>
@@ -255,7 +255,7 @@ export async function sendReceiptEmail(email: string, orderData: {
     <body>
       <div class="card">
         <div class="header">
-          <h1>🧾 TOKO IMAS</h1>
+          <h1>🧾 TOKO NANING</h1>
           <p style="color: #ecfdf5; margin: 4px 0 0 0; font-size: 12px;">STRUK TRANSAKSI RESMI</p>
         </div>
         <div class="content">
@@ -292,7 +292,7 @@ export async function sendReceiptEmail(email: string, orderData: {
           </div>
         </div>
         <div class="footer">
-          &copy; ${new Date().getFullYear()} Toko Imas • Simpan email ini sebagai bukti transaksi resmi.
+          &copy; ${new Date().getFullYear()} Toko Naning • Simpan email ini sebagai bukti transaksi resmi.
         </div>
       </div>
     </body>
@@ -300,7 +300,7 @@ export async function sendReceiptEmail(email: string, orderData: {
   `;
 
   const itemsText = orderData.items.map(item => `- ${item.name} (${item.quantity}x) = Rp ${item.price.toLocaleString('id-ID')}`).join('\n');
-  const text = `🧾 Bukti Transaksi #${orderData.orderId} - Toko Imas\n\nNama: ${orderData.customerName}\nStatus: Sudah Dibayar (LUNAS)\nTanggal: ${new Date(orderData.createdAt).toLocaleString('id-ID')}\n\nDetail:\n${itemsText}\nTotal: Rp ${orderData.totalHarga.toLocaleString('id-ID')}\n\nTerima kasih telah berbelanja di Toko Imas!`;
+  const text = `🧾 Bukti Transaksi #${orderData.orderId} - Toko Naning\n\nNama: ${orderData.customerName}\nStatus: Sudah Dibayar (LUNAS)\nTanggal: ${new Date(orderData.createdAt).toLocaleString('id-ID')}\n\nDetail:\n${itemsText}\nTotal: Rp ${orderData.totalHarga.toLocaleString('id-ID')}\n\nTerima kasih telah berbelanja di Toko Naning!`;
 
   return sendEmail({ to: email, subject, html, text });
 }
@@ -316,7 +316,7 @@ export async function sendCourierDeliveryEmail(email: string, orderData: {
   shippingNotes?: string;
   items: Array<{ name: string; quantity: number }>;
 }) {
-  const subject = `🚚 Tugas Pengiriman Baru #${orderData.orderId} - Toko Imas`;
+  const subject = `🚚 Tugas Pengiriman Baru #${orderData.orderId} - Toko Naning`;
 
   const itemsList = orderData.items.map(item => `<li>${item.name} (${item.quantity}x)</li>`).join('');
 
@@ -354,7 +354,7 @@ export async function sendCourierDeliveryEmail(email: string, orderData: {
   `;
 
   const itemsText = orderData.items.map(i => `- ${i.name} (${i.quantity}x)`).join('\n');
-  const text = `🚚 Tugas Pengiriman Baru #${orderData.orderId} - Toko Imas\n\nPelanggan: ${orderData.customerName} (${orderData.customerPhone})\nAlamat: ${orderData.shippingAddress}\nCatatan: ${orderData.shippingNotes || '-'}\n\nProduk:\n${itemsText}`;
+  const text = `🚚 Tugas Pengiriman Baru #${orderData.orderId} - Toko Naning\n\nPelanggan: ${orderData.customerName} (${orderData.customerPhone})\nAlamat: ${orderData.shippingAddress}\nCatatan: ${orderData.shippingNotes || '-'}\n\nProduk:\n${itemsText}`;
 
   return sendEmail({ to: email, subject, html, text });
 }
@@ -369,7 +369,7 @@ export async function sendCustomerShippingEmail(email: string, orderData: {
   courierName: string;
   courierPhone: string;
 }) {
-  const subject = `🚚 Pesanan #${orderData.orderId} Sedang Dikirim - Toko Imas`;
+  const subject = `🚚 Pesanan #${orderData.orderId} Sedang Dikirim - Toko Naning`;
 
   const html = `
     <!DOCTYPE html>
@@ -403,7 +403,7 @@ export async function sendCustomerShippingEmail(email: string, orderData: {
     </html>
   `;
 
-  const text = `🚚 Pesanan Sedang Dikirim - Toko Imas\n\nHalo ${orderData.customerName},\nPesanan #${orderData.orderId} sedang dalam perjalanan.\nAlamat: ${orderData.shippingAddress}\nKurir: ${orderData.courierName} (${orderData.courierPhone})\n\nTerima kasih telah berbelanja di Toko Imas!`;
+  const text = `🚚 Pesanan Sedang Dikirim - Toko Naning\n\nHalo ${orderData.customerName},\nPesanan #${orderData.orderId} sedang dalam perjalanan.\nAlamat: ${orderData.shippingAddress}\nKurir: ${orderData.courierName} (${orderData.courierPhone})\n\nTerima kasih telah berbelanja di Toko Naning!`;
 
   return sendEmail({ to: email, subject, html, text });
 }

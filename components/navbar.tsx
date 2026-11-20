@@ -136,7 +136,7 @@ export default function Navbar() {
           <Link href="/" className="flex items-center gap-2">
             <ShoppingBag className="h-6 w-6 text-[#ffd700]" />
             <div>
-              <div className="font-bold text-gray-900 text-base sm:text-lg">Toko Imas</div>
+              <div className="font-bold text-gray-900 text-base sm:text-lg">Toko Naning</div>
               <div className="text-[11px] text-gray-500">Toko Sembako</div>
             </div>
           </Link>

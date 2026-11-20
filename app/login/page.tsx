@@ -145,7 +145,7 @@ export default function LoginPage() {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-gray-900">Masuk ke Akun</CardTitle>
             <CardDescription className="text-gray-600">
-              Masuk untuk melanjutkan ke Toko Imas
+              Masuk untuk melanjutkan ke Toko Naning
             </CardDescription>
           </CardHeader>
           <CardContent>

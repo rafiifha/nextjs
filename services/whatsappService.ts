@@ -21,14 +21,14 @@ export async function sendWhatsAppMessage(target: string, message: string) {
 
   return sendEmail({
     to: recipientEmail,
-    subject: 'Notifikasi Toko Imas',
+    subject: 'Notifikasi Toko Naning',
     text: message,
     html: `
       <div style="font-family: sans-serif; padding: 20px; background: #f8fafc; border-radius: 12px; max-width: 500px;">
-        <h3 style="color: #d4a800; margin-top: 0;">🛒 Toko Imas</h3>
+        <h3 style="color: #d4a800; margin-top: 0;">🛒 Toko Naning</h3>
         <pre style="white-space: pre-wrap; font-family: inherit; font-size: 14px; color: #1e293b;">${message}</pre>
         <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
-        <small style="color: #94a3b8;">Notifikasi resmi Toko Imas via Gmail</small>
+        <small style="color: #94a3b8;">Notifikasi resmi Toko Naning via Gmail</small>
       </div>
     `,
   });
